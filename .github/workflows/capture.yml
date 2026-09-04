@@ -13,7 +13,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # ... (이하 기존 동일)
 
     steps:
       - uses: actions/checkout@v4
@@ -31,7 +30,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y fonts-nanum
 
-      - name: 캡처 실행
+      - name: 캡처 실행 (날짜 전달)
+        env:
+          START_DATE: ${{ github.event.inputs.start_date }}
+          END_DATE: ${{ github.event.inputs.end_date }}
         run: python screenshot.py
 
       - name: GitHub에 캡처 이미지 덮어쓰기
