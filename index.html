@@ -69,37 +69,29 @@
     <div class="container">
         <h1>업무 자동화 대시보드 🚀</h1>
         
-        <!-- 날짜 선택 영역 -->
         <div class="date-box">
             조회 기간: 
             <input type="date" id="startDate"> ~ <input type="date" id="endDate">
         </div>
 
-        <!-- 실행 버튼 -->
         <button class="run-btn" onclick="triggerBot()">해당 일자 캡처봇 실행하기</button>
         
-        <!-- 상태 표시 메시지 -->
         <p id="status"></p>
 
-        <!-- 캡처된 이미지 표시 -->
         <img src="capture.png" alt="최근 캡처 화면">
     </div>
 
-    <!-- 봇 실행을 위한 자바스크립트 -->
     <script>
         function triggerBot() {
-            // 사용자 정보 세팅
             const githubId = 'kshnpch-cmyk'; 
-            const repoName = 'dashboard'; // 알려주신 저장소 이름
+            const repoName = 'dashboard'; 
             
-            // ⚠️ 해킹 방지를 위해 추후 GitHub에서 토큰을 재발급 받고 이 부분을 꼭 새 토큰으로 바꿔주세요!
-            const token = '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'; 
+            // ⚠️ 발급받으신 토큰으로 교체해 주세요.
+            const token = 'ghp_여기에_발급받은_토큰을_넣어주세요'; 
 
-            // 날짜 입력값 가져오기 및 형식 변환 (YYYY-MM-DD -> YYYY/MM/DD)
             const startVal = document.getElementById('startDate').value.replace(/-/g, '/');
             const endVal = document.getElementById('endDate').value.replace(/-/g, '/');
 
-            // 날짜를 선택하지 않았을 경우 경고
             if(!startVal || !endVal) {
                 alert("시작일과 종료일을 모두 선택해주세요!");
                 return;
@@ -109,15 +101,15 @@
             statusText.innerText = "봇에게 날짜를 전송하고 있습니다... ⏳";
             statusText.style.color = "#0366d6";
 
-            // GitHub Actions로 실행 명령(POST API) 전송
             fetch(`https://api.github.com/repos/${githubId}/${repoName}/actions/workflows/capture.yml/dispatches`, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/vnd.github.v3+json',
                     'Authorization': `Bearer ${token}`
                 },
+                // 저장소 브랜치 이름이 'master'라면 아래 'main'을 'master'로 수정하세요.
                 body: JSON.stringify({ 
-                    ref: 'master', // 브랜치 이름 (필요시 master로 변경)
+                    ref: 'main',
                     inputs: {
                         start_date: startVal,
                         end_date: endVal
@@ -126,10 +118,11 @@
             })
             .then(res => {
                 if(res.ok) {
-                    statusText.innerText = "✅ 성공! 봇이 출동했습니다. 캡처가 완료될 때까지 약 30~40초 뒤 화면을 새로고침(F5) 해주세요.";
+                    statusText.innerText = "✅ 성공! 봇이 출동했습니다. 약 30~40초 뒤 화면을 새로고침 해주세요.";
                     statusText.style.color = "green";
                 } else {
-                    statusText.innerText = "❌ 오류 발생. 저장소 이름이나 토큰 설정을 다시 확인해주세요.";
+                    // 서버가 반환한 정확한 HTTP 상태 코드를 표시합니다.
+                    statusText.innerText = `❌ 오류 발생 (상태 코드: ${res.status}). 토큰, 브랜치명(main/master), capture.yml 설정을 확인하세요.`;
                     statusText.style.color = "red";
                 }
             })
