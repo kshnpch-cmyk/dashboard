@@ -2,17 +2,72 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>관리자 자동 캡처</title>
+    <title>자동 캡처 대시보드</title>
     <style>
-        body { text-align: center; background-color: #f0f4f8; margin: 0; padding: 20px; }
-        .capture-container { max-width: 1200px; margin: 0 auto; }
-        img { width: 100%; height: auto; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        body { text-align: center; background-color: #f0f4f8; margin: 0; padding: 20px; font-family: sans-serif; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        img { width: 100%; height: auto; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); margin-top: 20px; }
+        
+        /* 버튼 디자인 */
+        .run-btn { 
+            background-color: #2ea44f; color: white; border: none; 
+            padding: 15px 30px; font-size: 18px; font-weight: bold; 
+            border-radius: 8px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .run-btn:hover { background-color: #2c974b; }
+        
+        /* 상태 메시지 디자인 */
+        #status { margin-top: 15px; font-weight: bold; color: #0366d6; font-size: 16px; }
     </style>
 </head>
 <body>
-    <div class="capture-container">
-        <h1>자동 로그인 & 캡처 화면 📸</h1>
-        <img src="capture.png" alt="캡처 화면">
+    <div class="container">
+        <h1>나만의 업무 자동화 대시보드 🚀</h1>
+        
+        <!-- 실행 버튼 -->
+        <button class="run-btn" onclick="triggerBot()">봇 실행하기 (최신 캡처 업데이트)</button>
+        <p id="status"></p>
+
+        <!-- 캡처 이미지 -->
+        <img src="capture.png" alt="최근 캡처 화면">
     </div>
+
+    <!-- 봇을 실행하는 자바스크립트 코드 -->
+    <script>
+        function triggerBot() {
+            // 👇👇👇 이곳의 3가지 정보를 본인 것에 맞게 반드시 수정하세요! 👇👇👇
+            const githubId = 'kshnpch-cmyk';        // 1. 본인의 GitHub 닉네임
+            const repoName = 'dashboard'; // 2. 현재 작업 중인 GitHub 저장소 이름 (예: test)
+            const token = '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'; // 3. 방금 1단계에서 발급받은 비밀 열쇠
+            // 👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆
+            
+            const statusText = document.getElementById('status');
+            statusText.innerText = "GitHub 봇에게 명령을 전송하고 있습니다... ⏳";
+            statusText.style.color = "#0366d6";
+
+            // GitHub로 실행 명령(API) 쏘기
+            fetch(`https://api.github.com/repos/${githubId}/${repoName}/actions/workflows/capture.yml/dispatches`, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ ref: 'main' }) // 만약 브랜치 이름이 master라면 'master'로 변경
+            })
+            .then(response => {
+                if (response.ok) {
+                    statusText.innerText = "✅ 봇이 성공적으로 출발했습니다! 봇이 로그인하고 캡처를 마칠 때까지 약 30~40초 뒤에 화면을 새로고침 해보세요.";
+                    statusText.style.color = "green";
+                } else {
+                    statusText.innerText = "❌ 명령 전송 실패. 아이디, 저장소 이름, 토큰을 다시 확인해주세요.";
+                    statusText.style.color = "red";
+                }
+            })
+            .catch(error => {
+                statusText.innerText = "❌ 오류 발생: " + error;
+                statusText.style.color = "red";
+            });
+        }
+    </script>
 </body>
 </html>
