@@ -2,10 +2,18 @@ name: Auto Capture Bot
 
 on:
   workflow_dispatch:
+    inputs:
+      start_date:
+        description: '시작일'
+        required: false
+      end_date:
+        description: '종료일'
+        required: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    # ... (이하 기존 동일)
 
     steps:
       - uses: actions/checkout@v4
