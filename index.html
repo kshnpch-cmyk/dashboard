@@ -1,70 +1,140 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>자동 캡처 대시보드</title>
     <style>
-        body { text-align: center; background-color: #f0f4f8; margin: 0; padding: 20px; font-family: sans-serif; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        img { width: 100%; height: auto; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); margin-top: 20px; }
-        
-        /* 버튼 디자인 */
-        .run-btn { 
-            background-color: #2ea44f; color: white; border: none; 
-            padding: 15px 30px; font-size: 18px; font-weight: bold; 
-            border-radius: 8px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        body { 
+            text-align: center; 
+            background-color: #f0f4f8; 
+            margin: 0; 
+            padding: 20px; 
+            font-family: 'Malgun Gothic', sans-serif; 
         }
-        .run-btn:hover { background-color: #2c974b; }
-        
-        /* 상태 메시지 디자인 */
-        #status { margin-top: 15px; font-weight: bold; color: #0366d6; font-size: 16px; }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+        }
+        .date-box { 
+            margin: 20px auto; 
+            padding: 20px; 
+            background: white; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: inline-block;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        input[type="date"] { 
+            padding: 8px; 
+            font-size: 16px; 
+            margin: 0 10px; 
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .run-btn { 
+            background-color: #2ea44f; 
+            color: white; 
+            border: none; 
+            padding: 15px 30px; 
+            font-size: 18px; 
+            font-weight: bold; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            display: block;
+            margin: 20px auto;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: background-color 0.3s;
+        }
+        .run-btn:hover { 
+            background-color: #2c974b; 
+        }
+        img { 
+            width: 100%; 
+            height: auto; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3); 
+            margin-top: 20px; 
+        }
+        #status { 
+            font-weight: bold; 
+            color: #0366d6; 
+            margin-top: 15px; 
+            font-size: 16px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>나만의 업무 자동화 대시보드 🚀</h1>
+        <h1>업무 자동화 대시보드 🚀</h1>
         
+        <!-- 날짜 선택 영역 -->
+        <div class="date-box">
+            조회 기간: 
+            <input type="date" id="startDate"> ~ <input type="date" id="endDate">
+        </div>
+
         <!-- 실행 버튼 -->
-        <button class="run-btn" onclick="triggerBot()">봇 실행하기 (최신 캡처 업데이트)</button>
+        <button class="run-btn" onclick="triggerBot()">해당 일자 캡처봇 실행하기</button>
+        
+        <!-- 상태 표시 메시지 -->
         <p id="status"></p>
 
-        <!-- 캡처 이미지 -->
+        <!-- 캡처된 이미지 표시 -->
         <img src="capture.png" alt="최근 캡처 화면">
     </div>
 
-    <!-- 봇을 실행하는 자바스크립트 코드 -->
+    <!-- 봇 실행을 위한 자바스크립트 -->
     <script>
         function triggerBot() {
-            // 👇👇👇 이곳의 3가지 정보를 본인 것에 맞게 반드시 수정하세요! 👇👇👇
-            const githubId = 'kshnpch-cmyk';        // 1. 본인의 GitHub 닉네임
-            const repoName = 'dashboard'; // 2. 현재 작업 중인 GitHub 저장소 이름 (예: test)
-            const token = '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'; // 3. 방금 1단계에서 발급받은 비밀 열쇠
-            // 👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆👆
+            // 사용자 정보 세팅
+            const githubId = 'kshnpch-cmyk'; 
+            const repoName = 'dashboard'; // 알려주신 저장소 이름
             
+            // ⚠️ 해킹 방지를 위해 추후 GitHub에서 토큰을 재발급 받고 이 부분을 꼭 새 토큰으로 바꿔주세요!
+            const token = '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'; 
+
+            // 날짜 입력값 가져오기 및 형식 변환 (YYYY-MM-DD -> YYYY/MM/DD)
+            const startVal = document.getElementById('startDate').value.replace(/-/g, '/');
+            const endVal = document.getElementById('endDate').value.replace(/-/g, '/');
+
+            // 날짜를 선택하지 않았을 경우 경고
+            if(!startVal || !endVal) {
+                alert("시작일과 종료일을 모두 선택해주세요!");
+                return;
+            }
+
             const statusText = document.getElementById('status');
-            statusText.innerText = "GitHub 봇에게 명령을 전송하고 있습니다... ⏳";
+            statusText.innerText = "봇에게 날짜를 전송하고 있습니다... ⏳";
             statusText.style.color = "#0366d6";
 
-            // GitHub로 실행 명령(API) 쏘기
+            // GitHub Actions로 실행 명령(POST API) 전송
             fetch(`https://api.github.com/repos/${githubId}/${repoName}/actions/workflows/capture.yml/dispatches`, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/vnd.github.v3+json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ ref: 'main' }) // 만약 브랜치 이름이 master라면 'master'로 변경
+                body: JSON.stringify({ 
+                    ref: 'main', // 브랜치 이름 (필요시 master로 변경)
+                    inputs: {
+                        start_date: startVal,
+                        end_date: endVal
+                    }
+                })
             })
-            .then(response => {
-                if (response.ok) {
-                    statusText.innerText = "✅ 봇이 성공적으로 출발했습니다! 봇이 로그인하고 캡처를 마칠 때까지 약 30~40초 뒤에 화면을 새로고침 해보세요.";
+            .then(res => {
+                if(res.ok) {
+                    statusText.innerText = "✅ 성공! 봇이 출동했습니다. 캡처가 완료될 때까지 약 30~40초 뒤 화면을 새로고침(F5) 해주세요.";
                     statusText.style.color = "green";
                 } else {
-                    statusText.innerText = "❌ 명령 전송 실패. 아이디, 저장소 이름, 토큰을 다시 확인해주세요.";
+                    statusText.innerText = "❌ 오류 발생. 저장소 이름이나 토큰 설정을 다시 확인해주세요.";
                     statusText.style.color = "red";
                 }
             })
             .catch(error => {
-                statusText.innerText = "❌ 오류 발생: " + error;
+                statusText.innerText = "❌ 네트워크 오류: " + error;
                 statusText.style.color = "red";
             });
         }
