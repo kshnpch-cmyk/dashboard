@@ -78,12 +78,6 @@
             padding: 4px 10px;
             border-radius: 4px;
         }
-        .running {
-            background-color: #eff6ff;
-            color: #1d4ed8 !important;
-            border: 1px solid #bfdbfe;
-        }
-        
         .sheet-wrapper {
             flex: 1;
             width: 100%;
@@ -123,30 +117,49 @@
     </div>
 
     <script>
-        let isRunning = false; // 현재 작업 중 여부 플래그
+        const githubId = 'kshnpch-cmyk'; 
+        const repoName = 'dashboard'; 
+        const token = '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'; 
 
-        function triggerBot() {
-            // 1. 이미 진행 중인 경우 알림창 띄우고 종료
-            if (isRunning) {
-                alert("⏳ 현재 주문 데이터 동기화 업데이트가 진행 중입니다.\n잠시만 기다려 주세요! (약 30초 소요)");
-                return;
-            }
+        // 대시보드 진입 시 현재 깃허브 서버 실행 상태 체크
+        checkWorkflowStatus();
 
-            const githubId = 'kshnpch-cmyk'; 
-            const repoName = 'dashboard'; 
-            const token = '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'; 
+        function checkWorkflowStatus() {
+            fetch(`https://api.github.com/repos/${githubId}/${repoName}/actions/runs?status=in_progress`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.workflow_runs && data.workflow_runs.length > 0) {
+                    setButtonState(true, "⏳ 현재 동기화 작업이 진행 중입니다.");
+                    // 10초 뒤에 상태 재확인
+                    setTimeout(checkWorkflowStatus, 10000);
+                } else {
+                    setButtonState(false, "");
+                }
+            })
+            .catch(() => setButtonState(false, ""));
+        }
 
+        function setButtonState(disabled, message) {
             const btn = document.getElementById('run-btn');
             const statusText = document.getElementById('status-msg');
+            btn.disabled = disabled;
+            if (disabled) {
+                btn.innerText = "🔄 동기화 진행 중...";
+                statusText.innerText = message;
+                statusText.style.color = "#2563eb";
+            } else {
+                btn.innerText = "🚀 지금 즉시 동기화 실행";
+            }
+        }
 
-            // 2. 실행 상태로 전환 및 UI 업데이트
-            isRunning = true;
-            btn.disabled = true;
-            btn.innerText = "🔄 동기화 진행 중...";
-            statusText.className = "running";
-            statusText.innerText = "⏳ 데이터 업데이트 중입니다...";
+        function triggerBot() {
+            const btn = document.getElementById('run-btn');
+            if (btn.disabled) return;
 
-            // GitHub Action 실행 요청
+            setButtonState(true, "⏳ 동기화 요청 중...");
+
             fetch(`https://api.github.com/repos/${githubId}/${repoName}/actions/workflows/capture.yml/dispatches`, {
                 method: 'POST',
                 headers: {
@@ -157,31 +170,17 @@
             })
             .then(res => {
                 if (res.ok) {
-                    // 35초 후 완료 처리 (파이썬 봇 실행 시간 감안)
-                    setTimeout(() => {
-                        isRunning = false;
-                        btn.disabled = false;
-                        btn.innerText = "🚀 지금 즉시 동기화 실행";
-                        statusText.className = "";
-                        statusText.innerText = "✅ 업데이트 완료!";
-                        statusText.style.color = "#10b981";
-                        
-                        // 구글 시트 iframe 새로고침
-                        const iframe = document.getElementById('sheet-iframe');
-                        iframe.src = iframe.src;
-                    }, 35000);
+                    alert("✅ 동기화 명령을 보냈습니다. 완료까지 약 30~40초 소요됩니다.");
+                    // 5초 후부터 실행 상태 모니터링 시작
+                    setTimeout(checkWorkflowStatus, 5000);
                 } else {
-                    throw new Error(`Status ${res.status}`);
+                    alert("❌ 실행 실패: 이미 실행 중이거나 통신 오류입니다.");
+                    checkWorkflowStatus();
                 }
             })
             .catch(error => {
-                alert("❌ 동기화 요청 실패: 네트워크 상태나 권한을 확인해주세요.");
-                isRunning = false;
-                btn.disabled = false;
-                btn.innerText = "🚀 지금 즉시 동기화 실행";
-                statusText.className = "";
-                statusText.innerText = "❌ 실행 실패";
-                statusText.style.color = "#ef4444";
+                alert("❌ 통신 오류가 발생했습니다.");
+                setButtonState(false, "");
             });
         }
     </script>
