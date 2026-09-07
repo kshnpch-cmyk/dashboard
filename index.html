@@ -81,7 +81,7 @@
         .btn-reset:hover { background-color: #334155; }
         .btn:disabled { background-color: #94a3b8; cursor: not-allowed; }
 
-        .container { padding: 30px; max-width: 1500px; margin: 0 auto; }
+        .container { padding: 30px; max-width: 1650px; margin: 0 auto; }
         
         .kpi-grid {
             display: grid;
@@ -121,34 +121,53 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
-        .select-box {
+        .summary-badge-group {
+            display: flex;
+            gap: 8px;
+            font-size: 13px;
+        }
+        .summary-badge {
+            background-color: #f1f5f9;
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1;
+            color: #475569;
+        }
+        .summary-badge b {
+            color: #2563eb;
+        }
+
+        .select-box, .search-input {
             width: 100%;
-            padding: 12px;
+            padding: 10px 12px;
             border-radius: 8px;
             border: 1px solid #cbd5e1;
-            font-size: 15px;
-            font-weight: 600;
-            margin-bottom: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 12px;
         }
         .store-list {
             list-style: none;
             padding: 0;
             margin: 0;
-            max-height: 520px;
+            max-height: 480px;
             overflow-y: auto;
         }
         .store-item {
-            padding: 14px 18px;
+            padding: 12px 16px;
             border: 1px solid #e2e8f0;
             border-radius: 8px;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             cursor: pointer;
             display: flex;
             justify-content: space-between;
             align-items: center;
             transition: all 0.2s;
+            font-size: 14px;
         }
         .store-item:hover, .store-item.active {
             background-color: #eff6ff;
@@ -171,7 +190,7 @@
             margin-top: 10px;
         }
         th, td {
-            padding: 12px 15px;
+            padding: 10px 12px;
             text-align: left;
             border-bottom: 1px solid #e2e8f0;
         }
@@ -185,9 +204,27 @@
         th:hover {
             background-color: #e2e8f0;
         }
-        td { font-size: 14px; }
+        .filter-row th {
+            background-color: #ffffff;
+            padding: 6px 8px;
+            cursor: default;
+        }
+        .table-filter-select {
+            width: 100%;
+            padding: 5px;
+            font-size: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            background-color: #f8fafc;
+        }
+        td { font-size: 13.5px; }
         .text-right { text-align: right; }
         .sort-icon { font-size: 11px; margin-left: 4px; color: #2563eb; }
+        .code-tag {
+            font-size: 12px;
+            color: #64748b;
+            font-family: monospace;
+        }
     </style>
 </head>
 <body>
@@ -244,7 +281,10 @@
                     <option value="">-- 브랜드 선택 --</option>
                 </select>
 
-                <div id="brand-summary" style="margin-bottom: 15px; font-size: 13px; color: #64748b;">
+                <!-- 점포 목록 검색 필터 -->
+                <input type="text" id="store-search-input" class="search-input" placeholder="🔍 점포명/코드 검색..." onkeyup="filterStoreList()">
+
+                <div id="brand-summary" style="margin-bottom: 12px; font-size: 13px; color: #64748b;">
                     점포수: <b id="brand-store-count">0</b>개 | 품목수: <b id="brand-item-count">0</b>종
                 </div>
 
@@ -256,23 +296,42 @@
             <div class="panel">
                 <div class="panel-title">
                     <span id="selected-store-title">🛒 점포별 주문 상세</span>
+                    <div class="summary-badge-group">
+                        <span class="summary-badge">수량합계: <b id="list-total-qty">0</b>개</span>
+                        <span class="summary-badge">금액합계: <b id="list-total-amount">0</b>원</span>
+                    </div>
                 </div>
                 
                 <table>
                     <thead>
+                        <!-- 헤더 제목 및 정렬 기능 (점포코드, 품목코드 추가) -->
                         <tr>
+                            <th onclick="sortTable('storeCode')">점포코드<span id="sort-storeCode" class="sort-icon"></span></th>
                             <th onclick="sortTable('storeName')">점포명<span id="sort-storeName" class="sort-icon"></span></th>
                             <th onclick="sortTable('orderDate')">주문일자<span id="sort-orderDate" class="sort-icon"></span></th>
                             <th onclick="sortTable('deliveryDate')">배송일자<span id="sort-deliveryDate" class="sort-icon"></span></th>
+                            <th onclick="sortTable('itemCode')">품목코드<span id="sort-itemCode" class="sort-icon"></span></th>
                             <th onclick="sortTable('itemName')">품목명<span id="sort-itemName" class="sort-icon"></span></th>
                             <th class="text-right" onclick="sortTable('qty')">수량<span id="sort-qty" class="sort-icon"></span></th>
                             <th class="text-right" onclick="sortTable('price')">단가<span id="sort-price" class="sort-icon"></span></th>
                             <th class="text-right" onclick="sortTable('total')">금액<span id="sort-total" class="sort-icon"></span></th>
                         </tr>
+                        <!-- 열별 필터 드롭다운 행 -->
+                        <tr class="filter-row">
+                            <th><select id="filter-storeCode" class="table-filter-select" onchange="applyColumnFilters()"><option value="">전체 코드</option></select></th>
+                            <th><select id="filter-storeName" class="table-filter-select" onchange="applyColumnFilters()"><option value="">전체 점포</option></select></th>
+                            <th><select id="filter-orderDate" class="table-filter-select" onchange="applyColumnFilters()"><option value="">전체 주문일</option></select></th>
+                            <th><select id="filter-deliveryDate" class="table-filter-select" onchange="applyColumnFilters()"><option value="">전체 배송일</option></select></th>
+                            <th><select id="filter-itemCode" class="table-filter-select" onchange="applyColumnFilters()"><option value="">전체 코드</option></select></th>
+                            <th><select id="filter-itemName" class="table-filter-select" onchange="applyColumnFilters()"><option value="">전체 품목</option></select></th>
+                            <th></th>
+                            <th></th>
+                            <th></th>
+                        </tr>
                     </thead>
                     <tbody id="order-detail-table">
                         <tr>
-                            <td colspan="7" style="text-align: center; color: #94a3b8; padding: 40px;">
+                            <td colspan="9" style="text-align: center; color: #94a3b8; padding: 40px;">
                                 좌측에서 브랜드를 선택하시면 데이터가 표시됩니다.
                             </td>
                         </tr>
@@ -288,17 +347,20 @@
         const token = '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'; 
         const webhookUrl = "https://script.google.com/macros/s/AKfycbxqFDL26lqaQqzAEw7VCOp1t9oSZLNOEXyUuTPJa9DnLzqc9RNPIFk-88n4YLD0oChR/exec";
 
-        let colOrderDate    = 3;  // D열
-        let colDeliveryDate = 5;  // F열
-        let colStoreName    = 7;  // H열
-        let colBrandName    = 8;  // I열
-        let colItemName     = 16; // Q열
-        let colQty          = 24; // Y열
-        let colPrice        = 25; // Z열
-        let colTotal        = 26; // AA열
+        let colOrderDate    = 3;  // D열: 주문일자
+        let colDeliveryDate = 5;  // F열: 배송일자
+        let colStoreCode    = 6;  // G열: 점포코드/거래처코드
+        let colStoreName    = 7;  // H열: 거래처명
+        let colBrandName    = 8;  // I열: 브랜드명
+        let colItemCode     = 15; // P열: 품목코드
+        let colItemName     = 16; // Q열: 품목명
+        let colQty          = 24; // Y열: 수량
+        let colPrice        = 25; // Z열: 단가
+        let colTotal        = 26; // AA열: 합계
 
         let allOrders = []; 
         let filteredOrders = []; 
+        let baseDetailOrders = [];   
         let currentDetailOrders = [];
         let isShowAlert = false;
 
@@ -347,8 +409,10 @@
                 const title = String(headerRow[i]).trim();
                 if (title === "주문일자") colOrderDate = i;
                 else if (title === "배송일자") colDeliveryDate = i;
-                else if (title === "거래처명") colStoreName = i;
+                else if (title === "거래처코드" || title === "점포코드") colStoreCode = i;
+                else if (title === "거래처명" || title === "점포명") colStoreName = i;
                 else if (title === "브랜드명") colBrandName = i;
+                else if (title === "품목코드") colItemCode = i;
                 else if (title === "품목명") colItemName = i;
                 else if (title === "수량" || title === "주문수량") colQty = i;
                 else if (title === "단가" || title === "공급단가") colPrice = i;
@@ -421,12 +485,16 @@
                 document.getElementById('store-list').innerHTML = `<li style="color: #94a3b8; text-align: center; padding: 20px;">브랜드를 선택해주세요.</li>`;
             }
             
-            document.getElementById('order-detail-table').innerHTML = `<tr><td colspan="7" style="text-align: center; color: #94a3b8; padding: 40px;">좌측에서 브랜드를 선택하시면 데이터가 표시됩니다.</td></tr>`;
+            document.getElementById('order-detail-table').innerHTML = `<tr><td colspan="9" style="text-align: center; color: #94a3b8; padding: 40px;">좌측에서 브랜드를 선택하시면 데이터가 표시됩니다.</td></tr>`;
+            document.getElementById('list-total-qty').innerText = "0";
+            document.getElementById('list-total-amount').innerText = "0";
         }
 
         function onBrandChange() {
             const selectedBrand = document.getElementById('brand-select').value;
             if (!selectedBrand) return;
+
+            document.getElementById('store-search-input').value = '';
 
             const brandOrders = filteredOrders.filter(r => r[colBrandName] === selectedBrand);
             const stores = [...new Set(brandOrders.map(r => r[colStoreName]))].filter(Boolean);
@@ -453,8 +521,21 @@
                 `;
             });
 
-            // 브랜드 선택 시 기본 전체 합산 출력
             onStoreSelect('ALL', selectedBrand, storeListEl.firstElementChild);
+        }
+
+        function filterStoreList() {
+            const query = document.getElementById('store-search-input').value.toLowerCase();
+            const items = document.querySelectorAll('#store-list .store-item');
+            
+            items.forEach(item => {
+                const text = item.innerText.toLowerCase();
+                if (text.includes(query)) {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
         }
 
         function onStoreSelect(storeName, brandName, element) {
@@ -463,11 +544,58 @@
 
             if (storeName === 'ALL') {
                 document.getElementById('selected-store-title').innerText = `🛒 [${brandName}] 전체 점포 합산 상세 목록`;
-                currentDetailOrders = filteredOrders.filter(r => r[colBrandName] === brandName);
+                baseDetailOrders = filteredOrders.filter(r => r[colBrandName] === brandName);
             } else {
                 document.getElementById('selected-store-title').innerText = `🛒 [${storeName}] 주문 상세 목록`;
-                currentDetailOrders = filteredOrders.filter(r => r[colStoreName] === storeName);
+                baseDetailOrders = filteredOrders.filter(r => r[colStoreName] === storeName);
             }
+
+            populateTableFilterOptions(baseDetailOrders);
+            applyColumnFilters();
+        }
+
+        // 열별 필터 옵션(점포코드, 점포명, 주문일자, 배송일자, 품목코드, 품목명) 동적 생성
+        function populateTableFilterOptions(orders) {
+            const storeCodes= [...new Set(orders.map(r => r[colStoreCode]))].filter(Boolean).sort();
+            const stores    = [...new Set(orders.map(r => r[colStoreName]))].filter(Boolean).sort();
+            const orderDts  = [...new Set(orders.map(r => r[colOrderDate]))].filter(Boolean).sort();
+            const delivDts  = [...new Set(orders.map(r => r[colDeliveryDate]))].filter(Boolean).sort();
+            const itemCodes = [...new Set(orders.map(r => r[colItemCode]))].filter(Boolean).sort();
+            const items     = [...new Set(orders.map(r => r[colItemName]))].filter(Boolean).sort();
+
+            setSelectOptions('filter-storeCode', storeCodes, '전체 코드');
+            setSelectOptions('filter-storeName', stores, '전체 점포');
+            setSelectOptions('filter-orderDate', orderDts, '전체 주문일');
+            setSelectOptions('filter-deliveryDate', delivDts, '전체 배송일');
+            setSelectOptions('filter-itemCode', itemCodes, '전체 코드');
+            setSelectOptions('filter-itemName', items, '전체 품목');
+        }
+
+        function setSelectOptions(elementId, values, defaultLabel) {
+            const select = document.getElementById(elementId);
+            select.innerHTML = `<option value="">${defaultLabel}</option>`;
+            values.forEach(val => {
+                select.innerHTML += `<option value="${val}">${val}</option>`;
+            });
+        }
+
+        function applyColumnFilters() {
+            const selectedStoreCode= document.getElementById('filter-storeCode').value;
+            const selectedStore    = document.getElementById('filter-storeName').value;
+            const selectedOrderDt  = document.getElementById('filter-orderDate').value;
+            const selectedDelivDt  = document.getElementById('filter-deliveryDate').value;
+            const selectedItemCode = document.getElementById('filter-itemCode').value;
+            const selectedItem     = document.getElementById('filter-itemName').value;
+
+            currentDetailOrders = baseDetailOrders.filter(row => {
+                if (selectedStoreCode && row[colStoreCode] !== selectedStoreCode) return false;
+                if (selectedStore && row[colStoreName] !== selectedStore) return false;
+                if (selectedOrderDt && row[colOrderDate] !== selectedOrderDt) return false;
+                if (selectedDelivDt && row[colDeliveryDate] !== selectedDelivDt) return false;
+                if (selectedItemCode && row[colItemCode] !== selectedItemCode) return false;
+                if (selectedItem && row[colItemName] !== selectedItem) return false;
+                return true;
+            });
 
             renderDetailTable();
         }
@@ -477,14 +605,21 @@
             detailTable.innerHTML = "";
 
             if (!currentDetailOrders || currentDetailOrders.length === 0) {
-                detailTable.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #94a3b8; padding: 40px;">데이터가 없습니다.</td></tr>`;
+                detailTable.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #94a3b8; padding: 40px;">데이터가 없습니다.</td></tr>`;
+                document.getElementById('list-total-qty').innerText = "0";
+                document.getElementById('list-total-amount').innerText = "0";
                 return;
             }
 
+            let sumQty = 0;
+            let sumAmount = 0;
+
             currentDetailOrders.forEach(row => {
+                const storeCode    = row[colStoreCode] || '-';
                 const storeName    = row[colStoreName] || '-';
                 const orderDate    = row[colOrderDate] || '-';
                 const deliveryDate = row[colDeliveryDate] || '-';
+                const itemCode     = row[colItemCode] || '-';
                 const itemName     = row[colItemName] || '-';
                 const qty          = cleanNumber(row[colQty]);
                 const price        = cleanNumber(row[colPrice]);
@@ -494,11 +629,16 @@
                     total = qty * price;
                 }
 
+                sumQty += qty;
+                sumAmount += total;
+
                 detailTable.innerHTML += `
                     <tr>
+                        <td><span class="code-tag">${storeCode}</span></td>
                         <td><b>${storeName}</b></td>
                         <td>${orderDate}</td>
                         <td><span style="color:#2563eb; font-weight:bold;">${deliveryDate}</span></td>
+                        <td><span class="code-tag">${itemCode}</span></td>
                         <td>${itemName}</td>
                         <td class="text-right">${qty.toLocaleString()}</td>
                         <td class="text-right">${price > 0 ? price.toLocaleString() + '원' : '-'}</td>
@@ -506,9 +646,11 @@
                     </tr>
                 `;
             });
+
+            document.getElementById('list-total-qty').innerText = sumQty.toLocaleString();
+            document.getElementById('list-total-amount').innerText = sumAmount.toLocaleString();
         }
 
-        // 💡 오름차순 / 내림차순 정렬 로직
         function sortTable(key) {
             if (!currentDetailOrders || currentDetailOrders.length === 0) return;
 
@@ -519,16 +661,17 @@
                 currentSortAsc = true;
             }
 
-            // 정렬 아이콘 초기화 및 설정
             document.querySelectorAll('.sort-icon').forEach(el => el.innerText = '');
             const iconEl = document.getElementById(`sort-${key}`);
             if (iconEl) iconEl.innerText = currentSortAsc ? ' ▲' : ' ▼';
 
             currentDetailOrders.sort((a, b) => {
                 let valA, valB;
-                if (key === 'storeName') { valA = a[colStoreName] || ''; valB = b[colStoreName] || ''; }
+                if (key === 'storeCode') { valA = a[colStoreCode] || ''; valB = b[colStoreCode] || ''; }
+                else if (key === 'storeName') { valA = a[colStoreName] || ''; valB = b[colStoreName] || ''; }
                 else if (key === 'orderDate') { valA = cleanDateNum(a[colOrderDate]); valB = cleanDateNum(b[colOrderDate]); }
                 else if (key === 'deliveryDate') { valA = cleanDateNum(a[colDeliveryDate]); valB = cleanDateNum(b[colDeliveryDate]); }
+                else if (key === 'itemCode') { valA = a[colItemCode] || ''; valB = b[colItemCode] || ''; }
                 else if (key === 'itemName') { valA = a[colItemName] || ''; valB = b[colItemName] || ''; }
                 else if (key === 'qty') { valA = cleanNumber(a[colQty]); valB = cleanNumber(b[colQty]); }
                 else if (key === 'price') { valA = cleanNumber(a[colPrice]); valB = cleanNumber(b[colPrice]); }
