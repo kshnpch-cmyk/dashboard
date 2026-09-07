@@ -146,7 +146,7 @@
         .summary-badge-group {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
             font-size: 13px;
         }
         .summary-badge {
@@ -157,6 +157,27 @@
             color: #475569;
         }
         .summary-badge b { color: #2563eb; }
+
+        .chart-toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #2563eb;
+            background-color: #eff6ff;
+            padding: 5px 10px;
+            border-radius: 6px;
+            border: 1px solid #bfdbfe;
+            cursor: pointer;
+            user-select: none;
+        }
+        .chart-toggle-label input {
+            cursor: pointer;
+            accent-color: #2563eb;
+            width: 15px;
+            height: 15px;
+        }
 
         .select-box, .search-input {
             width: 100%;
@@ -254,22 +275,11 @@
         }
         td { font-size: 13.5px; }
         .text-right { text-align: right; }
-        .text-center { text-align: center; }
         .sort-icon { font-size: 11px; margin-left: 4px; color: #2563eb; }
         .code-tag {
             font-size: 12px;
             color: #64748b;
             font-family: monospace;
-        }
-        .checkbox-cell {
-            width: 40px;
-            text-align: center;
-        }
-        .row-checkbox {
-            width: 16px;
-            height: 16px;
-            cursor: pointer;
-            accent-color: #2563eb;
         }
     </style>
 </head>
@@ -319,7 +329,7 @@
         <!-- 2단계: 일자별 추이 그래프 -->
         <div class="chart-panel">
             <div class="panel-title">
-                <span>📊 일자별 주문 추이 그래프 (체크된 항목 반영)</span>
+                <span id="chart-panel-title">📊 일자별 주문 추이 그래프 (전체 데이터)</span>
             </div>
             <div class="chart-container">
                 <canvas id="dailyTrendChart"></canvas>
@@ -353,6 +363,11 @@
                     <span id="selected-store-title">🛒 점포별 주문 상세</span>
                     <div class="summary-badge-group">
                         <button class="btn btn-save-width" onclick="saveColumnWidths()">💾 열 너비 저장</button>
+                        <!-- 💡 열 너비 저장 옆 [차트보기] 체크박스 -->
+                        <label class="chart-toggle-label">
+                            <input type="checkbox" id="chart-only-detail-check" onchange="onChartToggleChange(this)">
+                            📊 차트보기
+                        </label>
                         <button class="btn btn-reset-width" onclick="resetColumnWidths()">🔄 너비 초기화</button>
                         <span class="summary-badge">수량합계: <b id="list-total-qty">0</b>개</span>
                         <span class="summary-badge">금액합계: <b id="list-total-amount">0</b>원</span>
@@ -362,22 +377,18 @@
                 <div class="table-container">
                     <table id="detail-table">
                         <colgroup>
-                            <col id="col-0" style="width: 45px;">
-                            <col id="col-1" style="width: 100px;">
-                            <col id="col-2" style="width: 180px;">
+                            <col id="col-0" style="width: 100px;">
+                            <col id="col-1" style="width: 180px;">
+                            <col id="col-2" style="width: 110px;">
                             <col id="col-3" style="width: 110px;">
-                            <col id="col-4" style="width: 110px;">
-                            <col id="col-5" style="width: 120px;">
-                            <col id="col-6" style="width: 250px;">
-                            <col id="col-7" style="width: 80px;">
-                            <col id="col-8" style="width: 100px;">
-                            <col id="col-9" style="width: 120px;">
+                            <col id="col-4" style="width: 120px;">
+                            <col id="col-5" style="width: 250px;">
+                            <col id="col-6" style="width: 80px;">
+                            <col id="col-7" style="width: 100px;">
+                            <col id="col-8" style="width: 120px;">
                         </colgroup>
                         <thead>
                             <tr>
-                                <th class="text-center checkbox-cell">
-                                    <input type="checkbox" id="check-all" class="row-checkbox" checked onchange="toggleSelectAll(this)">
-                                </th>
                                 <th onclick="sortTable('storeCode')">점포코드<span id="sort-storeCode" class="sort-icon"></span><div class="resizer"></div></th>
                                 <th onclick="sortTable('storeName')">점포명<span id="sort-storeName" class="sort-icon"></span><div class="resizer"></div></th>
                                 <th onclick="sortTable('orderDate')">주문일자<span id="sort-orderDate" class="sort-icon"></span><div class="resizer"></div></th>
@@ -389,7 +400,6 @@
                                 <th class="text-right" onclick="sortTable('total')">금액<span id="sort-total" class="sort-icon"></span><div class="resizer"></div></th>
                             </tr>
                             <tr class="filter-row">
-                                <th></th>
                                 <th><input type="text" id="filter-storeCode" class="table-filter-input" placeholder="🔍 검색" onkeyup="applyColumnFilters()"></th>
                                 <th><input type="text" id="filter-storeName" class="table-filter-input" placeholder="🔍 검색" onkeyup="applyColumnFilters()"></th>
                                 <th><input type="text" id="filter-orderDate" class="table-filter-input" placeholder="🔍 검색" onkeyup="applyColumnFilters()"></th>
@@ -403,7 +413,7 @@
                         </thead>
                         <tbody id="order-detail-table">
                             <tr>
-                                <td colspan="10" style="text-align: center; color: #94a3b8; padding: 40px;">
+                                <td colspan="9" style="text-align: center; color: #94a3b8; padding: 40px;">
                                     데이터를 불러오는 중입니다...
                                 </td>
                             </tr>
@@ -435,13 +445,12 @@
         let filteredOrders = []; 
         let baseDetailOrders = [];   
         let currentDetailOrders = [];
-        let selectedRowIndexes = new Set(); // 💡 체크박스로 선택된 행들의 인덱스 집합
         let trendChart = null;
 
         let currentSortKey = '';
         let currentSortAsc = true;
 
-        const DEFAULT_WIDTHS = ['45px', '100px', '180px', '110px', '110px', '120px', '250px', '80px', '100px', '120px'];
+        const DEFAULT_WIDTHS = ['100px', '180px', '110px', '110px', '120px', '250px', '80px', '100px', '120px'];
 
         loadSavedColumnWidths();
         resetToTomorrow();
@@ -590,10 +599,24 @@
             onBrandChange();
         }
 
-        // 💡 체크박스로 선택된 항목들만 가지고 그래프를 다시 그림
-        function updateChartFromSelection() {
-            const chartData = currentDetailOrders.filter((_, idx) => selectedRowIndexes.has(idx));
-            renderChart(chartData);
+        // 💡 [차트보기] 토글 상태 변경 시 이벤트
+        function onChartToggleChange(checkbox) {
+            updateDashboardChart();
+        }
+
+        // 💡 조건에 따른 차트 데이터 업데이트 (전체 vs 상세 목록)
+        function updateDashboardChart() {
+            const isOnlyDetail = document.getElementById('chart-only-detail-check').checked;
+            const chartTitleEl = document.getElementById('chart-panel-title');
+
+            if (isOnlyDetail) {
+                const storeTitle = document.getElementById('selected-store-title').innerText.replace('🛒 ', '');
+                chartTitleEl.innerText = `📊 일자별 주문 추이 그래프 [선택 상세: ${storeTitle}]`;
+                renderChart(currentDetailOrders);
+            } else {
+                chartTitleEl.innerText = `📊 일자별 주문 추이 그래프 (전체 데이터)`;
+                renderChart(filteredOrders);
+            }
         }
 
         function renderChart(orders) {
@@ -811,40 +834,8 @@
                 return true;
             });
 
-            // 💡 기본적으로 표시된 목록 전체를 체크박스 선택 처리
-            selectedRowIndexes = new Set(currentDetailOrders.map((_, idx) => idx));
-            document.getElementById('check-all').checked = true;
-
             renderDetailTable();
-            updateChartFromSelection();
-        }
-
-        // 💡 체크박스 상태 변경 이벤트
-        function onRowCheckChange(index, checkbox) {
-            if (checkbox.checked) {
-                selectedRowIndexes.add(index);
-            } else {
-                selectedRowIndexes.delete(index);
-            }
-            
-            const checkAll = document.getElementById('check-all');
-            checkAll.checked = (selectedRowIndexes.size === currentDetailOrders.length);
-
-            updateChartFromSelection();
-        }
-
-        // 💡 전체 선택/해제 이벤트
-        function toggleSelectAll(masterCheckbox) {
-            const isChecked = masterCheckbox.checked;
-            const checkboxes = document.querySelectorAll('.row-item-check');
-
-            selectedRowIndexes.clear();
-            checkboxes.forEach((cb, idx) => {
-                cb.checked = isChecked;
-                if (isChecked) selectedRowIndexes.add(idx);
-            });
-
-            updateChartFromSelection();
+            updateDashboardChart();
         }
 
         function renderDetailTable() {
@@ -852,7 +843,7 @@
             detailTable.innerHTML = "";
 
             if (!currentDetailOrders || currentDetailOrders.length === 0) {
-                detailTable.innerHTML = `<tr><td colspan="10" style="text-align: center; color: #94a3b8; padding: 40px;">선택한 범위에 표시할 데이터가 없습니다.</td></tr>`;
+                detailTable.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #94a3b8; padding: 40px;">선택한 범위에 표시할 데이터가 없습니다.</td></tr>`;
                 document.getElementById('list-total-qty').innerText = "0";
                 document.getElementById('list-total-amount').innerText = "0";
                 return;
@@ -861,7 +852,7 @@
             let sumQty = 0;
             let sumAmount = 0;
 
-            currentDetailOrders.forEach((row, idx) => {
+            currentDetailOrders.forEach(row => {
                 const storeCode    = row[colStoreCode] || '-';
                 const storeName    = row[colStoreName] || '-';
                 const orderDate    = formatDisplayDate(row[colOrderDate]);
@@ -879,13 +870,8 @@
                 sumQty += qty;
                 sumAmount += total;
 
-                const isChecked = selectedRowIndexes.has(idx) ? 'checked' : '';
-
                 detailTable.innerHTML += `
                     <tr>
-                        <td class="text-center checkbox-cell">
-                            <input type="checkbox" class="row-checkbox row-item-check" ${isChecked} onchange="onRowCheckChange(${idx}, this)">
-                        </td>
                         <td><span class="code-tag">${storeCode}</span></td>
                         <td><b>${storeName}</b></td>
                         <td>${orderDate}</td>
@@ -937,9 +923,8 @@
                 return 0;
             });
 
-            selectedRowIndexes = new Set(currentDetailOrders.map((_, idx) => idx));
             renderDetailTable();
-            updateChartFromSelection();
+            updateDashboardChart();
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -967,7 +952,7 @@
 
                 const mouseMoveHandler = (e) => {
                     const dx = e.clientX - x;
-                    const newWidth = Math.max(30, w + dx);
+                    const newWidth = Math.max(50, w + dx);
                     const col = document.getElementById(`col-${index}`);
                     col.style.width = `${newWidth}px`;
                 };
@@ -984,7 +969,7 @@
 
         function saveColumnWidths() {
             const widths = [];
-            for (let i = 0; i < 10; i++) {
+            for (let i = 0; i < 9; i++) {
                 const col = document.getElementById(`col-${i}`);
                 widths.push(col.style.width || DEFAULT_WIDTHS[i]);
             }
