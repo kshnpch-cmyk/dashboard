@@ -1,12 +1,23 @@
 import os
 import time
 import requests
+from datetime import datetime, timedelta, timezone
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
 WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbykxUSe-5RA20YOav7F5ohYZrD1739O7FInVzP-vR_jB31iMIsyRj4HSo9-e0Oedc0q/exec"
+
+# 한국 시간(KST) 구하기
+KST = timezone(timedelta(hours=9))
+now_kst = datetime.now(KST)
+
+# 동적 월별 탭 이름 설정 (예: 202609)
+target_tab_name = now_kst.strftime("%Y%m")
+
+# 날짜 설정 (기본값: 오늘 날짜 기준)
+today_str = now_kst.strftime("%Y/%m/%d")
 
 options = webdriver.ChromeOptions()
 options.add_argument('--headless')
@@ -17,8 +28,9 @@ driver = webdriver.Chrome(options=options)
 driver.set_window_size(1920, 1080)
 
 try:
+    print(f"[{now_kst.strftime('%Y-%m-%d %H:%M:%S')}] 동기화 프로세스 시작 - 타깃 탭: {target_tab_name}")
+
     # 1. 로그인
-    print("사이트 접속 중...")
     driver.get('https://admin.theborn.co.kr/oms-manager/login')
     time.sleep(2) 
 
@@ -34,11 +46,11 @@ try:
     driver.find_element(By.XPATH, "//*[contains(text(), '기간별 주문현황')]").click()
     time.sleep(5) 
 
-    # 3. 날짜 설정
-    target_start_date = os.environ.get('START_DATE', '2026/08/01')
-    target_end_date = os.environ.get('END_DATE', '2026/08/31')
+    # 3. 날짜 세팅 (대시보드 수동 입력값이 없으면 오늘 날짜 적용)
+    target_start_date = os.environ.get('START_DATE') or today_str
+    target_end_date = os.environ.get('END_DATE') or today_str
 
-    print(f"날짜 세팅 진행: {target_start_date} ~ {target_end_date}")
+    print(f"조회 기간: {target_start_date} ~ {target_end_date}")
     js_script = f"""
         var rangeInput = document.getElementsByName('BOR111_dateRange')[0];
         if(rangeInput) {{
@@ -54,25 +66,20 @@ try:
     time.sleep(2)
 
     # 4. 조회 버튼 클릭
-    print("조회 버튼 클릭 시도 중...")
     try:
         search_btn = driver.find_element(By.CSS_SELECTOR, "button.form_btn_search[data-shortcut='F2']")
         search_btn.click()
-        print("✅ form_btn_search 버튼 클릭 성공!")
-    except Exception as e:
-        print(f"버튼 직접 클릭 실패, F2 키 입력으로 대체: {e}")
+    except Exception:
         body = driver.find_element(By.TAG_NAME, 'body')
         body.send_keys(Keys.F2)
 
-    time.sleep(6) # 데이터 로딩 대기
+    time.sleep(6)
 
-    # 5. 정밀 데이터 추출 및 정제 (잡동사니 필터링)
+    # 5. 테이블 데이터 파싱 및 정제
     html = driver.page_source
     soup = BeautifulSoup(html, 'html.parser')
     
     rows = []
-    
-    # 올바른 헤더 라인 추가
     header = [
         "No.", "주문번호", "주문순번", "주문일자", "주문구분", "배송일자", 
         "거래처코드", "거래처명", "브랜드명", "화주사코드", "화주사명", 
@@ -80,42 +87,30 @@ try:
     ]
     rows.append(header)
 
-    # 모든 행 중 OMS 데이터가 시작하는 실제 목록만 필터링
     table_rows = soup.select('tr') 
     for tr in table_rows:
         cols = [td.get_text(strip=True) for td in tr.select('td, th')]
-        
-        # 💡 정제 조건:
-        # 1. OMS 주문번호 패턴(OMS로 시작)이 들어있거나,
-        # 2. 순수한 숫자로 시작하는 실제 주문 데이터 행만 픽업
         if cols and len(cols) >= 5:
             first_col = cols[0]
             second_col = cols[1] if len(cols) > 1 else ""
             
-            # 'indicator column' 등 불필요한 하단 노이즈 제거
             if "indicator" in first_col.lower() or "summary" in first_col.lower():
                 continue
                 
-            # 실제 주문 데이터 행 추출 (주문번호 OMS 포함 또는 첫 열이 숫자)
             if second_col.startswith("OMS") or first_col.isdigit():
                 rows.append(cols)
 
-    print(f"정제 완료된 깨끗한 데이터 행 수: {len(rows)}개")
+    # 6. 구글 시트로 페이로드 전송 (탭 이름 포함)
+    payload = {
+        "tabName": target_tab_name,
+        "data": rows
+    }
 
-    # 6. 구글 앱스 스크립트 웹훅 전송
-    if len(rows) <= 1: # 헤더만 있는 경우
-        print("❌ 파싱된 실제 주문 데이터가 없어 전송을 스킵합니다.")
-    else:
-        print("웹훅을 통해 구글 시트로 데이터 전송 중...")
-        response = requests.post(WEBHOOK_URL, json=rows, allow_redirects=True)
-        print(f"응답 상태 코드: {response.status_code}")
-        print(f"구글 시트 응답 내용: {response.text}")
-
-    driver.save_screenshot('capture.png')
+    if len(rows) > 1:
+        response = requests.post(WEBHOOK_URL, json=payload, allow_redirects=True)
+        print(f"구글 시트 동기화 완료: {response.text}")
 
 except Exception as e:
     print(f"오류 발생: {e}")
-    driver.save_screenshot('capture.png') 
-    
 finally:
     driver.quit()
