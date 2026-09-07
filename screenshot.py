@@ -7,7 +7,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
-WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyFph9famYyQNkqxFtzDkOiUdBIT0dCkKn-2l8y1cP51Xr5pj3YqwA-AdpsJ2UjPJzu/exec"
+WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxPGghBFACIVEp9MXVTd0RQZK8sQZZ4WMcGLEwMl2cSbbOX82e4WfTyxEZZtRno2Q/exec"
 
 # 1. 한국 시간(KST) 및 항상 다음날(오늘 + 1일) 날짜 자동 계산
 KST = timezone(timedelta(hours=9))
