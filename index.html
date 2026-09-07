@@ -85,7 +85,6 @@
         .btn-reset-width:hover { background-color: #475569; }
         .btn:disabled { background-color: #94a3b8; cursor: not-allowed; }
 
-        /* 💡 전체 화면 확장을 위한 컨테이너 조절 */
         .container { padding: 20px; max-width: 98%; margin: 0 auto; }
         
         .kpi-grid {
@@ -143,9 +142,7 @@
             border: 1px solid #cbd5e1;
             color: #475569;
         }
-        .summary-badge b {
-            color: #2563eb;
-        }
+        .summary-badge b { color: #2563eb; }
 
         .select-box, .search-input {
             width: 100%;
@@ -190,14 +187,11 @@
             border-color: #2563eb;
         }
         
-        .table-container {
-            width: 100%;
-            overflow-x: auto;
-        }
+        .table-container { width: 100%; overflow-x: auto; }
         table {
             width: 100%;
             border-collapse: collapse;
-            table-layout: fixed; /* 💡 드래그 조절을 위한 레이아웃 고정 */
+            table-layout: fixed;
         }
         th, td {
             padding: 10px 12px;
@@ -215,23 +209,16 @@
             user-select: none;
             position: relative;
         }
-        th:hover {
-            background-color: #e2e8f0;
-        }
-        /* 💡 열 너비 드래그 핸들 스타일 */
+        th:hover { background-color: #e2e8f0; }
         .resizer {
             position: absolute;
-            right: 0;
-            top: 0;
-            height: 100%;
-            width: 6px;
+            right: 0; top: 0;
+            height: 100%; width: 6px;
             background: transparent;
             cursor: col-resize;
             user-select: none;
         }
-        .resizer:hover, .resizing {
-            background-color: #2563eb;
-        }
+        .resizer:hover, .resizing { background-color: #2563eb; }
         .filter-row th {
             background-color: #ffffff;
             padding: 6px 8px;
@@ -288,7 +275,7 @@
     </div>
 
     <div class="container">
-        <!-- 1단계: 요약 KPI -->
+        <!-- 요약 KPI -->
         <div class="kpi-grid">
             <div class="kpi-card">
                 <div class="kpi-title">전체 총 주문수량</div>
@@ -304,7 +291,6 @@
             </div>
         </div>
 
-        <!-- 2, 3단계: 드릴다운 상세 -->
         <div class="dashboard-layout">
             <div class="panel">
                 <div class="panel-title">
@@ -469,11 +455,16 @@
             }
         }
 
+        // 💡 배열 수신 및 객체 수신 모두 완벽 지원하도록 파서 보완
         function handleSheetResponse(res) {
-            let data = res;
-            if (res && res.data) {
+            let data = [];
+            if (Array.isArray(res)) {
+                data = res;
+            } else if (res && res.data) {
                 data = res.data;
-                document.getElementById('last-updated-text').innerText = `🕒 동기화: ${res.lastUpdated || '-'}`;
+                if (res.lastUpdated) {
+                    document.getElementById('last-updated-text').innerText = `🕒 동기화: ${res.lastUpdated}`;
+                }
             }
 
             if (Array.isArray(data) && data.length > 0) {
@@ -502,6 +493,7 @@
             const startNum = cleanDateNum(document.getElementById('start-date').value);
             const endNum = cleanDateNum(document.getElementById('end-date').value);
 
+            // 배송일자 기준 필터링 (없으면 주문일자 보완)
             filteredOrders = allOrders.slice(1).filter(row => {
                 let rowDateNum = cleanDateNum(row[colDeliveryDate]);
                 if (rowDateNum === 0) rowDateNum = cleanDateNum(row[colOrderDate]); 
@@ -648,7 +640,7 @@
             detailTable.innerHTML = "";
 
             if (!currentDetailOrders || currentDetailOrders.length === 0) {
-                detailTable.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #94a3b8; padding: 40px;">데이터가 없습니다.</td></tr>`;
+                detailTable.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #94a3b8; padding: 40px;">선택한 범위에 표시할 데이터가 없습니다.</td></tr>`;
                 document.getElementById('list-total-qty').innerText = "0";
                 document.getElementById('list-total-amount').innerText = "0";
                 return;
@@ -731,7 +723,6 @@
             renderDetailTable();
         }
 
-        // 💡 마우스 드래그 열 너비 조절 기능 (Resizable Columns)
         document.addEventListener('DOMContentLoaded', () => {
             initResizableColumns();
         });
@@ -772,7 +763,6 @@
             });
         }
 
-        // 💡 열 너비 저장 (LocalStorage 연동)
         function saveColumnWidths() {
             const widths = [];
             for (let i = 0; i < 9; i++) {
@@ -780,10 +770,9 @@
                 widths.push(col.style.width || DEFAULT_WIDTHS[i]);
             }
             localStorage.setItem('oms_col_widths', JSON.stringify(widths));
-            alert('💾 열 너비 설정이 저장되었습니다!\n다음 접속 시에도 이 설정이 유지됩니다.');
+            alert('💾 열 너비 설정이 저장되었습니다!');
         }
 
-        // 💡 저장된 열 너비 불러오기
         function loadSavedColumnWidths() {
             const saved = localStorage.getItem('oms_col_widths');
             if (saved) {
@@ -797,7 +786,6 @@
             }
         }
 
-        // 💡 열 너비 초기화
         function resetColumnWidths() {
             localStorage.removeItem('oms_col_widths');
             DEFAULT_WIDTHS.forEach((w, i) => {
