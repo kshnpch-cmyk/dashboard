@@ -412,6 +412,21 @@
             return `${year}-${month}-${day}`;
         }
 
+        // 💡 [수정됨] ISO 시간 찌꺼기가 남은 날짜도 완벽하게 8자리 숫자만 빼오도록 보완
+        function cleanDateNum(dateStr) {
+            if (!dateStr) return 0;
+            let s = String(dateStr).replace(/[^0-9]/g, '');
+            return parseInt(s.substring(0, 8), 10) || 0;
+        }
+
+        // 💡 [수정됨] 테이블에 보여줄 때 날짜 뒤에 붙은 시간(T00:00:00)을 잘라내어 깔끔하게 표시
+        function formatDisplayDate(dateStr) {
+            if (!dateStr || dateStr === '-') return '-';
+            let s = String(dateStr);
+            if (s.includes('T')) s = s.split('T')[0];
+            return s.replace(/-/g, '/');
+        }
+
         function resetToTomorrow() {
             const tomorrow = new Date();
             tomorrow.setDate(tomorrow.getDate() + 1);
@@ -455,7 +470,6 @@
             }
         }
 
-        // 💡 배열 수신 및 객체 수신 모두 완벽 지원하도록 파서 보완
         function handleSheetResponse(res) {
             let data = [];
             if (Array.isArray(res)) {
@@ -477,11 +491,6 @@
             }
         }
 
-        function cleanDateNum(dateStr) {
-            if (!dateStr) return 0;
-            return parseInt(String(dateStr).replace(/[^0-9]/g, ''), 10) || 0;
-        }
-
         function cleanNumber(val) {
             if (!val) return 0;
             return parseFloat(String(val).replace(/[^0-9.-]/g, '')) || 0;
@@ -493,7 +502,6 @@
             const startNum = cleanDateNum(document.getElementById('start-date').value);
             const endNum = cleanDateNum(document.getElementById('end-date').value);
 
-            // 배송일자 기준 필터링 (없으면 주문일자 보완)
             filteredOrders = allOrders.slice(1).filter(row => {
                 let rowDateNum = cleanDateNum(row[colDeliveryDate]);
                 if (rowDateNum === 0) rowDateNum = cleanDateNum(row[colOrderDate]); 
@@ -617,8 +625,8 @@
             currentDetailOrders = baseDetailOrders.filter(row => {
                 const sc = String(row[colStoreCode] || '').toLowerCase();
                 const sn = String(row[colStoreName] || '').toLowerCase();
-                const od = String(row[colOrderDate] || '').toLowerCase();
-                const dd = String(row[colDeliveryDate] || '').toLowerCase();
+                const od = formatDisplayDate(row[colOrderDate]).toLowerCase();
+                const dd = formatDisplayDate(row[colDeliveryDate]).toLowerCase();
                 const ic = String(row[colItemCode] || '').toLowerCase();
                 const iname = String(row[colItemName] || '').toLowerCase();
 
@@ -652,8 +660,8 @@
             currentDetailOrders.forEach(row => {
                 const storeCode    = row[colStoreCode] || '-';
                 const storeName    = row[colStoreName] || '-';
-                const orderDate    = row[colOrderDate] || '-';
-                const deliveryDate = row[colDeliveryDate] || '-';
+                const orderDate    = formatDisplayDate(row[colOrderDate]);
+                const deliveryDate = formatDisplayDate(row[colDeliveryDate]);
                 const itemCode     = row[colItemCode] || '-';
                 const itemName     = row[colItemName] || '-';
                 const qty          = cleanNumber(row[colQty]);
