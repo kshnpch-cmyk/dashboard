@@ -60,16 +60,30 @@
             border-radius: 6px;
             cursor: pointer;
             text-decoration: none;
-            transition: background 0.2s;
+            transition: background 0.2s, opacity 0.2s;
         }
         .action-btn:hover { background-color: #1d4ed8; }
+        .action-btn:disabled {
+            background-color: #94a3b8;
+            cursor: not-allowed;
+            opacity: 0.8;
+        }
         .sheet-btn { background-color: #0284c7; }
         .sheet-btn:hover { background-color: #0369a1; }
+        
         #status-msg {
             font-size: 13px;
             font-weight: bold;
             color: #2563eb;
+            padding: 4px 10px;
+            border-radius: 4px;
         }
+        .running {
+            background-color: #eff6ff;
+            color: #1d4ed8 !important;
+            border: 1px solid #bfdbfe;
+        }
+        
         .sheet-wrapper {
             flex: 1;
             width: 100%;
@@ -94,7 +108,7 @@
         <div class="status-badge">⚡ 10분 주기 자동 동기화</div>
 
         <div class="btn-group">
-            <button class="action-btn" onclick="triggerBot()">
+            <button id="run-btn" class="action-btn" onclick="triggerBot()">
                 🚀 지금 즉시 동기화 실행
             </button>
             <a href="https://docs.google.com/spreadsheets/d/1E_FwM6qIiv-vmFGdpGTR9zHWPgyudNG9UY8Jo8LCGPM/edit" target="_blank" class="action-btn sheet-btn">
@@ -105,20 +119,34 @@
     </div>
 
     <div class="sheet-wrapper">
-        <iframe src="https://docs.google.com/spreadsheets/d/1E_FwM6qIiv-vmFGdpGTR9zHWPgyudNG9UY8Jo8LCGPM/htmlembed?widget=true&amp;headers=false"></iframe>
+        <iframe id="sheet-iframe" src="https://docs.google.com/spreadsheets/d/1E_FwM6qIiv-vmFGdpGTR9zHWPgyudNG9UY8Jo8LCGPM/htmlembed?widget=true&amp;headers=false"></iframe>
     </div>
 
     <script>
+        let isRunning = false; // 현재 작업 중 여부 플래그
+
         function triggerBot() {
+            // 1. 이미 진행 중인 경우 알림창 띄우고 종료
+            if (isRunning) {
+                alert("⏳ 현재 주문 데이터 동기화 업데이트가 진행 중입니다.\n잠시만 기다려 주세요! (약 30초 소요)");
+                return;
+            }
+
             const githubId = 'kshnpch-cmyk'; 
             const repoName = 'dashboard'; 
             const token = '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'; 
 
+            const btn = document.getElementById('run-btn');
             const statusText = document.getElementById('status-msg');
-            statusText.innerText = "⏳ 수동 동기화 요철 중...";
-            statusText.style.color = "#2563eb";
 
-            // yml 파일명에 관계없이 최근 등록된 워크플로우 수동 트리거
+            // 2. 실행 상태로 전환 및 UI 업데이트
+            isRunning = true;
+            btn.disabled = true;
+            btn.innerText = "🔄 동기화 진행 중...";
+            statusText.className = "running";
+            statusText.innerText = "⏳ 데이터 업데이트 중입니다...";
+
+            // GitHub Action 실행 요청
             fetch(`https://api.github.com/repos/${githubId}/${repoName}/actions/workflows/capture.yml/dispatches`, {
                 method: 'POST',
                 headers: {
@@ -128,16 +156,31 @@
                 body: JSON.stringify({ ref: 'main' })
             })
             .then(res => {
-                if(res.ok) {
-                    statusText.innerText = "✅ 동기화 시작! (약 30초 뒤 시트 반영)";
-                    statusText.style.color = "#10b981";
+                if (res.ok) {
+                    // 35초 후 완료 처리 (파이썬 봇 실행 시간 감안)
+                    setTimeout(() => {
+                        isRunning = false;
+                        btn.disabled = false;
+                        btn.innerText = "🚀 지금 즉시 동기화 실행";
+                        statusText.className = "";
+                        statusText.innerText = "✅ 업데이트 완료!";
+                        statusText.style.color = "#10b981";
+                        
+                        // 구글 시트 iframe 새로고침
+                        const iframe = document.getElementById('sheet-iframe');
+                        iframe.src = iframe.src;
+                    }, 35000);
                 } else {
-                    statusText.innerText = `❌ 실행 오류 (${res.status})`;
-                    statusText.style.color = "#ef4444";
+                    throw new Error(`Status ${res.status}`);
                 }
             })
             .catch(error => {
-                statusText.innerText = "❌ 통신 오류";
+                alert("❌ 동기화 요청 실패: 네트워크 상태나 권한을 확인해주세요.");
+                isRunning = false;
+                btn.disabled = false;
+                btn.innerText = "🚀 지금 즉시 동기화 실행";
+                statusText.className = "";
+                statusText.innerText = "❌ 실행 실패";
                 statusText.style.color = "#ef4444";
             });
         }
