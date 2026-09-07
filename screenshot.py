@@ -9,13 +9,19 @@ from selenium.webdriver.common.keys import Keys
 
 WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxqFDL26lqaQqzAEw7VCOp1t9oSZLNOEXyUuTPJa9DnLzqc9RNPIFk-88n4YLD0oChR/exec"
 
-# 1. 한국 시간(KST) 및 항상 다음날(오늘 + 1일) 날짜 자동 계산
+# 1. KST 기준 시간별 자동 조회 범위 계산
 KST = timezone(timedelta(hours=9))
 now_kst = datetime.now(KST)
-target_date = now_kst + timedelta(days=1)
 
-target_tab_name = target_date.strftime("%Y%m") # 예: 202609
-tomorrow_str = target_date.strftime("%Y/%m/%d") # 예: 2026/09/08
+start_date_obj = now_kst + timedelta(days=1)
+if now_kst.hour >= 11:
+    end_date_obj = now_kst + timedelta(days=3)
+else:
+    end_date_obj = now_kst + timedelta(days=2)
+
+target_tab_name = start_date_obj.strftime("%Y%m")
+auto_start_str = start_date_obj.strftime("%Y/%m/%d")
+auto_end_str = end_date_obj.strftime("%Y/%m/%d")
 
 options = webdriver.ChromeOptions()
 options.add_argument('--headless')
@@ -26,7 +32,7 @@ driver = webdriver.Chrome(options=options)
 driver.set_window_size(1920, 1080)
 
 try:
-    print(f"[{now_kst.strftime('%Y-%m-%d %H:%M:%S')}] 동기화 진행 (기준 조회일: {tomorrow_str} / 탭: {target_tab_name})")
+    print(f"[{now_kst.strftime('%Y-%m-%d %H:%M:%S')}] 동기화 진행")
 
     # 2. 로그인
     driver.get('https://admin.theborn.co.kr/oms-manager/login')
@@ -44,11 +50,11 @@ try:
     driver.find_element(By.XPATH, "//*[contains(text(), '기간별 주문현황')]").click()
     time.sleep(5) 
 
-    # 4. 날짜 세팅 (기본값: 내일 날짜)
-    target_start_date = os.environ.get('START_DATE') or tomorrow_str
-    target_end_date = os.environ.get('END_DATE') or tomorrow_str
+    # 4. 날짜 세팅
+    target_start_date = os.environ.get('START_DATE') or auto_start_str
+    target_end_date = os.environ.get('END_DATE') or auto_end_str
 
-    print(f"조회 기간 적용: {target_start_date} ~ {target_end_date}")
+    print(f"조회 기간 적용: {target_start_date} ~ {target_end_date} (시트 탭: {target_tab_name})")
     js_script = f"""
         var rangeInput = document.getElementsByName('BOR111_dateRange')[0];
         if(rangeInput) {{
@@ -72,37 +78,38 @@ try:
         body = driver.find_element(By.TAG_NAME, 'body')
         body.send_keys(Keys.F2)
 
-    time.sleep(10) # 로딩 대기
+    time.sleep(10)
 
-    # 6. 동적 테이블 헤더 및 전체 데이터 추출
+    # 6. 헤더 및 전체 컬럼(규격, 세액, 부가세, 등록일시, 등록자ID 등) 끝까지 완벽 파싱
     html = driver.page_source
     soup = BeautifulSoup(html, 'html.parser')
     
     rows = []
     
-    # 6-1. 웹 OMS 화면의 헤더(th) 전체 추출
-    th_elements = soup.select('thead tr th') or soup.select('tr th')
-    dynamic_header = [th.get_text(strip=True) for th in th_elements if th.get_text(strip=True)]
+    # 6-1. 첫 번째 데이터 행의 컬럼 수에 맞춰 헤더 태그 전체 탐색
+    table_rows = soup.select('tbody tr') or soup.select('tr')
+    sample_cols_len = 0
+    for tr in table_rows:
+        cols = [td.get_text(strip=True) for td in tr.select('td')]
+        if cols and any("OMS" in c for c in cols):
+            sample_cols_len = len(cols)
+            break
+
+    # 헤더 태그 추출 (모든 th 수집)
+    th_elements = soup.select('thead tr th') or soup.select('tr th') or soup.select('th')
+    dynamic_header = []
     
-    # 만약 헤더 추출 실패 시 기본 고정 헤더 적용
-    if not dynamic_header:
-        dynamic_header = [
-            "No.", "주문번호", "주문순번", "주문일자", "주문구분", "배송일자", 
-            "거래처코드", "거래처명", "브랜드명", "화주사코드", "화주사명", 
-            "센터코드", "센터명", "창고코드", "창고명", "품목코드", "품목명", 
-            "세트품목코드", "세트품목명", "품목온도"
-        ]
-    else:
-        # 맨 앞 No. 헤더 보정
-        if dynamic_header[0] != "No.":
-            dynamic_header.insert(0, "No.")
+    for th in th_elements:
+        txt = th.get_text(strip=True)
+        # 빈 체크박스나 아이콘 헤더도 위치 맞춤을 위해 포함
+        dynamic_header.append(txt if txt else f"컬럼_{len(dynamic_header)+1}")
 
-    rows.append(dynamic_header)
+    # No. 헤더 위치 보정 및 중복 정리
+    if dynamic_header and dynamic_header[0] != "No.":
+        dynamic_header.insert(0, "No.")
 
-    # 6-2. 데이터 행(tr) 전체 추출
-    table_rows = soup.select('tbody tr') or soup.select('tr') 
+    # 6-2. 실제 데이터 행 수집
     row_count = 1
-
     for tr in table_rows:
         cols = [td.get_text(strip=True) for td in tr.select('td')]
         if cols and len(cols) >= 5:
@@ -110,15 +117,22 @@ try:
             if "indicator" in row_str.lower() or "summary" in row_str.lower() or "summa" in row_str.lower():
                 continue
             
-            # OMS 주문 데이터 파싱 및 No. 순번 할당
             if any("OMS" in c for c in cols):
                 if not cols[0].isdigit():
                     cols.insert(0, str(row_count))
                     row_count += 1
                 rows.append(cols)
 
-    print(f"파싱 완료된 총 컬럼 수: {len(dynamic_header)}개")
-    print(f"파싱 완료된 총 데이터 행 수: {len(rows)}개 (헤더 포함)")
+    # 헤더 길이가 실제 데이터 길이보다 짧을 경우 끝까지 자동 확장
+    max_data_len = max([len(r) for r in rows]) if rows else 0
+    while len(dynamic_header) < max_data_len:
+        dynamic_header.append(f"추가컬럼_{len(dynamic_header)+1}")
+
+    # 헤더를 최종 1행으로 삽입
+    rows.insert(0, dynamic_header)
+
+    print(f"파싱 완료된 총 헤더 컬럼 수: {len(dynamic_header)}개")
+    print(f"파싱 완료된 총 데이터 행 수: {len(rows)-1}개")
 
     # 7. 구글 시트로 페이로드 전송
     payload = {
