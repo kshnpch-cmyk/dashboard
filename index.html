@@ -209,13 +209,19 @@
             padding: 6px 8px;
             cursor: default;
         }
-        .table-filter-select {
+        .table-filter-input {
             width: 100%;
-            padding: 5px;
+            padding: 6px 8px;
             font-size: 12px;
             border: 1px solid #cbd5e1;
-            border-radius: 4px;
+            border-radius: 6px;
             background-color: #f8fafc;
+            box-sizing: border-box;
+        }
+        .table-filter-input:focus {
+            background-color: #ffffff;
+            border-color: #2563eb;
+            outline: none;
         }
         td { font-size: 13.5px; }
         .text-right { text-align: right; }
@@ -278,7 +284,7 @@
                 </div>
                 
                 <select id="brand-select" class="select-box" onchange="onBrandChange()">
-                    <option value="">-- 브랜드 선택 --</option>
+                    <option value="ALL">🌐 전체 브랜드</option>
                 </select>
 
                 <!-- 점포 목록 검색 필터 -->
@@ -304,7 +310,7 @@
                 
                 <table>
                     <thead>
-                        <!-- 헤더 제목 및 정렬 기능 (점포코드, 품목코드 추가) -->
+                        <!-- 헤더 제목 및 정렬 기능 -->
                         <tr>
                             <th onclick="sortTable('storeCode')">점포코드<span id="sort-storeCode" class="sort-icon"></span></th>
                             <th onclick="sortTable('storeName')">점포명<span id="sort-storeName" class="sort-icon"></span></th>
@@ -316,14 +322,14 @@
                             <th class="text-right" onclick="sortTable('price')">단가<span id="sort-price" class="sort-icon"></span></th>
                             <th class="text-right" onclick="sortTable('total')">금액<span id="sort-total" class="sort-icon"></span></th>
                         </tr>
-                        <!-- 열별 필터 드롭다운 행 -->
+                        <!-- 💡 직접 검색 입력창 (input) -->
                         <tr class="filter-row">
-                            <th><select id="filter-storeCode" class="table-filter-select" onchange="applyColumnFilters()"><option value="">전체 코드</option></select></th>
-                            <th><select id="filter-storeName" class="table-filter-select" onchange="applyColumnFilters()"><option value="">전체 점포</option></select></th>
-                            <th><select id="filter-orderDate" class="table-filter-select" onchange="applyColumnFilters()"><option value="">전체 주문일</option></select></th>
-                            <th><select id="filter-deliveryDate" class="table-filter-select" onchange="applyColumnFilters()"><option value="">전체 배송일</option></select></th>
-                            <th><select id="filter-itemCode" class="table-filter-select" onchange="applyColumnFilters()"><option value="">전체 코드</option></select></th>
-                            <th><select id="filter-itemName" class="table-filter-select" onchange="applyColumnFilters()"><option value="">전체 품목</option></select></th>
+                            <th><input type="text" id="filter-storeCode" class="table-filter-input" placeholder="🔍 점포코드" onkeyup="applyColumnFilters()"></th>
+                            <th><input type="text" id="filter-storeName" class="table-filter-input" placeholder="🔍 점포명" onkeyup="applyColumnFilters()"></th>
+                            <th><input type="text" id="filter-orderDate" class="table-filter-input" placeholder="🔍 주문일" onkeyup="applyColumnFilters()"></th>
+                            <th><input type="text" id="filter-deliveryDate" class="table-filter-input" placeholder="🔍 배송일" onkeyup="applyColumnFilters()"></th>
+                            <th><input type="text" id="filter-itemCode" class="table-filter-input" placeholder="🔍 품목코드" onkeyup="applyColumnFilters()"></th>
+                            <th><input type="text" id="filter-itemName" class="table-filter-input" placeholder="🔍 품목명" onkeyup="applyColumnFilters()"></th>
                             <th></th>
                             <th></th>
                             <th></th>
@@ -332,7 +338,7 @@
                     <tbody id="order-detail-table">
                         <tr>
                             <td colspan="9" style="text-align: center; color: #94a3b8; padding: 40px;">
-                                좌측에서 브랜드를 선택하시면 데이터가 표시됩니다.
+                                데이터를 불러오는 중입니다...
                             </td>
                         </tr>
                     </tbody>
@@ -349,7 +355,7 @@
 
         let colOrderDate    = 3;  // D열: 주문일자
         let colDeliveryDate = 5;  // F열: 배송일자
-        let colStoreCode    = 6;  // G열: 점포코드/거래처코드
+        let colStoreCode    = 6;  // G열: 점포코드
         let colStoreName    = 7;  // H열: 거래처명
         let colBrandName    = 8;  // I열: 브랜드명
         let colItemCode     = 15; // P열: 품목코드
@@ -474,29 +480,23 @@
             const brandSelect = document.getElementById('brand-select');
             const brands = [...new Set(filteredOrders.map(r => r[colBrandName]))].filter(Boolean);
             
-            brandSelect.innerHTML = '<option value="">-- 브랜드 선택 --</option>';
+            brandSelect.innerHTML = '<option value="ALL">🌐 전체 브랜드</option>';
             brands.forEach(b => {
                 brandSelect.innerHTML += `<option value="${b}">${b}</option>`;
             });
 
-            if (filteredOrders.length === 0) {
-                document.getElementById('store-list').innerHTML = `<li style="color: #94a3b8; text-align: center; padding: 20px;">지정한 날짜의 데이터가 시트에 없습니다.</li>`;
-            } else {
-                document.getElementById('store-list').innerHTML = `<li style="color: #94a3b8; text-align: center; padding: 20px;">브랜드를 선택해주세요.</li>`;
-            }
-            
-            document.getElementById('order-detail-table').innerHTML = `<tr><td colspan="9" style="text-align: center; color: #94a3b8; padding: 40px;">좌측에서 브랜드를 선택하시면 데이터가 표시됩니다.</td></tr>`;
-            document.getElementById('list-total-qty').innerText = "0";
-            document.getElementById('list-total-amount').innerText = "0";
+            onBrandChange();
         }
 
         function onBrandChange() {
             const selectedBrand = document.getElementById('brand-select').value;
-            if (!selectedBrand) return;
-
             document.getElementById('store-search-input').value = '';
 
-            const brandOrders = filteredOrders.filter(r => r[colBrandName] === selectedBrand);
+            let brandOrders = filteredOrders;
+            if (selectedBrand && selectedBrand !== 'ALL') {
+                brandOrders = filteredOrders.filter(r => r[colBrandName] === selectedBrand);
+            }
+
             const stores = [...new Set(brandOrders.map(r => r[colStoreName]))].filter(Boolean);
             const items = new Set(brandOrders.map(r => r[colItemName]));
 
@@ -504,9 +504,11 @@
             document.getElementById('brand-item-count').innerText = items.size;
 
             const storeListEl = document.getElementById('store-list');
+            const brandLabel = (selectedBrand === 'ALL' || !selectedBrand) ? '전체 브랜드' : selectedBrand;
+
             storeListEl.innerHTML = `
                 <li class="store-item total-item active" onclick="onStoreSelect('ALL', '${selectedBrand}', this)">
-                    <span>🏢 [${selectedBrand}] 전체 점포 합산</span>
+                    <span>🏢 [${brandLabel}] 전체 점포 합산</span>
                     <span style="font-size: 12px; color: #2563eb;">${brandOrders.length}건</span>
                 </li>
             `;
@@ -538,62 +540,61 @@
             });
         }
 
+        function clearTableFilterInputs() {
+            document.getElementById('filter-storeCode').value = '';
+            document.getElementById('filter-storeName').value = '';
+            document.getElementById('filter-orderDate').value = '';
+            document.getElementById('filter-deliveryDate').value = '';
+            document.getElementById('filter-itemCode').value = '';
+            document.getElementById('filter-itemName').value = '';
+        }
+
         function onStoreSelect(storeName, brandName, element) {
             document.querySelectorAll('.store-item').forEach(el => el.classList.remove('active'));
             if (element) element.classList.add('active');
 
+            const brandLabel = (brandName === 'ALL' || !brandName) ? '전체 브랜드' : brandName;
+
             if (storeName === 'ALL') {
-                document.getElementById('selected-store-title').innerText = `🛒 [${brandName}] 전체 점포 합산 상세 목록`;
-                baseDetailOrders = filteredOrders.filter(r => r[colBrandName] === brandName);
+                document.getElementById('selected-store-title').innerText = `🛒 [${brandLabel}] 전체 점포 합산 상세 목록`;
+                if (brandName === 'ALL' || !brandName) {
+                    baseDetailOrders = filteredOrders;
+                } else {
+                    baseDetailOrders = filteredOrders.filter(r => r[colBrandName] === brandName);
+                }
             } else {
                 document.getElementById('selected-store-title').innerText = `🛒 [${storeName}] 주문 상세 목록`;
                 baseDetailOrders = filteredOrders.filter(r => r[colStoreName] === storeName);
             }
 
-            populateTableFilterOptions(baseDetailOrders);
+            clearTableFilterInputs();
             applyColumnFilters();
         }
 
-        // 열별 필터 옵션(점포코드, 점포명, 주문일자, 배송일자, 품목코드, 품목명) 동적 생성
-        function populateTableFilterOptions(orders) {
-            const storeCodes= [...new Set(orders.map(r => r[colStoreCode]))].filter(Boolean).sort();
-            const stores    = [...new Set(orders.map(r => r[colStoreName]))].filter(Boolean).sort();
-            const orderDts  = [...new Set(orders.map(r => r[colOrderDate]))].filter(Boolean).sort();
-            const delivDts  = [...new Set(orders.map(r => r[colDeliveryDate]))].filter(Boolean).sort();
-            const itemCodes = [...new Set(orders.map(r => r[colItemCode]))].filter(Boolean).sort();
-            const items     = [...new Set(orders.map(r => r[colItemName]))].filter(Boolean).sort();
-
-            setSelectOptions('filter-storeCode', storeCodes, '전체 코드');
-            setSelectOptions('filter-storeName', stores, '전체 점포');
-            setSelectOptions('filter-orderDate', orderDts, '전체 주문일');
-            setSelectOptions('filter-deliveryDate', delivDts, '전체 배송일');
-            setSelectOptions('filter-itemCode', itemCodes, '전체 코드');
-            setSelectOptions('filter-itemName', items, '전체 품목');
-        }
-
-        function setSelectOptions(elementId, values, defaultLabel) {
-            const select = document.getElementById(elementId);
-            select.innerHTML = `<option value="">${defaultLabel}</option>`;
-            values.forEach(val => {
-                select.innerHTML += `<option value="${val}">${val}</option>`;
-            });
-        }
-
+        // 💡 실시간 검색어(키워드) 필터링
         function applyColumnFilters() {
-            const selectedStoreCode= document.getElementById('filter-storeCode').value;
-            const selectedStore    = document.getElementById('filter-storeName').value;
-            const selectedOrderDt  = document.getElementById('filter-orderDate').value;
-            const selectedDelivDt  = document.getElementById('filter-deliveryDate').value;
-            const selectedItemCode = document.getElementById('filter-itemCode').value;
-            const selectedItem     = document.getElementById('filter-itemName').value;
+            const qStoreCode = document.getElementById('filter-storeCode').value.toLowerCase().trim();
+            const qStoreName = document.getElementById('filter-storeName').value.toLowerCase().trim();
+            const qOrderDate = document.getElementById('filter-orderDate').value.toLowerCase().trim();
+            const qDelivDate = document.getElementById('filter-deliveryDate').value.toLowerCase().trim();
+            const qItemCode  = document.getElementById('filter-itemCode').value.toLowerCase().trim();
+            const qItemName  = document.getElementById('filter-itemName').value.toLowerCase().trim();
 
             currentDetailOrders = baseDetailOrders.filter(row => {
-                if (selectedStoreCode && row[colStoreCode] !== selectedStoreCode) return false;
-                if (selectedStore && row[colStoreName] !== selectedStore) return false;
-                if (selectedOrderDt && row[colOrderDate] !== selectedOrderDt) return false;
-                if (selectedDelivDt && row[colDeliveryDate] !== selectedDelivDt) return false;
-                if (selectedItemCode && row[colItemCode] !== selectedItemCode) return false;
-                if (selectedItem && row[colItemName] !== selectedItem) return false;
+                const sc = String(row[colStoreCode] || '').toLowerCase();
+                const sn = String(row[colStoreName] || '').toLowerCase();
+                const od = String(row[colOrderDate] || '').toLowerCase();
+                const dd = String(row[colDeliveryDate] || '').toLowerCase();
+                const ic = String(row[colItemCode] || '').toLowerCase();
+                const iname = String(row[colItemName] || '').toLowerCase();
+
+                if (qStoreCode && !sc.includes(qStoreCode)) return false;
+                if (qStoreName && !sn.includes(qStoreName)) return false;
+                if (qOrderDate && !od.includes(qOrderDate)) return false;
+                if (qDelivDate && !dd.includes(qDelivDate)) return false;
+                if (qItemCode && !ic.includes(qItemCode)) return false;
+                if (qItemName && !iname.includes(qItemName)) return false;
+
                 return true;
             });
 
