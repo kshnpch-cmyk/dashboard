@@ -22,15 +22,14 @@ else:
 auto_start_str = start_date_obj.strftime("%Y/%m/%d")
 auto_end_str = end_date_obj.strftime("%Y/%m/%d")
 
-# 💡 수동 조회일(START_DATE)이 지정되어 있으면 해당 조회일의 연월을 탭 이름으로 설정
+# 💡 수동 지정 시 탭 이름(YYYYMM) 파싱 로직
 target_start_date = os.environ.get('START_DATE') or auto_start_str
 target_end_date = os.environ.get('END_DATE') or auto_end_str
 
-# YYYY/MM/DD 또는 YYYY-MM-DD 형식에서 YYYYMM 탭 이름 파싱
 clean_start_date = target_start_date.replace('-', '/').replace('.', '/')
 date_parts = clean_start_date.split('/')
 if len(date_parts) >= 2:
-    target_tab_name = f"{date_parts[0]}{date_parts[1].zfill(2)}"  # 예: 2026/08/24 -> 202608
+    target_tab_name = f"{date_parts[0]}{date_parts[1].zfill(2)}"
 else:
     target_tab_name = start_date_obj.strftime("%Y%m")
 
@@ -88,13 +87,22 @@ try:
 
     time.sleep(10)
 
-    # 6. 헤더 및 데이터 파싱
+    # 6. 헤더 및 전체 컬럼(규격, 세액, 부가세, 등록일시, 등록자ID 등) 끝까지 완벽 파싱
     html = driver.page_source
     soup = BeautifulSoup(html, 'html.parser')
     
     rows = []
     
+    # 6-1. 첫 번째 데이터 행의 컬럼 수에 맞춰 헤더 태그 전체 탐색
     table_rows = soup.select('tbody tr') or soup.select('tr')
+    sample_cols_len = 0
+    for tr in table_rows:
+        cols = [td.get_text(strip=True) for td in tr.select('td')]
+        if cols and any("OMS" in c for c in cols):
+            sample_cols_len = len(cols)
+            break
+
+    # 💡 모든 th 태그 수집 및 빈 셀명 보정
     th_elements = soup.select('thead tr th') or soup.select('tr th') or soup.select('th')
     dynamic_header = []
     
@@ -105,6 +113,7 @@ try:
     if dynamic_header and dynamic_header[0] != "No.":
         dynamic_header.insert(0, "No.")
 
+    # 6-2. 실제 데이터 행 수집
     row_count = 1
     for tr in table_rows:
         cols = [td.get_text(strip=True) for td in tr.select('td')]
@@ -119,6 +128,7 @@ try:
                     row_count += 1
                 rows.append(cols)
 
+    # 💡 헤더 길이가 실제 데이터 길이보다 짧을 경우 끝까지 자동 확장 처리
     max_data_len = max([len(r) for r in rows]) if rows else 0
     while len(dynamic_header) < max_data_len:
         dynamic_header.append(f"추가컬럼_{len(dynamic_header)+1}")
