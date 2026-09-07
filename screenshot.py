@@ -7,7 +7,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
-WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbykxUSe-5RA20YOav7F5ohYZrD1739O7FInVzP-vR_jB31iMIsyRj4HSo9-e0Oedc0q/exec"
+WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxtJIgNMXgigoA5xWcLtziCPIO9VKA0OoFYsdWFx0RH-h06_Yey00vVtTu8HN73eTT8/exec"
 
 # 한국 시간(KST) 구하기
 KST = timezone(timedelta(hours=9))
