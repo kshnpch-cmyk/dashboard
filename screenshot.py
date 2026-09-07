@@ -6,8 +6,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
-# ⚠️ 배포하신 구글 앱스 스크립트 웹 앱 URL을 아래에 넣어주세요.
-WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbw--_Gs008VRb5-aMBcF1GY7QqUhLnJ87ryxElvHU7K_497ozytdZlL2LLFYEcik4eU/exec"
+WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbykxUSe-5RA20YOav7F5ohYZrD1739O7FInVzP-vR_jB31iMIsyRj4HSo9-e0Oedc0q/exec"
 
 options = webdriver.ChromeOptions()
 options.add_argument('--headless')
@@ -65,28 +64,47 @@ try:
         body = driver.find_element(By.TAG_NAME, 'body')
         body.send_keys(Keys.F2)
 
-    time.sleep(6) # 데이터 렌더링을 위해 충분히 대기
+    time.sleep(6) # 데이터 로딩 대기
 
-    # 5. HTML 데이터 추출
+    # 5. 정밀 데이터 추출 및 정제 (잡동사니 필터링)
     html = driver.page_source
     soup = BeautifulSoup(html, 'html.parser')
     
     rows = []
-    # 모든 테이블 행 파싱
+    
+    # 올바른 헤더 라인 추가
+    header = [
+        "No.", "주문번호", "주문순번", "주문일자", "주문구분", "배송일자", 
+        "거래처코드", "거래처명", "브랜드명", "화주사코드", "화주사명", 
+        "센터코드", "센터명", "창고코드", "창고명", "품목코드", "품목명", "세트품목코드", "세트품목명", "품목온도"
+    ]
+    rows.append(header)
+
+    # 모든 행 중 OMS 데이터가 시작하는 실제 목록만 필터링
     table_rows = soup.select('tr') 
     for tr in table_rows:
         cols = [td.get_text(strip=True) for td in tr.select('td, th')]
-        # 완전 빈 행이 아니거나 의미 있는 셀 데이터를 가졌을 경우 추가
-        if cols and any(cols): 
-            rows.append(cols)
+        
+        # 💡 정제 조건:
+        # 1. OMS 주문번호 패턴(OMS로 시작)이 들어있거나,
+        # 2. 순수한 숫자로 시작하는 실제 주문 데이터 행만 픽업
+        if cols and len(cols) >= 5:
+            first_col = cols[0]
+            second_col = cols[1] if len(cols) > 1 else ""
+            
+            # 'indicator column' 등 불필요한 하단 노이즈 제거
+            if "indicator" in first_col.lower() or "summary" in first_col.lower():
+                continue
+                
+            # 실제 주문 데이터 행 추출 (주문번호 OMS 포함 또는 첫 열이 숫자)
+            if second_col.startswith("OMS") or first_col.isdigit():
+                rows.append(cols)
 
-    print(f"파싱 완료된 데이터 행 수: {len(rows)}개")
+    print(f"정제 완료된 깨끗한 데이터 행 수: {len(rows)}개")
 
-    # 6. 구글 시트 웹훅 전송
-    if not WEBHOOK_URL or "여기에_복사한_URL" in WEBHOOK_URL:
-        print("❌ WEBHOOK_URL이 설정되지 않았습니다. URL을 확인해 주세요.")
-    elif not rows:
-        print("❌ 파싱된 테이블 데이터가 존재하지 않아 전송을 스킵합니다.")
+    # 6. 구글 앱스 스크립트 웹훅 전송
+    if len(rows) <= 1: # 헤더만 있는 경우
+        print("❌ 파싱된 실제 주문 데이터가 없어 전송을 스킵합니다.")
     else:
         print("웹훅을 통해 구글 시트로 데이터 전송 중...")
         response = requests.post(WEBHOOK_URL, json=rows, allow_redirects=True)
