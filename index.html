@@ -45,16 +45,28 @@
             color: #94a3b8;
             font-weight: 600;
         }
+        
+        /* 💡 달력 입력창 및 아이콘 선명도 개선 */
         .date-input {
             background-color: #0f172a;
-            color: white;
+            color: #ffffff;
             border: 1px solid #475569;
             padding: 6px 10px;
             border-radius: 6px;
             font-size: 13px;
             font-family: inherit;
             cursor: pointer;
+            color-scheme: dark; /* 브라우저 기본 달력 아이콘을 흰색으로 전환 */
         }
+        .date-input::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+            filter: invert(1); /* 아이콘 흰색 반전 */
+            opacity: 0.9;
+        }
+        .date-input::-webkit-calendar-picker-indicator:hover {
+            opacity: 1;
+        }
+
         .last-updated-tag {
             font-size: 12px;
             color: #38bdf8;
@@ -293,9 +305,10 @@
             </div>
             <div class="date-picker-group">
                 <label>조회 기간:</label>
-                <input type="date" id="start-date" class="date-input" onchange="onDateFilterChange()">
+                <!-- 💡 클릭 시 달력 바로 열림 기능(onclick) 적용 -->
+                <input type="date" id="start-date" class="date-input" onchange="onDateFilterChange()" onclick="this.showPicker && this.showPicker()">
                 <span style="color:#94a3b8;">~</span>
-                <input type="date" id="end-date" class="date-input" onchange="onDateFilterChange()">
+                <input type="date" id="end-date" class="date-input" onchange="onDateFilterChange()" onclick="this.showPicker && this.showPicker()">
             </div>
             <button class="btn btn-query" onclick="fetchSheetData(true)">
                 🔍 시트 데이터 조회
@@ -363,7 +376,6 @@
                     <span id="selected-store-title">🛒 점포별 주문 상세</span>
                     <div class="summary-badge-group">
                         <button class="btn btn-save-width" onclick="saveColumnWidths()">💾 열 너비 저장</button>
-                        <!-- 💡 열 너비 저장 옆 [차트보기] 체크박스 -->
                         <label class="chart-toggle-label">
                             <input type="checkbox" id="chart-only-detail-check" onchange="onChartToggleChange(this)">
                             📊 차트보기
@@ -599,12 +611,10 @@
             onBrandChange();
         }
 
-        // 💡 [차트보기] 토글 상태 변경 시 이벤트
         function onChartToggleChange(checkbox) {
             updateDashboardChart();
         }
 
-        // 💡 조건에 따른 차트 데이터 업데이트 (전체 vs 상세 목록)
         function updateDashboardChart() {
             const isOnlyDetail = document.getElementById('chart-only-detail-check').checked;
             const chartTitleEl = document.getElementById('chart-panel-title');
