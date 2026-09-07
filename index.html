@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>더본 OMS 주문 현황 대시보드</title>
+    <!-- Chart.js 라이브러리 추가 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -104,6 +106,20 @@
         .kpi-card.purple { border-left-color: #8b5cf6; }
         .kpi-title { font-size: 14px; color: #64748b; font-weight: 600; }
         .kpi-value { font-size: 26px; font-weight: 800; margin-top: 6px; color: #0f172a; }
+
+        /* 💡 차트 패널 스타일 */
+        .chart-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            margin-bottom: 20px;
+        }
+        .chart-container {
+            position: relative;
+            height: 280px;
+            width: 100%;
+        }
 
         .dashboard-layout {
             display: grid;
@@ -275,7 +291,7 @@
     </div>
 
     <div class="container">
-        <!-- 요약 KPI -->
+        <!-- 1단계: 요약 KPI -->
         <div class="kpi-grid">
             <div class="kpi-card">
                 <div class="kpi-title">전체 총 주문수량</div>
@@ -291,6 +307,17 @@
             </div>
         </div>
 
+        <!-- 2단계: 💡 일자별 추이 그래픽 차트 (새로 추가됨) -->
+        <div class="chart-panel">
+            <div class="panel-title">
+                <span>📊 일자별 주문 추이 그래프 (주문점포수 / 주문수량 / 주문금액)</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="dailyTrendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 3단계: 점포 목록 및 상세 목록 -->
         <div class="dashboard-layout">
             <div class="panel">
                 <div class="panel-title">
@@ -373,28 +400,28 @@
         </div>
     </div>
 
-   <script>
+    <script>
         const githubId = 'kshnpch-cmyk'; 
         const repoName = 'dashboard'; 
         const token = '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'; 
         const webhookUrl = "https://script.google.com/macros/s/AKfycbxqFDL26lqaQqzAEw7VCOp1t9oSZLNOEXyUuTPJa9DnLzqc9RNPIFk-88n4YLD0oChR/exec";
 
-        // 기본 컬럼 위치 (매칭 실패 시 비상 기본값)
-        let colOrderDate    = 3;  // D열
-        let colDeliveryDate = 5;  // F열
-        let colStoreCode    = 6;  // G열
-        let colStoreName    = 7;  // H열
-        let colBrandName    = 8;  // I열
-        let colItemCode     = 15; // P열
-        let colItemName     = 16; // Q열
-        let colQty          = 24; // Y열
-        let colPrice        = 25; // Z열
-        let colTotal        = 26; // AA열
+        let colOrderDate    = 3;  
+        let colDeliveryDate = 5;  
+        let colStoreCode    = 6;  
+        let colStoreName    = 7;  
+        let colBrandName    = 8;  
+        let colItemCode     = 15; 
+        let colItemName     = 16; 
+        let colQty          = 24; 
+        let colPrice        = 25; 
+        let colTotal        = 26; 
 
         let allOrders = []; 
         let filteredOrders = []; 
         let baseDetailOrders = [];   
         let currentDetailOrders = [];
+        let trendChart = null;
 
         let currentSortKey = '';
         let currentSortAsc = true;
@@ -450,18 +477,17 @@
             document.body.appendChild(script);
         }
 
-        // 💡 중복 헤더 및 summary 열을 방지하고 앞쪽 진짜 헤더 위치 매칭
+        // 💡 중복 summary 컬럼을 무시하는 헤더 탐색 로직
         function detectColumnIndexes(headerRow) {
             if (!headerRow) return;
             
-            // 인덱스 초기화
             colOrderDate = -1; colDeliveryDate = -1; colStoreCode = -1;
             colStoreName = -1; colBrandName = -1; colItemCode = -1;
             colItemName = -1; colQty = -1; colPrice = -1; colTotal = -1;
 
             for (let i = 0; i < headerRow.length; i++) {
                 const title = String(headerRow[i]).trim();
-                if (title.includes("summary")) continue; // summary 열 무시
+                if (title.includes("summary")) continue;
 
                 if (colOrderDate === -1 && title === "주문일자") colOrderDate = i;
                 else if (colDeliveryDate === -1 && title === "배송일자") colDeliveryDate = i;
@@ -475,7 +501,6 @@
                 else if (colTotal === -1 && (title === "금액" || title === "합계" || title === "공급가액")) colTotal = i;
             }
 
-            // 매칭 실패 시 기본 인덱스 보정
             if (colOrderDate === -1) colOrderDate = 3;
             if (colDeliveryDate === -1) colDeliveryDate = 5;
             if (colStoreCode === -1) colStoreCode = 6;
@@ -535,6 +560,9 @@
             });
             document.getElementById('total-amount').innerText = `${totalAmount.toLocaleString()} 원`;
 
+            // 💡 차트 생성 및 업데이트
+            renderChart(filteredOrders);
+
             const brandSelect = document.getElementById('brand-select');
             const brands = [...new Set(filteredOrders.map(r => r[colBrandName]))].filter(Boolean);
             
@@ -544,6 +572,113 @@
             });
 
             onBrandChange();
+        }
+
+        // 💡 일자별 주문 추이 그래프 렌더링 함수
+        function renderChart(orders) {
+            const dailyData = {};
+
+            orders.forEach(row => {
+                let dateKey = formatDisplayDate(row[colDeliveryDate]);
+                if (dateKey === '-' || !dateKey) dateKey = formatDisplayDate(row[colOrderDate]);
+                if (dateKey === '-') return;
+
+                if (!dailyData[dateKey]) {
+                    dailyData[dateKey] = { stores: new Set(), qty: 0, amount: 0 };
+                }
+
+                if (row[colStoreName]) dailyData[dateKey].stores.add(row[colStoreName]);
+                
+                const q = cleanNumber(row[colQty]);
+                const p = cleanNumber(row[colPrice]);
+                let t = cleanNumber(row[colTotal]);
+                if (t === 0) t = q * p;
+
+                dailyData[dateKey].qty += q;
+                dailyData[dateKey].amount += t;
+            });
+
+            const labels = Object.keys(dailyData).sort();
+            const storeCounts = labels.map(k => dailyData[k].stores.size);
+            const qtySums = labels.map(k => dailyData[k].qty);
+            const amountSums = labels.map(k => dailyData[k].amount);
+
+            const ctx = document.getElementById('dailyTrendChart').getContext('2d');
+
+            if (trendChart) {
+                trendChart.destroy();
+            }
+
+            trendChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '주문 점포수 (개)',
+                            data: storeCounts,
+                            backgroundColor: 'rgba(37, 99, 235, 0.6)',
+                            borderColor: '#2563eb',
+                            borderWidth: 1,
+                            yAxisID: 'y1',
+                            order: 3
+                        },
+                        {
+                            label: '주문 수량 (건/개)',
+                            data: qtySums,
+                            type: 'line',
+                            borderColor: '#10b981',
+                            backgroundColor: '#10b981',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.2,
+                            yAxisID: 'y1',
+                            order: 2
+                        },
+                        {
+                            label: '주문 금액 (원)',
+                            data: amountSums,
+                            type: 'line',
+                            borderColor: '#8b5cf6',
+                            backgroundColor: '#8b5cf6',
+                            borderWidth: 2,
+                            borderDash: [4, 4],
+                            fill: false,
+                            tension: 0.2,
+                            yAxisID: 'y2',
+                            order: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        x: { grid: { display: false } },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: { display: true, text: '점포수 / 수량' },
+                            beginAtZero: true
+                        },
+                        y2: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: { display: true, text: '금액 (원)' },
+                            beginAtZero: true,
+                            grid: { drawOnChartArea: false },
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString() + '원';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
         }
 
         function onBrandChange() {
