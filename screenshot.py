@@ -6,8 +6,8 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
-# ⚠️ 구글 앱스 스크립트 웹 앱 URL을 아래에 넣으세요
-WEBHOOK_URL = "https://script.google.com/macros/s/여기에_복사한_URL을_붙여넣으세요/exec"
+# ⚠️ 배포하신 구글 앱스 스크립트 웹 앱 URL을 아래에 넣어주세요.
+WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbw--_Gs008VRb5-aMBcF1GY7QqUhLnJ87ryxElvHU7K_497ozytdZlL2LLFYEcik4eU/exec"
 
 options = webdriver.ChromeOptions()
 options.add_argument('--headless')
@@ -54,40 +54,44 @@ try:
     driver.execute_script(js_script)
     time.sleep(2)
 
-    # 4. 조회 버튼 클릭 (제공해주신 태그 정보로 정밀 클릭)
+    # 4. 조회 버튼 클릭
     print("조회 버튼 클릭 시도 중...")
     try:
-        # 1순위: 클래스명 form_btn_search 요소 직접 클릭
         search_btn = driver.find_element(By.CSS_SELECTOR, "button.form_btn_search[data-shortcut='F2']")
         search_btn.click()
         print("✅ form_btn_search 버튼 클릭 성공!")
     except Exception as e:
         print(f"버튼 직접 클릭 실패, F2 키 입력으로 대체: {e}")
-        # 2순위: F2 키 입력
         body = driver.find_element(By.TAG_NAME, 'body')
         body.send_keys(Keys.F2)
 
-    time.sleep(5) # 데이터 로딩 대기
+    time.sleep(6) # 데이터 렌더링을 위해 충분히 대기
 
-    # 5. HTML 테이블 데이터 추출
+    # 5. HTML 데이터 추출
     html = driver.page_source
     soup = BeautifulSoup(html, 'html.parser')
     
     rows = []
-    table_rows = soup.select('table tr') 
+    # 모든 테이블 행 파싱
+    table_rows = soup.select('tr') 
     for tr in table_rows:
         cols = [td.get_text(strip=True) for td in tr.select('td, th')]
-        if cols:
+        # 완전 빈 행이 아니거나 의미 있는 셀 데이터를 가졌을 경우 추가
+        if cols and any(cols): 
             rows.append(cols)
 
+    print(f"파싱 완료된 데이터 행 수: {len(rows)}개")
+
     # 6. 구글 시트 웹훅 전송
-    if rows and "script.google.com" in WEBHOOK_URL:
+    if not WEBHOOK_URL or "여기에_복사한_URL" in WEBHOOK_URL:
+        print("❌ WEBHOOK_URL이 설정되지 않았습니다. URL을 확인해 주세요.")
+    elif not rows:
+        print("❌ 파싱된 테이블 데이터가 존재하지 않아 전송을 스킵합니다.")
+    else:
         print("웹훅을 통해 구글 시트로 데이터 전송 중...")
-        response = requests.post(WEBHOOK_URL, json=rows)
-        if response.status_code == 200:
-            print("✅ 구글 시트 '202608' 탭으로 데이터 전송 성공!")
-        else:
-            print(f"❌ 전송 실패 (상태 코드: {response.status_code})")
+        response = requests.post(WEBHOOK_URL, json=rows, allow_redirects=True)
+        print(f"응답 상태 코드: {response.status_code}")
+        print(f"구글 시트 응답 내용: {response.text}")
 
     driver.save_screenshot('capture.png')
 
