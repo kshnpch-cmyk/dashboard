@@ -13,6 +13,11 @@ on:
         description: '종료일'
         required: false
 
+# 💡 동시 실행 방지 설정 (이미 실행 중이면 중복 실행 방지)
+concurrency:
+  group: sync-bot-group
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
