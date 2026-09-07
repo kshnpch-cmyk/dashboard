@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>더본 OMS 주문 현황 대시보드</title>
-    <!-- Chart.js 라이브러리 추가 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { box-sizing: border-box; }
@@ -107,7 +106,6 @@
         .kpi-title { font-size: 14px; color: #64748b; font-weight: 600; }
         .kpi-value { font-size: 26px; font-weight: 800; margin-top: 6px; color: #0f172a; }
 
-        /* 💡 차트 패널 스타일 */
         .chart-panel {
             background: white;
             padding: 20px;
@@ -282,7 +280,7 @@
                 🔍 시트 데이터 조회
             </button>
             <button class="btn btn-reset" onclick="resetToTomorrow()">
-                🔄 내일 기준 초기화
+                🔄 최근 일주일 기준 초기화
             </button>
             <button id="run-btn" class="btn" onclick="triggerBot()">
                 🚀 해당 기간 OMS 동기화
@@ -291,7 +289,7 @@
     </div>
 
     <div class="container">
-        <!-- 1단계: 요약 KPI -->
+        <!-- 요약 KPI -->
         <div class="kpi-grid">
             <div class="kpi-card">
                 <div class="kpi-title">전체 총 주문수량</div>
@@ -307,7 +305,7 @@
             </div>
         </div>
 
-        <!-- 2단계: 💡 일자별 추이 그래픽 차트 (새로 추가됨) -->
+        <!-- 일자별 추이 그래프 -->
         <div class="chart-panel">
             <div class="panel-title">
                 <span>📊 일자별 주문 추이 그래프 (주문점포수 / 주문수량 / 주문금액)</span>
@@ -317,7 +315,6 @@
             </div>
         </div>
 
-        <!-- 3단계: 점포 목록 및 상세 목록 -->
         <div class="dashboard-layout">
             <div class="panel">
                 <div class="panel-title">
@@ -452,13 +449,19 @@
             return s.replace(/-/g, '/');
         }
 
+        // 💡 [개선] 오늘 기준 다음날(D+1)부터 직전 7일간(D-6 ~ D+1) 자동 조회 세팅
         function resetToTomorrow() {
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            const tomorrowStr = formatDate(tomorrow);
+            const endObj = new Date();
+            endObj.setDate(endObj.getDate() + 1); // 종료일: 내일 (D+1)
 
-            document.getElementById('start-date').value = tomorrowStr;
-            document.getElementById('end-date').value = tomorrowStr;
+            const startObj = new Date(endObj);
+            startObj.setDate(startObj.getDate() - 6); // 시작일: 내일 기준 직전 7일간
+
+            const startStr = formatDate(startObj);
+            const endStr = formatDate(endObj);
+
+            document.getElementById('start-date').value = startStr;
+            document.getElementById('end-date').value = endStr;
             
             processData();
         }
@@ -477,7 +480,6 @@
             document.body.appendChild(script);
         }
 
-        // 💡 중복 summary 컬럼을 무시하는 헤더 탐색 로직
         function detectColumnIndexes(headerRow) {
             if (!headerRow) return;
             
@@ -560,7 +562,6 @@
             });
             document.getElementById('total-amount').innerText = `${totalAmount.toLocaleString()} 원`;
 
-            // 💡 차트 생성 및 업데이트
             renderChart(filteredOrders);
 
             const brandSelect = document.getElementById('brand-select');
@@ -574,7 +575,6 @@
             onBrandChange();
         }
 
-        // 💡 일자별 주문 추이 그래프 렌더링 함수
         function renderChart(orders) {
             const dailyData = {};
 
