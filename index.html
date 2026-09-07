@@ -252,11 +252,9 @@
         const githubId = 'kshnpch-cmyk'; 
         const repoName = 'dashboard'; 
         const token = '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'; 
-        
-        // 💡 신규 발급 웹 앱 URL 반영
-        const webhookUrl = "https://script.google.com/macros/s/AKfycbw-vPBcUbAjxHdP492e3z_JR1M74WZIp2q-48v6idKD3XjrBu5C_Fns00ybhzf3d-aa/exec";
+        const sheetId = '1E_FwM6qIiv-vmFGdpGTR9zHWPgyudNG9UY8Jo8LCGPM';
 
-        const COL_ORDER_DATE    = 4;  // E열: 주문일자
+        // 구글 시트 열 위치 매칭 (캡처본 기반)
         const COL_DELIVERY_DATE = 5;  // F열: 배송일자
         const COL_STORE_NAME    = 7;  // H열: 거래처명
         const COL_BRAND_NAME    = 8;  // I열: 브랜드명
@@ -264,7 +262,6 @@
 
         let allOrders = []; 
         let filteredOrders = []; 
-        let isShowAlert = false;
 
         resetToTomorrow();
         fetchSheetData();
@@ -291,25 +288,50 @@
             processData();
         }
 
+        // CSV 기반 직접 호출 API (앱스 스크립트 장애 완전 우회)
         function fetchSheetData(showAlert = false) {
-            isShowAlert = showAlert;
-            const oldScript = document.getElementById('jsonp-script');
-            if (oldScript) oldScript.remove();
+            const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=202609`;
 
-            const script = document.createElement('script');
-            script.id = 'jsonp-script';
-            script.src = `${webhookUrl}?callback=handleSheetResponse&_=${new Date().getTime()}`;
-            document.body.appendChild(script);
+            fetch(csvUrl)
+            .then(res => res.text())
+            .then(csvText => {
+                const rows = parseCSV(csvText);
+                if (rows && rows.length > 1) {
+                    allOrders = rows;
+                    processData();
+                    if (showAlert) alert("✅ 구글 시트 데이터를 불러왔습니다!");
+                } else {
+                    if (showAlert) alert("⚠️ 시트에 조회할 데이터가 없습니다.");
+                }
+            })
+            .catch(err => {
+                console.log("데이터 수신 오류:", err);
+                if (showAlert) alert("❌ 구글 시트 데이터를 불러올 수 없습니다. [파일]-[공유]-[웹에 게시]를 확인해 주세요.");
+            });
         }
 
-        function handleSheetResponse(data) {
-            if (Array.isArray(data) && data.length > 0) {
-                allOrders = data;
-                processData();
-                if (isShowAlert) alert("✅ 구글 시트 데이터를 성공적으로 불러왔습니다!");
-            } else {
-                if (isShowAlert) alert("⚠️ 시트에 데이터가 존재하지 않습니다.");
+        // CSV 파서 헬퍼
+        function parseCSV(text) {
+            let p = '', c = '', r = [];
+            let q = false;
+            let row = [''];
+            for (let n = 0; n < text.length; n++) {
+                c = text[n];
+                if (c === '"') {
+                    if (q && text[n + 1] === '"') { row[row.length - 1] += '"'; n++; }
+                    else { q = !q; }
+                } else if (c === ',' && !q) {
+                    row.push('');
+                } else if ((c === '\r' || c === '\n') && !q) {
+                    if (c === '\r' && text[n + 1] === '\n') { n++; }
+                    r.push(row);
+                    row = [''];
+                } else {
+                    row[row.length - 1] += c;
+                }
             }
+            if (row.length > 1 || row[0] !== '') { r.push(row); }
+            return r;
         }
 
         function cleanDateNum(dateStr) {
@@ -325,7 +347,7 @@
 
             filteredOrders = allOrders.filter(row => {
                 let rowDateNum = cleanDateNum(row[COL_DELIVERY_DATE]);
-                if (rowDateNum === 0) rowDateNum = cleanDateNum(row[COL_ORDER_DATE]);
+                if (rowDateNum === 0) rowDateNum = cleanDateNum(row[4]); // E열 유연 대응
                 return rowDateNum >= startNum && rowDateNum <= endNum;
             });
 
@@ -343,7 +365,7 @@
             });
 
             if (filteredOrders.length === 0) {
-                document.getElementById('store-list').innerHTML = `<li style="color: #94a3b8; text-align: center; padding: 20px;">지정한 날짜의 주문 데이터가 없습니다.</li>`;
+                document.getElementById('store-list').innerHTML = `<li style="color: #94a3b8; text-align: center; padding: 20px;">선택한 날짜의 데이터가 시트에 없습니다.</li>`;
             } else {
                 document.getElementById('store-list').innerHTML = `<li style="color: #94a3b8; text-align: center; padding: 20px;">브랜드를 선택해주세요.</li>`;
             }
