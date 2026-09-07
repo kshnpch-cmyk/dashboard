@@ -115,7 +115,7 @@ try:
                 if not cols[0].isdigit():
                     cols.insert(0, str(row_count))
                     row_count += 1
-                rows.append(cols) # 끝까지 데이터 전체 삽입
+                rows.append(cols)
 
     print(f"파싱 완료된 총 컬럼 수: {len(dynamic_header)}개")
     print(f"파싱 완료된 총 데이터 행 수: {len(rows)}개 (헤더 포함)")
