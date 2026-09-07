@@ -9,12 +9,11 @@ from selenium.webdriver.common.keys import Keys
 
 WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbykxUSe-5RA20YOav7F5ohYZrD1739O7FInVzP-vR_jB31iMIsyRj4HSo9-e0Oedc0q/exec"
 
-# 1. 한국 시간(KST) 및 항상 다음날(오늘 + 1일) 날짜 자동 계산
+# 1. 한국 시간(KST) 및 내일 날짜(오늘 + 1일) 자동 계산
 KST = timezone(timedelta(hours=9))
 now_kst = datetime.now(KST)
 target_date = now_kst + timedelta(days=1)
 
-# 다음날 기준 탭 이름 및 날짜 문자열 세팅
 target_tab_name = target_date.strftime("%Y%m") # 예: 202609
 tomorrow_str = target_date.strftime("%Y/%m/%d") # 예: 2026/09/08
 
@@ -45,7 +44,7 @@ try:
     driver.find_element(By.XPATH, "//*[contains(text(), '기간별 주문현황')]").click()
     time.sleep(5) 
 
-    # 4. 날짜 세팅 (수동 지정값이 없으면 '다음날' 적용)
+    # 4. 날짜 세팅 (수동 지정값이 없으면 내일 날짜 적용)
     target_start_date = os.environ.get('START_DATE') or tomorrow_str
     target_end_date = os.environ.get('END_DATE') or tomorrow_str
 
@@ -68,13 +67,17 @@ try:
     try:
         search_btn = driver.find_element(By.CSS_SELECTOR, "button.form_btn_search[data-shortcut='F2']")
         search_btn.click()
+        print("조회 버튼 클릭 성공")
     except Exception:
         body = driver.find_element(By.TAG_NAME, 'body')
         body.send_keys(Keys.F2)
+        print("F2 키 입력으로 대체")
 
-    time.sleep(6) # 데이터 로딩 대기
+    # 충분한 데이터 로딩 대기
+    print("데이터 로딩 대기 중 (10초)...")
+    time.sleep(10) 
 
-    # 6. 테이블 데이터 파싱 및 필터링
+    # 6. 데이터 파싱 조건 완화 (실제 주문 행 픽업)
     html = driver.page_source
     soup = BeautifulSoup(html, 'html.parser')
     
@@ -90,14 +93,15 @@ try:
     for tr in table_rows:
         cols = [td.get_text(strip=True) for td in tr.select('td, th')]
         if cols and len(cols) >= 5:
-            first_col = cols[0]
-            second_col = cols[1] if len(cols) > 1 else ""
-            
-            if "indicator" in first_col.lower() or "summary" in first_col.lower():
+            row_str = "".join(cols)
+            if "indicator" in row_str.lower() or "summary" in row_str.lower() or "summa" in row_str.lower():
                 continue
-                
-            if second_col.startswith("OMS") or first_col.isdigit():
+            
+            # 숫자(No) 또는 OMS 주문번호가 포함된 데이터 행 수집
+            if cols[0].isdigit() or any("OMS" in c for c in cols):
                 rows.append(cols)
+
+    print(f"파싱 완료된 데이터 행 수: {len(rows)}개 (헤더 포함)")
 
     # 7. 구글 시트로 페이로드 전송
     payload = {
@@ -106,10 +110,14 @@ try:
     }
 
     if len(rows) > 1:
+        print(f"구글 시트 '{target_tab_name}' 탭으로 전송 중...")
         response = requests.post(WEBHOOK_URL, json=payload, allow_redirects=True)
-        print(f"✅ 구글 시트 {target_tab_name} 탭 동기화 성공: {response.text}")
+        print(f"✅ 동기화 결과: {response.text}")
     else:
-        print("❌ 조회된 데이터가 없어 시트 업데이트를 건너땁니다.")
+        print(f"⚠️ 추출된 데이터가 없지만 '{target_tab_name}' 탭 생성을 위해 기본 헤더 전송 중...")
+        # 데이터가 없어도 헤더를 보내 탭을 자동 생성함
+        response = requests.post(WEBHOOK_URL, json=payload, allow_redirects=True)
+        print(f"✅ 동기화 결과: {response.text}")
 
 except Exception as e:
     print(f"오류 발생: {e}")
