@@ -7,7 +7,6 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
-# 💡 신규 발급된 구글 앱스 스크립트 WEBHOOK URL 적용 완료
 WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyFph9famYyQNkqxFtzDkOiUdBIT0dCkKn-2l8y1cP51Xr5pj3YqwA-AdpsJ2UjPJzu/exec"
 
 # 1. 한국 시간(KST) 및 항상 다음날(오늘 + 1일) 날짜 자동 계산
@@ -75,7 +74,7 @@ try:
 
     time.sleep(10) # 로딩 대기
 
-    # 6. 테이블 데이터 파싱
+    # 6. 테이블 데이터 파싱 (No. 순번 자동 삽입)
     html = driver.page_source
     soup = BeautifulSoup(html, 'html.parser')
     
@@ -88,6 +87,8 @@ try:
     rows.append(header)
 
     table_rows = soup.select('tr') 
+    row_count = 1
+
     for tr in table_rows:
         cols = [td.get_text(strip=True) for td in tr.select('td, th')]
         if cols and len(cols) >= 5:
@@ -95,12 +96,17 @@ try:
             if "indicator" in row_str.lower() or "summary" in row_str.lower() or "summa" in row_str.lower():
                 continue
             
-            if cols[0].isdigit() or any("OMS" in c for c in cols):
+            # 주문 데이터 패턴 매칭 ("OMS" 주문번호 포함 시)
+            if any("OMS" in c for c in cols):
+                # 만약 첫 번째 값이 숫자(No.)가 아니면 순번(row_count)을 맨 앞에 자동 추가!
+                if not cols[0].isdigit():
+                    cols.insert(0, str(row_count))
+                    row_count += 1
                 rows.append(cols)
 
     print(f"파싱 완료된 데이터 행 수: {len(rows)}개 (헤더 포함)")
 
-    # 7. 구글 시트로 페이로드 전송 (동적 탭 생성 포함)
+    # 7. 구글 시트로 페이로드 전송
     payload = {
         "tabName": target_tab_name,
         "data": rows
