@@ -66,6 +66,8 @@
             font-size: 14px;
         }
         .btn:hover { background-color: #1d4ed8; }
+        .btn-query { background-color: #0284c7; }
+        .btn-query:hover { background-color: #0369a1; }
         .btn-reset { background-color: #475569; }
         .btn-reset:hover { background-color: #334155; }
         .btn:disabled { background-color: #94a3b8; cursor: not-allowed; }
@@ -166,16 +168,19 @@
         <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
         <div class="control-panel">
             <div class="date-picker-group">
-                <label>조회 기간(배송일 기준):</label>
+                <label>조회 기간:</label>
                 <input type="date" id="start-date" class="date-input" onchange="onDateFilterChange()">
                 <span style="color:#94a3b8;">~</span>
                 <input type="date" id="end-date" class="date-input" onchange="onDateFilterChange()">
             </div>
+            <button class="btn btn-query" onclick="fetchSheetData(true)">
+                🔍 시트 데이터 조회
+            </button>
             <button class="btn btn-reset" onclick="resetToTomorrow()">
                 🔄 내일 기준 초기화
             </button>
             <button id="run-btn" class="btn" onclick="triggerBot()">
-                🚀 해당 기간 수동 동기화
+                🚀 해당 기간 OMS 동기화
             </button>
         </div>
     </div>
@@ -247,10 +252,9 @@
         const githubId = 'kshnpch-cmyk'; 
         const repoName = 'dashboard'; 
         const token = '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'; 
-        
-        // 💡 신규 발급 주소 반영 완료
         const webhookUrl = "https://script.google.com/macros/s/AKfycbzDMgxGldf82cEFKz4hVL3WBiAaRWIWndr23T48e10ZQ7QWDnOhDS10MnerHhJG9gMF/exec";
 
+        const COL_ORDER_DATE    = 3; // D열: 주문일자
         const COL_DELIVERY_DATE = 5; // F열: 배송일자
         const COL_STORE_NAME    = 7; // H열: 거래처명
         const COL_BRAND_NAME    = 8; // I열: 브랜드명
@@ -284,29 +288,43 @@
             processData();
         }
 
-        function fetchSheetData() {
+        function fetchSheetData(showAlert = false) {
             fetch(webhookUrl)
             .then(res => res.json())
             .then(data => {
                 if (Array.isArray(data) && data.length > 0) {
                     allOrders = data;
                     processData();
+                    if (showAlert) alert("✅ 구글 시트 데이터를 불러왔습니다!");
+                } else {
+                    if (showAlert) alert("⚠️ 시트에 조회할 데이터가 없습니다.");
                 }
             })
             .catch(err => {
                 console.log("데이터 수신 오류:", err);
+                if (showAlert) alert("❌ 구글 시트 통신 오류가 발생했습니다.");
             });
+        }
+
+        // 숫자만 추출하는 헬퍼 함수 (예: "2026/09/08" -> 20260908)
+        function cleanDateNum(dateStr) {
+            if (!dateStr) return 0;
+            return parseInt(String(dateStr).replace(/[^0-9]/g, ''), 10) || 0;
         }
 
         function processData() {
             if (!allOrders || allOrders.length <= 1) return;
 
-            const startVal = document.getElementById('start-date').value.replace(/-/g, '/');
-            const endVal = document.getElementById('end-date').value.replace(/-/g, '/');
+            const startNum = cleanDateNum(document.getElementById('start-date').value);
+            const endNum = cleanDateNum(document.getElementById('end-date').value);
 
+            // 배송일자(F열) 우선 비교 ➔ 없을 경우 주문일자(D열) 비교
             filteredOrders = allOrders.slice(1).filter(row => {
-                const rowDate = row[COL_DELIVERY_DATE];
-                return rowDate >= startVal && rowDate <= endVal;
+                let rowDateNum = cleanDateNum(row[COL_DELIVERY_DATE]);
+                if (rowDateNum === 0) {
+                    rowDateNum = cleanDateNum(row[COL_ORDER_DATE]);
+                }
+                return rowDateNum >= startNum && rowDateNum <= endNum;
             });
 
             document.getElementById('total-qty').innerText = `${filteredOrders.length} 건`;
@@ -322,7 +340,12 @@
                 brandSelect.innerHTML += `<option value="${b}">${b}</option>`;
             });
 
-            document.getElementById('store-list').innerHTML = `<li style="color: #94a3b8; text-align: center; padding: 20px;">브랜드를 선택해주세요.</li>`;
+            if (filteredOrders.length === 0) {
+                document.getElementById('store-list').innerHTML = `<li style="color: #94a3b8; text-align: center; padding: 20px;">지정한 날짜의 주문 데이터가 시트에 없습니다.<br>(상단 동기화 버튼을 눌러주세요)</li>`;
+            } else {
+                document.getElementById('store-list').innerHTML = `<li style="color: #94a3b8; text-align: center; padding: 20px;">브랜드를 선택해주세요.</li>`;
+            }
+            
             document.getElementById('order-detail-table').innerHTML = `<tr><td colspan="4" style="text-align: center; color: #94a3b8; padding: 40px;">좌측에서 점포를 선택하시면 상세 주문 데이터가 표시됩니다.</td></tr>`;
         }
 
@@ -398,15 +421,15 @@
             })
             .then(res => {
                 if(res.ok) {
-                    alert(`✅ [${startVal} ~ ${endVal}] 기간으로 동기화 요청 완료!\n약 30초 후 데이터가 반영됩니다.`);
+                    alert(`✅ [${startVal} ~ ${endVal}] OMS 수동 동기화 요청 완료!\n약 30초 후 데이터가 동기화됩니다.`);
                     setTimeout(() => { 
                         btn.disabled = false; 
-                        btn.innerText = "🚀 해당 기간 수동 동기화"; 
+                        btn.innerText = "🚀 해당 기간 OMS 동기화"; 
                         fetchSheetData();
                     }, 35000);
                 } else {
                     alert("❌ 동기화 요청 실패");
-                    btn.disabled = false; btn.innerText = "🚀 해당 기간 수동 동기화";
+                    btn.disabled = false; btn.innerText = "🚀 해당 기간 OMS 동기화";
                 }
             });
         }
