@@ -74,37 +74,51 @@ try:
 
     time.sleep(10) # 로딩 대기
 
-    # 6. 테이블 데이터 파싱 (No. 순번 자동 삽입)
+    # 6. 동적 테이블 헤더 및 전체 데이터 추출
     html = driver.page_source
     soup = BeautifulSoup(html, 'html.parser')
     
     rows = []
-    header = [
-        "No.", "주문번호", "주문순번", "주문일자", "주문구분", "배송일자", 
-        "거래처코드", "거래처명", "브랜드명", "화주사코드", "화주사명", 
-        "센터코드", "센터명", "창고코드", "창고명", "품목코드", "품목명", "세트품목코드", "세트품목명", "품목온도"
-    ]
-    rows.append(header)
+    
+    # 6-1. 웹 OMS 화면의 헤더(th) 전체 추출
+    th_elements = soup.select('thead tr th') or soup.select('tr th')
+    dynamic_header = [th.get_text(strip=True) for th in th_elements if th.get_text(strip=True)]
+    
+    # 만약 헤더 추출 실패 시 기본 고정 헤더 적용
+    if not dynamic_header:
+        dynamic_header = [
+            "No.", "주문번호", "주문순번", "주문일자", "주문구분", "배송일자", 
+            "거래처코드", "거래처명", "브랜드명", "화주사코드", "화주사명", 
+            "센터코드", "센터명", "창고코드", "창고명", "품목코드", "품목명", 
+            "세트품목코드", "세트품목명", "품목온도"
+        ]
+    else:
+        # 맨 앞 No. 헤더 보정
+        if dynamic_header[0] != "No.":
+            dynamic_header.insert(0, "No.")
 
-    table_rows = soup.select('tr') 
+    rows.append(dynamic_header)
+
+    # 6-2. 데이터 행(tr) 전체 추출
+    table_rows = soup.select('tbody tr') or soup.select('tr') 
     row_count = 1
 
     for tr in table_rows:
-        cols = [td.get_text(strip=True) for td in tr.select('td, th')]
+        cols = [td.get_text(strip=True) for td in tr.select('td')]
         if cols and len(cols) >= 5:
             row_str = "".join(cols)
             if "indicator" in row_str.lower() or "summary" in row_str.lower() or "summa" in row_str.lower():
                 continue
             
-            # 주문 데이터 패턴 매칭 ("OMS" 주문번호 포함 시)
+            # OMS 주문 데이터 파싱 및 No. 순번 할당
             if any("OMS" in c for c in cols):
-                # 만약 첫 번째 값이 숫자(No.)가 아니면 순번(row_count)을 맨 앞에 자동 추가!
                 if not cols[0].isdigit():
                     cols.insert(0, str(row_count))
                     row_count += 1
-                rows.append(cols)
+                rows.append(cols) # 끝까지 데이터 전체 삽입
 
-    print(f"파싱 완료된 데이터 행 수: {len(rows)}개 (헤더 포함)")
+    print(f"파싱 완료된 총 컬럼 수: {len(dynamic_header)}개")
+    print(f"파싱 완료된 총 데이터 행 수: {len(rows)}개 (헤더 포함)")
 
     # 7. 구글 시트로 페이로드 전송
     payload = {
