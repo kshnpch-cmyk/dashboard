@@ -86,8 +86,8 @@
             const githubId = 'kshnpch-cmyk'; 
             const repoName = 'dashboard'; 
             
-            // ⚠️ 발급받으신 토큰으로 교체해 주세요.
-            const token = 'ghp_여기에_발급받은_토큰을_넣어주세요'; 
+            // ⚠️ [중요] 한글을 완전히 지우고 실제 ghp_로 시작하는 토큰만 넣으셔야 합니다!
+            const token = 'ghp_xxxxxx'; 
 
             const startVal = document.getElementById('startDate').value.replace(/-/g, '/');
             const endVal = document.getElementById('endDate').value.replace(/-/g, '/');
@@ -107,7 +107,6 @@
                     'Accept': 'application/vnd.github.v3+json',
                     'Authorization': `Bearer ${token}`
                 },
-                // 저장소 브랜치 이름이 'master'라면 아래 'main'을 'master'로 수정하세요.
                 body: JSON.stringify({ 
                     ref: 'main',
                     inputs: {
@@ -121,8 +120,7 @@
                     statusText.innerText = "✅ 성공! 봇이 출동했습니다. 약 30~40초 뒤 화면을 새로고침 해주세요.";
                     statusText.style.color = "green";
                 } else {
-                    // 서버가 반환한 정확한 HTTP 상태 코드를 표시합니다.
-                    statusText.innerText = `❌ 오류 발생 (상태 코드: ${res.status}). 토큰, 브랜치명(main/master), capture.yml 설정을 확인하세요.`;
+                    statusText.innerText = `❌ 오류 발생 (상태 코드: ${res.status}).`;
                     statusText.style.color = "red";
                 }
             })
