@@ -132,7 +132,6 @@
             .then(data => {
                 if (data.workflow_runs && data.workflow_runs.length > 0) {
                     setButtonState(true, "⏳ 현재 동기화 작업이 진행 중입니다.");
-                    // 10초 뒤에 상태 재확인
                     setTimeout(checkWorkflowStatus, 10000);
                 } else {
                     setButtonState(false, "");
@@ -158,7 +157,7 @@
             const btn = document.getElementById('run-btn');
             if (btn.disabled) return;
 
-            setButtonState(true, "⏳ 동기화 요청 중...");
+            setButtonState(true, "⏳ 수동 동기화 요청 중...");
 
             fetch(`https://api.github.com/repos/${githubId}/${repoName}/actions/workflows/capture.yml/dispatches`, {
                 method: 'POST',
@@ -171,7 +170,6 @@
             .then(res => {
                 if (res.ok) {
                     alert("✅ 동기화 명령을 보냈습니다. 완료까지 약 30~40초 소요됩니다.");
-                    // 5초 후부터 실행 상태 모니터링 시작
                     setTimeout(checkWorkflowStatus, 5000);
                 } else {
                     alert("❌ 실행 실패: 이미 실행 중이거나 통신 오류입니다.");
