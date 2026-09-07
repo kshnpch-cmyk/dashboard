@@ -54,6 +54,15 @@
             font-family: inherit;
             cursor: pointer;
         }
+        .last-updated-tag {
+            font-size: 12px;
+            color: #38bdf8;
+            background-color: #1e293b;
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid #0284c7;
+            font-weight: bold;
+        }
         .btn {
             background-color: #2563eb;
             color: white;
@@ -167,8 +176,11 @@
     <div class="navbar">
         <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
         <div class="control-panel">
+            <div class="last-updated-tag" id="last-updated-text">
+                🕒 동기화: 확인 중...
+            </div>
             <div class="date-picker-group">
-                <label>조회 기간(배송일 기준):</label>
+                <label>조회 기간:</label>
                 <input type="date" id="start-date" class="date-input" onchange="onDateFilterChange()">
                 <span style="color:#94a3b8;">~</span>
                 <input type="date" id="end-date" class="date-input" onchange="onDateFilterChange()">
@@ -186,7 +198,7 @@
     </div>
 
     <div class="container">
-        <!-- 1단계: 전체 요약 KPI -->
+        <!-- 1단계: 요약 KPI -->
         <div class="kpi-grid">
             <div class="kpi-card">
                 <div class="kpi-title">전체 총 주문수량</div>
@@ -253,15 +265,13 @@
         const repoName = 'dashboard'; 
         const token = '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'; 
         
-        // 💡 최신 웹 앱 URL 반영 완료
-        const webhookUrl = "https://script.google.com/macros/s/AKfycbzdbqLJJIqQ8cXxMgyadZXwERo21zwJaTBeVtQuvyqSmXpyHscOJNWJ_76UR2J_Rm4g/exec";
+        // 💡 신규 발급된 웹 앱 URL 반영
+        const webhookUrl = "https://script.google.com/macros/s/AKfycbxqFDL26lqaQqzAEw7VCOp1t9oSZLNOEXyUuTPJa9DnLzqc9RNPIFk-88n4YLD0oChR/exec";
 
-        // 구글 시트 캡처본 기준 컬럼 매칭
-        const COL_ORDER_DATE    = 4;  // E열: 주문일자
-        const COL_DELIVERY_DATE = 5;  // F열: 배송일자 (2026/09/08)
-        const COL_STORE_NAME    = 7;  // H열: 거래처명
-        const COL_BRAND_NAME    = 8;  // I열: 브랜드명
-        const COL_ITEM_NAME     = 16; // Q열: 품목명
+        let colDeliveryDate = 5; 
+        let colStoreName    = 7; 
+        let colBrandName    = 8; 
+        let colItemName     = 16; 
 
         let allOrders = []; 
         let filteredOrders = []; 
@@ -292,7 +302,6 @@
             processData();
         }
 
-        // JSONP 방식 통신 (보안 및 차단 오류 완벽 차단)
         function fetchSheetData(showAlert = false) {
             isShowAlert = showAlert;
             const oldScript = document.getElementById('jsonp-script');
@@ -304,8 +313,26 @@
             document.body.appendChild(script);
         }
 
-        function handleSheetResponse(data) {
+        function detectColumnIndexes(headerRow) {
+            if (!headerRow) return;
+            for (let i = 0; i < headerRow.length; i++) {
+                const title = String(headerRow[i]).trim();
+                if (title === "배송일자") colDeliveryDate = i;
+                else if (title === "거래처명") colStoreName = i;
+                else if (title === "브랜드명") colBrandName = i;
+                else if (title === "품목명") colItemName = i;
+            }
+        }
+
+        function handleSheetResponse(res) {
+            let data = res;
+            if (res && res.data) {
+                data = res.data;
+                document.getElementById('last-updated-text').innerText = `🕒 동기화: ${res.lastUpdated || '-'}`;
+            }
+
             if (Array.isArray(data) && data.length > 0) {
+                detectColumnIndexes(data[0]); 
                 allOrders = data;
                 processData();
                 if (isShowAlert) alert("✅ 구글 시트 데이터를 성공적으로 불러왔습니다!");
@@ -320,25 +347,24 @@
         }
 
         function processData() {
-            if (!allOrders || allOrders.length < 1) return;
+            if (!allOrders || allOrders.length <= 1) return;
 
             const startNum = cleanDateNum(document.getElementById('start-date').value);
             const endNum = cleanDateNum(document.getElementById('end-date').value);
 
-            // F열(인덱스 5번 - 배송일자) 기준 정밀 매칭
-            filteredOrders = allOrders.filter(row => {
-                let rowDateNum = cleanDateNum(row[COL_DELIVERY_DATE]);
-                if (rowDateNum === 0) rowDateNum = cleanDateNum(row[COL_ORDER_DATE]);
+            filteredOrders = allOrders.slice(1).filter(row => {
+                let rowDateNum = cleanDateNum(row[colDeliveryDate]);
+                if (rowDateNum === 0) rowDateNum = cleanDateNum(row[4]); 
                 return rowDateNum >= startNum && rowDateNum <= endNum;
             });
 
             document.getElementById('total-qty').innerText = `${filteredOrders.length} 건`;
             
-            const uniqueItems = new Set(filteredOrders.map(r => r[COL_ITEM_NAME]));
+            const uniqueItems = new Set(filteredOrders.map(r => r[colItemName]));
             document.getElementById('total-items').innerText = `${uniqueItems.size} 종`;
 
             const brandSelect = document.getElementById('brand-select');
-            const brands = [...new Set(filteredOrders.map(r => r[COL_BRAND_NAME]))].filter(Boolean);
+            const brands = [...new Set(filteredOrders.map(r => r[colBrandName]))].filter(Boolean);
             
             brandSelect.innerHTML = '<option value="">-- 브랜드 선택 --</option>';
             brands.forEach(b => {
@@ -358,9 +384,9 @@
             const selectedBrand = document.getElementById('brand-select').value;
             if (!selectedBrand) return;
 
-            const brandOrders = filteredOrders.filter(r => r[COL_BRAND_NAME] === selectedBrand);
-            const stores = [...new Set(brandOrders.map(r => r[COL_STORE_NAME]))].filter(Boolean);
-            const items = new Set(brandOrders.map(r => r[COL_ITEM_NAME]));
+            const brandOrders = filteredOrders.filter(r => r[colBrandName] === selectedBrand);
+            const stores = [...new Set(brandOrders.map(r => r[colStoreName]))].filter(Boolean);
+            const items = new Set(brandOrders.map(r => r[colItemName]));
 
             document.getElementById('brand-store-count').innerText = stores.length;
             document.getElementById('brand-item-count').innerText = items.size;
@@ -369,7 +395,7 @@
             storeListEl.innerHTML = "";
 
             stores.forEach(store => {
-                const count = brandOrders.filter(r => r[COL_STORE_NAME] === store).length;
+                const count = brandOrders.filter(r => r[colStoreName] === store).length;
                 storeListEl.innerHTML += `
                     <li class="store-item" onclick="onStoreSelect('${store}', '${selectedBrand}', this)">
                         <span>${store}</span>
@@ -385,12 +411,12 @@
 
             document.getElementById('selected-store-title').innerText = `🛒 [${storeName}] 주문 상세 목록`;
 
-            const storeOrders = filteredOrders.filter(r => r[COL_STORE_NAME] === storeName);
+            const storeOrders = filteredOrders.filter(r => r[colStoreName] === storeName);
             const detailTable = document.getElementById('order-detail-table');
 
             detailTable.innerHTML = "";
             storeOrders.forEach(row => {
-                const itemName = row[COL_ITEM_NAME] || '-';
+                const itemName = row[colItemName] || '-';
                 detailTable.innerHTML += `
                     <tr>
                         <td>${itemName}</td>
