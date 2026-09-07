@@ -121,23 +121,31 @@
         const repoName = 'dashboard'; 
         const token = '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'; 
 
-        // 대시보드 진입 시 현재 깃허브 서버 실행 상태 체크
+        // 대시보드 진입 시 상태 모니터링 시작
         checkWorkflowStatus();
+        setInterval(checkWorkflowStatus, 5000); // 5초마다 실시간 체크
 
-        function checkWorkflowStatus() {
-            fetch(`https://api.github.com/repos/${githubId}/${repoName}/actions/runs?status=in_progress`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.workflow_runs && data.workflow_runs.length > 0) {
-                    setButtonState(true, "⏳ 현재 동기화 작업이 진행 중입니다.");
-                    setTimeout(checkWorkflowStatus, 10000);
-                } else {
-                    setButtonState(false, "");
-                }
-            })
-            .catch(() => setButtonState(false, ""));
+        // 현재 깃허브 서버에서 동작 중이거나 대기 중인 작업이 있는지 확인
+        async function getActiveRuns() {
+            try {
+                const res = await fetch(`https://api.github.com/repos/${githubId}/${repoName}/actions/runs?per_page=10`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                
+                // in_progress, queued, pending 상태인 작업 필터링
+                const active = data.workflow_runs.filter(run => 
+                    run.status === 'in_progress' || run.status === 'queued' || run.status === 'pending' || run.status === 'requested'
+                );
+                return active.length > 0;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        async function checkWorkflowStatus() {
+            const isActive = await getActiveRuns();
+            setButtonState(isActive, isActive ? "⏳ 현재 동기화 작업이 진행 중입니다." : "");
         }
 
         function setButtonState(disabled, message) {
@@ -150,12 +158,29 @@
                 statusText.style.color = "#2563eb";
             } else {
                 btn.innerText = "🚀 지금 즉시 동기화 실행";
+                if (statusText.innerText.includes("⏳")) {
+                    statusText.innerText = "✅ 동기화 완료!";
+                    statusText.style.color = "#10b981";
+                    // 시트 새로고침
+                    const iframe = document.getElementById('sheet-iframe');
+                    iframe.src = iframe.src;
+                }
             }
         }
 
-        function triggerBot() {
+        async function triggerBot() {
             const btn = document.getElementById('run-btn');
-            if (btn.disabled) return;
+            
+            // 클릭 즉시 서버 실시간 체크
+            btn.innerText = "⏳ 확인 중...";
+            const isActive = await getActiveRuns();
+
+            // 이미 동작 중이거나 대기 중이면 알림창을 띄우고 실행 차단!
+            if (isActive) {
+                alert("⚠️ 현재 데이터 동기화 업데이트가 진행 중입니다!\n작업이 끝난 후 다시 시도해주세요.");
+                setButtonState(true, "⏳ 현재 동기화 작업이 진행 중입니다.");
+                return;
+            }
 
             setButtonState(true, "⏳ 수동 동기화 요청 중...");
 
@@ -169,8 +194,8 @@
             })
             .then(res => {
                 if (res.ok) {
-                    alert("✅ 동기화 명령을 보냈습니다. 완료까지 약 30~40초 소요됩니다.");
-                    setTimeout(checkWorkflowStatus, 5000);
+                    alert("✅ 동기화 명령을 보냈습니다.\n(완료 시 자동으로 대시보드가 갱신됩니다)");
+                    setTimeout(checkWorkflowStatus, 3000);
                 } else {
                     alert("❌ 실행 실패: 이미 실행 중이거나 통신 오류입니다.");
                     checkWorkflowStatus();
