@@ -20,38 +20,58 @@
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            flex-wrap: wrap;
+            gap: 15px;
         }
         .navbar h1 { margin: 0; font-size: 20px; font-weight: 700; }
         .control-panel {
             display: flex;
-            gap: 15px;
+            gap: 10px;
             align-items: center;
+            flex-wrap: wrap;
         }
-        .date-badge {
-            background-color: #334155;
-            padding: 8px 16px;
-            border-radius: 20px;
+        .date-picker-group {
+            display: flex;
+            align-items: center;
+            background-color: #1e293b;
+            padding: 6px 12px;
+            border-radius: 8px;
+            gap: 8px;
+            border: 1px solid #334155;
+        }
+        .date-picker-group label {
+            font-size: 13px;
+            color: #94a3b8;
             font-weight: 600;
-            font-size: 14px;
+        }
+        .date-input {
+            background-color: #0f172a;
+            color: white;
+            border: 1px solid #475569;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: inherit;
+            cursor: pointer;
         }
         .btn {
             background-color: #2563eb;
             color: white;
             border: none;
-            padding: 10px 18px;
+            padding: 9px 16px;
             border-radius: 8px;
             font-weight: 700;
             cursor: pointer;
             transition: all 0.2s;
+            font-size: 14px;
         }
         .btn:hover { background-color: #1d4ed8; }
-        .btn-deadline { background-color: #d97706; }
-        .btn-deadline:hover { background-color: #b45309; }
+        .btn-reset { background-color: #475569; }
+        .btn-reset:hover { background-color: #334155; }
         .btn:disabled { background-color: #94a3b8; cursor: not-allowed; }
 
         .container { padding: 30px; max-width: 1400px; margin: 0 auto; }
         
-        /* 1단계 KPI 카드 */
         .kpi-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -70,7 +90,6 @@
         .kpi-title { font-size: 14px; color: #64748b; font-weight: 600; }
         .kpi-value { font-size: 28px; font-weight: 800; margin-top: 8px; color: #0f172a; }
 
-        /* 2, 3단계 레이아웃 */
         .dashboard-layout {
             display: grid;
             grid-template-columns: 1fr 2fr;
@@ -146,12 +165,17 @@
     <div class="navbar">
         <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
         <div class="control-panel">
-            <div class="date-badge" id="current-target-date">배송일자: 계산 중...</div>
-            <button class="btn btn-deadline" onclick="toggleDeadline()">
-                ⏰ 11시 마감 적용 (익익일)
+            <div class="date-picker-group">
+                <label>조회 기간(배송일 기준):</label>
+                <input type="date" id="start-date" class="date-input" onchange="onDateFilterChange()">
+                <span style="color:#94a3b8;">~</span>
+                <input type="date" id="end-date" class="date-input" onchange="onDateFilterChange()">
+            </div>
+            <button class="btn btn-reset" onclick="resetToTomorrow()">
+                🔄 내일 기준 초기화
             </button>
             <button id="run-btn" class="btn" onclick="triggerBot()">
-                🚀 수동 동기화
+                🚀 해당 기간 수동 동기화
             </button>
         </div>
     </div>
@@ -225,37 +249,38 @@
         const token = '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'; 
         const webhookUrl = "https://script.google.com/macros/s/AKfycbyFph9famYyQNkqxFtzDkOiUdBIT0dCkKn-2l8y1cP51Xr5pj3YqwA-AdpsJ2UjPJzu/exec";
 
-        // 시트 열 고정 인덱스 (F열 = 5번 인덱스)
         const COL_DELIVERY_DATE = 5; // F열: 배송일자
-        const COL_STORE_NAME    = 7; // H열: 거래처명(점포명)
+        const COL_STORE_NAME    = 7; // H열: 거래처명
         const COL_BRAND_NAME    = 8; // I열: 브랜드명
         const COL_ITEM_NAME     = 16; // Q열: 품목명
 
-        let isDeadlineApplied = false;
         let allOrders = []; 
         let filteredOrders = []; 
-        let currentTargetDateStr = "";
 
-        updateTargetDate();
+        // 초기화: 기본값 '내일 날짜' 세팅
+        resetToTomorrow();
         fetchSheetData();
 
-        function updateTargetDate() {
-            const today = new Date();
-            const daysToAdd = isDeadlineApplied ? 2 : 1;
-            const targetDate = new Date(today.setDate(today.getDate() + daysToAdd));
-            
-            const year = targetDate.getFullYear();
-            const month = String(targetDate.getMonth() + 1).padStart(2, '0');
-            const day = String(targetDate.getDate()).padStart(2, '0');
-            
-            currentTargetDateStr = `${year}/${month}/${day}`;
-            document.getElementById('current-target-date').innerText = `배송일자(F열) 기준: ${currentTargetDateStr} (${isDeadlineApplied ? '11시 마감' : '내일 배송'})`;
+        function formatDate(dateObj) {
+            const year = dateObj.getFullYear();
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         }
 
-        function toggleDeadline() {
-            isDeadlineApplied = !isDeadlineApplied;
-            updateTargetDate();
-            processData(); 
+        function resetToTomorrow() {
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const tomorrowStr = formatDate(tomorrow);
+
+            document.getElementById('start-date').value = tomorrowStr;
+            document.getElementById('end-date').value = tomorrowStr;
+            
+            processData();
+        }
+
+        function onDateFilterChange() {
+            processData();
         }
 
         function fetchSheetData() {
@@ -266,17 +291,20 @@
                 processData();
             })
             .catch(err => {
-                console.log("시트 데이터 로드 중...");
+                console.log("시트 데이터 데이터 로딩 중...");
             });
         }
 
-        // F열(배송일자) 지정 집계 로직
+        // 선택한 기간(start ~ end)으로 F열(배송일자) 필터링
         function processData() {
             if (!allOrders || allOrders.length <= 1) return;
 
-            // F열(인덱스 5) 기준 배송일자 매칭
+            const startVal = document.getElementById('start-date').value.replace(/-/g, '/');
+            const endVal = document.getElementById('end-date').value.replace(/-/g, '/');
+
             filteredOrders = allOrders.slice(1).filter(row => {
-                return row[COL_DELIVERY_DATE] === currentTargetDateStr;
+                const rowDate = row[COL_DELIVERY_DATE]; // 예: 2026/09/08
+                return rowDate >= startVal && rowDate <= endVal;
             });
 
             // 1단계 KPI
@@ -285,7 +313,7 @@
             const uniqueItems = new Set(filteredOrders.map(r => r[COL_ITEM_NAME]));
             document.getElementById('total-items').innerText = `${uniqueItems.size} 종`;
 
-            // 2단계 브랜드 채우기
+            // 2단계 브랜드 선택 드롭다운 채우기
             const brandSelect = document.getElementById('brand-select');
             const brands = [...new Set(filteredOrders.map(r => r[COL_BRAND_NAME]))].filter(Boolean);
             
@@ -295,6 +323,7 @@
             });
 
             document.getElementById('store-list').innerHTML = `<li style="color: #94a3b8; text-align: center; padding: 20px;">브랜드를 선택해주세요.</li>`;
+            document.getElementById('order-detail-table').innerHTML = `<tr><td colspan="4" style="text-align: center; color: #94a3b8; padding: 40px;">좌측에서 점포를 선택하시면 상세 주문 데이터가 표시됩니다.</td></tr>`;
         }
 
         function onBrandChange() {
@@ -344,8 +373,13 @@
             });
         }
 
+        // 선택한 기간을 파라미터로 넘겨 봇 수동 트리거 실행
         async function triggerBot() {
             const btn = document.getElementById('run-btn');
+            
+            const startVal = document.getElementById('start-date').value.replace(/-/g, '/');
+            const endVal = document.getElementById('end-date').value.replace(/-/g, '/');
+
             btn.disabled = true;
             btn.innerText = "🔄 동기화 중...";
 
@@ -355,19 +389,25 @@
                     'Accept': 'application/vnd.github.v3+json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ ref: 'main' })
+                body: JSON.stringify({ 
+                    ref: 'main',
+                    inputs: {
+                        start_date: startVal,
+                        end_date: endVal
+                    }
+                })
             })
             .then(res => {
                 if(res.ok) {
-                    alert("✅ 동기화 요청 완료! 약 30초 뒤 수집 데이터가 반영됩니다.");
+                    alert(`✅ [${startVal} ~ ${endVal}] 기간으로 동기화 요청 완료!\n약 30초 후 데이터가 반영됩니다.`);
                     setTimeout(() => { 
                         btn.disabled = false; 
-                        btn.innerText = "🚀 수동 동기화"; 
+                        btn.innerText = "🚀 해당 기간 수동 동기화"; 
                         fetchSheetData();
-                    }, 30000);
+                    }, 35000);
                 } else {
                     alert("❌ 동기화 요청 실패");
-                    btn.disabled = false; btn.innerText = "🚀 수동 동기화";
+                    btn.disabled = false; btn.innerText = "🚀 해당 기간 수동 동기화";
                 }
             });
         }
