@@ -247,7 +247,9 @@
         const githubId = 'kshnpch-cmyk'; 
         const repoName = 'dashboard'; 
         const token = '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'; 
-        const webhookUrl = "https://script.google.com/macros/s/AKfycbyFph9famYyQNkqxFtzDkOiUdBIT0dCkKn-2l8y1cP51Xr5pj3YqwA-AdpsJ2UjPJzu/exec";
+        
+        // 💡 신규 발급 주소 반영 완료
+        const webhookUrl = "https://script.google.com/macros/s/AKfycbzDMgxGldf82cEFKz4hVL3WBiAaRWIWndr23T48e10ZQ7QWDnOhDS10MnerHhJG9gMF/exec";
 
         const COL_DELIVERY_DATE = 5; // F열: 배송일자
         const COL_STORE_NAME    = 7; // H열: 거래처명
@@ -257,7 +259,6 @@
         let allOrders = []; 
         let filteredOrders = []; 
 
-        // 초기화: 기본값 '내일 날짜' 세팅
         resetToTomorrow();
         fetchSheetData();
 
@@ -287,15 +288,16 @@
             fetch(webhookUrl)
             .then(res => res.json())
             .then(data => {
-                allOrders = data;
-                processData();
+                if (Array.isArray(data) && data.length > 0) {
+                    allOrders = data;
+                    processData();
+                }
             })
             .catch(err => {
-                console.log("시트 데이터 데이터 로딩 중...");
+                console.log("데이터 수신 오류:", err);
             });
         }
 
-        // 선택한 기간(start ~ end)으로 F열(배송일자) 필터링
         function processData() {
             if (!allOrders || allOrders.length <= 1) return;
 
@@ -303,17 +305,15 @@
             const endVal = document.getElementById('end-date').value.replace(/-/g, '/');
 
             filteredOrders = allOrders.slice(1).filter(row => {
-                const rowDate = row[COL_DELIVERY_DATE]; // 예: 2026/09/08
+                const rowDate = row[COL_DELIVERY_DATE];
                 return rowDate >= startVal && rowDate <= endVal;
             });
 
-            // 1단계 KPI
             document.getElementById('total-qty').innerText = `${filteredOrders.length} 건`;
             
             const uniqueItems = new Set(filteredOrders.map(r => r[COL_ITEM_NAME]));
             document.getElementById('total-items').innerText = `${uniqueItems.size} 종`;
 
-            // 2단계 브랜드 선택 드롭다운 채우기
             const brandSelect = document.getElementById('brand-select');
             const brands = [...new Set(filteredOrders.map(r => r[COL_BRAND_NAME]))].filter(Boolean);
             
@@ -373,7 +373,6 @@
             });
         }
 
-        // 선택한 기간을 파라미터로 넘겨 봇 수동 트리거 실행
         async function triggerBot() {
             const btn = document.getElementById('run-btn');
             
