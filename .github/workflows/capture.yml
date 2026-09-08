@@ -13,7 +13,7 @@ on:
         description: '종료일'
         required: false
 
-# 💡 동시 실행 방지 설정 (이미 실행 중이면 중복 실행 방지)
+# 동시 실행 방지 설정
 concurrency:
   group: sync-bot-group
   cancel-in-progress: false
@@ -33,15 +33,19 @@ jobs:
 
       - name: 필수 라이브러리 설치
         run: pip install selenium beautifulsoup4 requests
-        
-      - name: 캡처 이미지 저장 (Artifact Upload)
-        uses: actions/upload-artifact@v4
-        with:
-          name: oms-screenshot-result
-          path: oms_result.png
 
+      # 1. 파이썬 크롤링 스크립트를 먼저 실행하여 이미지를 생성합니다.
       - name: 동기화 스크립트 실행
         env:
           START_DATE: ${{ github.event.inputs.start_date }}
           END_DATE: ${{ github.event.inputs.end_date }}
         run: python screenshot.py
+
+      # 2. 스크립트 실행 완료 후(오류 발생 시 포함) 스크린샷을 아티팩트로 업로드합니다.
+      - name: 캡처 이미지 저장 (Artifact Upload)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: oms-screenshot-result
+          path: oms_result.png
+          if-no-files-found: warn
