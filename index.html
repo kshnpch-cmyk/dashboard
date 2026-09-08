@@ -488,21 +488,23 @@
             return s.replace(/-/g, '/');
         }
 
+       // 💡 대시보드 기본 조회 범위: 직전 7일부터 미래 D+2까지 포함
         function resetToTomorrow() {
-            const endObj = new Date();
-            endObj.setDate(endObj.getDate() + 1);
+    const today = new Date();
+    
+    // 시작일: 직전 7일 전
+    const startObj = new Date(today);
+    startObj.setDate(startObj.getDate() - 7); 
 
-            const startObj = new Date(endObj);
-            startObj.setDate(startObj.getDate() - 6);
+    // 종료일: 미래 D+2일 후 (스크랩 최대 범위 표출)
+    const endObj = new Date(today);
+    endObj.setDate(endObj.getDate() + 2); 
 
-            const startStr = formatDate(startObj);
-            const endStr = formatDate(endObj);
-
-            document.getElementById('start-date').value = startStr;
-            document.getElementById('end-date').value = endStr;
-            
-            processData();
-        }
+    document.getElementById('start-date').value = formatDate(startObj);
+    document.getElementById('end-date').value = formatDate(endObj);
+    
+    processData();
+}
 
         function onDateFilterChange() {
             processData();
