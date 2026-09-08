@@ -10,6 +10,16 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 
+# 💡 [핵심] openpyxl 버그(CellStyle count 인자 오류) 강제 방지 패치
+import openpyxl.styles.cell_style
+_original_cell_style_init = openpyxl.styles.cell_style.CellStyle.__init__
+
+def _patched_cell_style_init(self, *args, **kwargs):
+    kwargs.pop('count', None) # openpyxl 패닉 원인인 count 속성 제거
+    _original_cell_style_init(self, *args, **kwargs)
+
+openpyxl.styles.cell_style.CellStyle.__init__ = _patched_cell_style_init
+
 # 경고 메시지 비활성화
 warnings.filterwarnings('ignore')
 
@@ -188,7 +198,7 @@ try:
 
     driver.save_screenshot("oms_result.png")
 
-    # 9. 다운로드된 엑셀 파일 열기 및 세부 디버깅 파싱
+    # 9. 다운로드된 엑셀 파일 열기 및 파싱
     print("\n--------------------------------------------------")
     print("📂 [STEP 4/5] 다운로드된 엑셀 파일 열기 및 정밀 파싱 분석")
     list_of_files = glob.glob(os.path.join(download_dir, '*.xlsx')) or glob.glob(os.path.join(download_dir, '*.xls'))
@@ -200,57 +210,19 @@ try:
     file_size_bytes = os.path.getsize(latest_file)
     print(f"📄 대상 파일 감지: {os.path.basename(latest_file)} (용량: {file_size_bytes:,} bytes)")
 
-    # 🔍 세부 분석 로그: 파일 헤더 검사
-    file_preview = ""
-    file_encoding = 'utf-8'
-    for enc in ['utf-8', 'euc-kr', 'cp949', 'utf-16']:
-        try:
-            with open(latest_file, 'r', encoding=enc) as f:
-                file_preview = f.read(500)
-                file_encoding = enc
-                print(f"🔍 [파일 분석] 성공한 인코딩 포맷: '{enc}'")
-                print(f"🔍 [파일 분석] 헤더 미리보기(500자):\n{file_preview[:200]}...\n")
-                break
-        except Exception:
-            continue
-
     df = None
 
-    # 시도 A: BeautifulSoup 기반 HTML 직접 수집 (euc-kr / cp949 인코딩 완벽 대응)
-    if "<table" in file_preview.lower() or "<html" in file_preview.lower() or "xml" in file_preview.lower():
-        print("💡 [파싱 전략 A] HTML/XML 표 형식 감지됨 -> BeautifulSoup 파서 작동")
-        try:
-            from bs4 import BeautifulSoup
-            with open(latest_file, 'r', encoding=file_encoding, errors='ignore') as f:
-                soup = BeautifulSoup(f.read(), 'html.parser')
-            
-            tables = soup.find_all('table')
-            print(f"    └─ 발견된 <table> 태그 개수: {len(tables)}개")
-            
-            for idx, table in enumerate(tables):
-                rows = []
-                for tr in table.find_all('tr'):
-                    cells = [td.get_text(strip=True) for td in tr.find_all(['td', 'th'])]
-                    if cells:
-                        rows.append(cells)
-                if len(rows) > 1: # 데이터가 유의미하게 존재하는 테이블 선택
-                    df = pd.DataFrame(rows[1:], columns=rows[0])
-                    print(f"    └─ {idx+1}번째 테이블에서 데이터 추출 성공! (행: {len(rows)-1}, 열: {len(rows[0])})")
-                    break
-        except Exception as e:
-            print(f"    ❌ [전략 A 실패 로그]: {e}")
-
-    # 시도 B: Pandas 다중 엔진 자동 순회 시도
-    if df is None or df.empty:
-        print("💡 [파싱 전략 B] Pandas 범용 엔진 파싱 순회 시도")
+    # 패치 적용된 openpyxl 엔진으로 최우선 시도
+    try:
+        df = pd.read_excel(latest_file, engine='openpyxl')
+        print("💡 [파싱 성공] openpyxl 엔진 (패치 적용)으로 데이터 수집 완료!")
+    except Exception as e:
+        print(f"    └─ openpyxl 파싱 실패: {e}")
+        # 예외 대비 범용 순회
         parse_methods = [
-            ("pd.read_html (lxml)", lambda f: pd.read_html(f, flavor='lxml', encoding=file_encoding)[0]),
-            ("pd.read_html (html5lib)", lambda f: pd.read_html(f, flavor='html5lib', encoding=file_encoding)[0]),
-            ("openpyxl", lambda f: pd.read_excel(f, engine='openpyxl')),
-            ("xlrd", lambda f: pd.read_excel(f, engine='xlrd')),
+            ("openpyxl_data_only", lambda f: pd.read_excel(f, engine='openpyxl', data_only=True)),
             ("default_read_excel", lambda f: pd.read_excel(f))
         ]
-
         for name, method in parse_methods:
             try:
                 res_df = method(latest_file)
@@ -258,11 +230,11 @@ try:
                     df = res_df
                     print(f"    └─ [{name}] 엔진으로 데이터 수집 성공!")
                     break
-            except Exception as e_engine:
-                print(f"    └─ [{name}] 엔진 실패 원인: {e_engine}")
+            except Exception:
+                continue
 
     if df is None or df.empty:
-        raise Exception("모든 파싱 방법으로 읽기에 실패했습니다. 파일 헤더 정보를 확인하세요.")
+        raise Exception("모든 파싱 방법으로 읽기에 실패했습니다.")
 
     # 데이터 정제 및 가공
     df = df.fillna('')
