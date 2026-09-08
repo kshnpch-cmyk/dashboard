@@ -135,14 +135,13 @@ try:
     # 7. '엑셀다운로드' 메뉴 클릭
     excel_btn = driver.find_element(By.XPATH, "//*[contains(text(), '엑셀다운로드')]")
     driver.execute_script("arguments[0].click();", excel_btn)
-    print("🖱️ '엑셀다운로드' 메뉴 클릭 완료. SweetAlert2 팝업 대기 중...")
+    print("🖱️ '엑셀다운로드' 메뉴 클릭 완료. 파일명 입력 팝업 대기 중...")
 
     time.sleep(2)
 
-    # 8. SweetAlert2 팝업 파일명 입력 및 [다운로드](swal2-confirm) 버튼 정밀 클릭
-    print("📝 SweetAlert2 다운로드 버튼 클릭 중...")
+    # 8. 파일명 입력 팝업 처리 후 첫 번째 [다운로드] 버튼 클릭
+    print("📝 파일명 입력 및 다운로드 요청...")
     
-    # 팝업창 내 input에 파일명 입력
     try:
         swal_input = driver.find_element(By.CSS_SELECTOR, "input.swal2-input") or driver.find_element(By.CSS_SELECTOR, ".swal2-popup input")
         swal_input.clear()
@@ -158,12 +157,30 @@ try:
 
     time.sleep(1)
 
-    # swal2-confirm 버튼 클릭
     download_btn = driver.find_element(By.CSS_SELECTOR, "button.swal2-confirm")
     driver.execute_script("arguments[0].click();", download_btn)
 
-    print("📥 SweetAlert2 [다운로드] 버튼 클릭 성공! 엑셀 파일 수신 대기 중...")
-    time.sleep(8) # 엑셀 다운로드 완료 대기
+    print("⏳ 엑셀 파일 생성 대기 중...")
+    time.sleep(5) # 파일 생성 후 "완료" 알림 모달 출력 대기
+
+    # 💡 8-1. [신규] "엑셀 다운로드가 완료 되었습니다." [OK] 버튼 클릭
+    print("🖱️ '다운로드 완료' 팝업 [OK] 버튼 클릭...")
+    try:
+        ok_btn = driver.find_element(By.CSS_SELECTOR, "button.swal2-confirm")
+        driver.execute_script("arguments[0].click();", ok_btn)
+    except Exception:
+        driver.execute_script("""
+            var btns = document.querySelectorAll('button');
+            for(var i=0; i<btns.length; i++){
+                if(btns[i].innerText.trim() === 'OK'){
+                    btns[i].click();
+                    break;
+                }
+            }
+        """)
+
+    print("📥 최종 파일 저장 수신 대기 중...")
+    time.sleep(5)
 
     driver.save_screenshot("oms_result.png")
 
