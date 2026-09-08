@@ -11,7 +11,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 
 WEBHOOK_URL = "https://script.google.com/macros/s/AKfycby2-YHNufhOlHJcIBspE1bljMNtIEf3aXoXWqqakUgqvndDCf0nT1MSVuZkopmuEOvK/exec"
 
-# 1. KST 기준 조회 범위 및 탭 이름 계산
+# 1. KST 기준 날짜 및 시트 탭 이름 계산
 KST = timezone(timedelta(hours=9))
 now_kst = datetime.now(KST)
 
@@ -34,7 +34,7 @@ if len(date_parts) >= 2:
 else:
     target_tab_name = start_date_obj.strftime("%Y%m")
 
-# 2. 크롬 다운로드 경로 설정 (현재 작업 디렉터리로 지정)
+# 2. 크롬 다운로드 경로 설정
 download_dir = os.getcwd()
 
 options = webdriver.ChromeOptions()
@@ -42,7 +42,6 @@ options.add_argument('--headless')
 options.add_argument('--no-sandbox')
 options.add_argument('--disable-dev-shm-usage')
 
-# 다운로드 자동 승인 설정
 options.add_experimental_option("prefs", {
     "download.default_directory": download_dir,
     "download.prompt_for_download": False,
@@ -53,14 +52,14 @@ options.add_experimental_option("prefs", {
 driver = webdriver.Chrome(options=options)
 driver.set_window_size(1920, 1080)
 
-# 다운로드 권한 강제 적용 (Headless 모드 대응)
+# Headless 모드 다운로드 권한 강제 승인
 driver.command_executor._commands["send_command"] = ("POST", '/session/$sessionId/chromium/send_command')
 params = {'cmd': 'Page.setDownloadBehavior', 'params': {'behavior': 'allow', 'downloadPath': download_dir}}
 driver.execute_script("return null;")
 driver.execute("send_command", params)
 
 try:
-    print(f"[{now_kst.strftime('%Y-%m-%d %H:%M:%S')}] 엑셀 추출 동기화 진행")
+    print(f"[{now_kst.strftime('%Y-%m-%d %H:%M:%S')}] OMS 엑셀 다운로드 동기화 시작")
     print(f"조회 지정 기간: {target_start_date} ~ {target_end_date} ➔ [저장 대상 시트 탭: '{target_tab_name}']")
 
     # 3. 로그인
@@ -100,52 +99,111 @@ try:
     except Exception:
         driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.F2)
 
-    time.sleep(6) # 데이터 조회 대기
+    time.sleep(6) # 데이터 로딩 대기
 
-    # 6. 우클릭 후 '엑셀다운로드' 버튼 클릭
-    print("🖱️ 그리드 우클릭 및 엑셀 다운로드 실행...")
+    # 6. 컬럼 헤더 영역 우클릭
+    print("🖱️ 컬럼 헤더 영역 우클릭 실행...")
     
-    # 그리드 바디 요소 찾기
-    grid_element = driver.find_element(By.CSS_SELECTOR, 'tbody tr td') or driver.find_element(By.TAG_NAME, 'body')
-    
-    # 우클릭 이벤트 발생
-    actions = ActionChains(driver)
-    actions.context_click(grid_element).perform()
+    header_element = None
+    for col_text in ['배송일자', '품목코드', '품목명', '거래처코드', '주문번호']:
+        try:
+            header_element = driver.find_element(By.XPATH, f"//th[contains(text(), '{col_text}')]")
+            if header_element:
+                break
+        except Exception:
+            continue
+
+    if not header_element:
+        header_element = driver.find_element(By.CSS_SELECTOR, 'thead th') or driver.find_element(By.TAG_NAME, 'th')
+
+    try:
+        ActionChains(driver).context_click(header_element).perform()
+    except Exception:
+        driver.execute_script("""
+            var th = arguments[0];
+            var event = new MouseEvent('contextmenu', {
+                'bubbles': true,
+                'cancelable': true,
+                'view': window,
+                'buttons': 2
+            });
+            th.dispatchEvent(event);
+        """, header_element)
+
     time.sleep(1.5)
 
-    # 팝업 메뉴에서 '엑셀다운로드' 클릭
+    # 7. '엑셀다운로드' 컨텍스트 메뉴 클릭
     excel_btn = driver.find_element(By.XPATH, "//*[contains(text(), '엑셀다운로드')]")
     excel_btn.click()
-    print("📥 엑셀 다운로드 요청 완료. 파일 수신 대기 중...")
-    
-    time.sleep(6) # 엑셀 파일 다운로드 완료 대기
+    print("🖱️ '엑셀다운로드' 메뉴 클릭 완료. 팝업창 대기 중...")
 
-    # 6-1. 스크린샷 캡처
+    time.sleep(2)
+
+    # 💡 8. 파일명 입력 팝업창 처리
+    print("📝 파일명 입력 팝업창에 파일명 입력 및 다운로드 진행...")
+    
+    # 팝업 입력창 찾아 파일명 입력
+    try:
+        # 파일명 input 요소를 다양하게 찾기
+        input_box = driver.find_element(By.CSS_SELECTOR, "input[placeholder*='파일명']") or \
+                    driver.find_element(By.XPATH, "//input[@type='text']")
+        input_box.clear()
+        input_box.send_keys("oms_download")
+    except Exception:
+        # JS로 팝업 내 input 입력 시도
+        driver.execute_script("""
+            var inputs = document.querySelectorAll('input[type="text"]');
+            for(var i=0; i<inputs.length; i++){
+                if(inputs[i].offsetParent !== null){
+                    inputs[i].value = 'oms_download';
+                    inputs[i].dispatchEvent(new Event('input', { bubbles: true }));
+                    break;
+                }
+            }
+        """)
+
+    time.sleep(1)
+
+    # '다운로드' 버튼 클릭
+    try:
+        download_btn = driver.find_element(By.XPATH, "//*[contains(text(), '다운로드')]")
+        download_btn.click()
+    except Exception:
+        driver.execute_script("""
+            var btns = document.querySelectorAll('button, a, div');
+            for(var i=0; i<btns.length; i++){
+                if(btns[i].innerText.trim() === '다운로드'){
+                    btns[i].click();
+                    break;
+                }
+            }
+        """)
+
+    print("📥 엑셀 파일 생성 요청 완료! 수신 대기 중...")
+    time.sleep(6) # 엑셀 다운로드 대기
+
+    # 화면 스크린샷 저장
     driver.save_screenshot("oms_result.png")
 
-    # 7. 다운로드된 엑셀 파일 찾아 파싱하기
+    # 9. 다운로드된 엑셀 파일 찾기 및 pandas 파싱
     list_of_files = glob.glob(os.path.join(download_dir, '*.xlsx')) or glob.glob(os.path.join(download_dir, '*.xls'))
     
     if not list_of_files:
         raise Exception("다운로드된 엑셀 파일을 찾지 못했습니다.")
 
     latest_file = max(list_of_files, key=os.path.getctime)
-    print(f"📄 추출할 엑셀 파일: {latest_file}")
+    print(f"📄 추출된 엑셀 파일: {latest_file}")
 
-    # pandas로 엑셀 읽기
     df = pd.read_excel(latest_file)
-    df = df.fillna('') # 빈값을 빈 문자열로 처리
+    df = df.fillna('')
 
-    # 헤더와 데이터 분리 후 리스트 변환
     header = df.columns.tolist()
     data_rows = df.values.tolist()
-
-    # 구글 시트로 보낼 최종 2차원 배열 데이터 구성
     final_rows = [header] + data_rows
 
-    print(f"✅ 엑셀 파싱 완료 - 총 헤더 컬럼 수: {len(header)}개 / 데이터 행 수: {len(data_rows)}개")
+    print(f"✅ 엑셀 파싱 성공! - 헤더: {len(header)}열 / 총 데이터: {len(data_rows)}행")
 
-    # 8. 구글 시트로 페이로드 전송
+    # 10. 구글 시트로 데이터 전송
     payload = {
         "tabName": target_tab_name,
         "data": final_rows
@@ -155,7 +213,7 @@ try:
     response = requests.post(WEBHOOK_URL, json=payload, allow_redirects=True)
     print(f"✅ 동기화 결과: {response.text}")
 
-    # 사용한 엑셀 파일 정리 삭제
+    # 다운로드 파일 정리 삭제
     if os.path.exists(latest_file):
         os.remove(latest_file)
 
