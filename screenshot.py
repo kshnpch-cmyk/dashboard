@@ -7,7 +7,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
-WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxZx_c4oiyDksK2lTKotOl7nkd--MthKng_bRQkztjXECQQqGko3HzRxzuv6hFkNlKj/exec"
+WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxO0uYMmBZ3_VMf-k-NiDKcglY-eiSaZ2uMMSdtsmEEWWOjrgACq7qCSEzFubfOPdRf/exec"
 
 # 1. KST 기준 시간별 자동 조회 범위 및 탭 이름 계산
 KST = timezone(timedelta(hours=9))
