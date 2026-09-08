@@ -329,7 +329,7 @@
                 <span style="color:#94a3b8;">~</span>
                 <input type="date" id="end-date" class="date-input" onchange="onDateFilterChange()" onclick="this.showPicker && this.showPicker()">
             </div>
-            <button class="btn btn-query" onclick="fetchSheetData(true)">
+            <button class="btn btn-query" onclick="fetchSheetData()">
                 🔍 데이터 새로고침
             </button>
             <button class="btn btn-reset" onclick="resetToTomorrow()">
@@ -460,7 +460,6 @@
         const githubId = 'kshnpch-cmyk'; 
         const repoName = 'dashboard'; 
         const token = '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'; 
-        // 💡 깃허브 Raw DB 파일 주소 직접 로드
         const dataJsonUrl = `https://raw.githubusercontent.com/${githubId}/${repoName}/main/dashboard_data.json`;
 
         let colOrderDate    = 3;  
@@ -528,11 +527,13 @@
             processData();
         }
 
-        // 💡 구글 시트 웹훅 대신 깃허브 dashboard_data.json 수신
+        // 💡 깃허브 Raw DB 수신 함수 (에러 방지 및 유연한 파싱 적용)
         function fetchSheetData() {
+            document.getElementById('last-updated-text').innerText = "🕒 동기화: 수신 중...";
+
             fetch(`${dataJsonUrl}?_=${new Date().getTime()}`)
                 .then(response => {
-                    if (!response.ok) throw new Error("데이터 수신 실패");
+                    if (!response.ok) throw new Error("데이터 파일 수신 오류");
                     return response.json();
                 })
                 .then(res => {
@@ -579,9 +580,9 @@
             if (colTotal === -1) colTotal = 26;
         }
 
+        // 💡 2차원 배열 & 객체 배열 포맷 둘 다 상호 지원하는 파싱 함수
         function handleSheetResponse(res) {
-            let rawRows = [];
-            let headers = [];
+            let data = [];
 
             if (res && res.updated_at) {
                 document.getElementById('last-updated-text').innerText = `🕒 동기화: ${res.updated_at}`;
@@ -592,23 +593,25 @@
             }
 
             if (res && res.data && Array.isArray(res.data)) {
-                if (res.columns && Array.isArray(res.columns)) {
-                    headers = res.columns;
-                } else if (res.data.length > 0) {
-                    headers = Object.keys(res.data[0]);
+                if (res.data.length > 0 && Array.isArray(res.data[0])) {
+                    // 2차원 배열 구조인 경우
+                    data = res.data;
+                } else if (res.data.length > 0 && typeof res.data[0] === 'object') {
+                    // Dictionary 객체 배열 구조인 경우
+                    const headers = res.columns || Object.keys(res.data[0]);
+                    const rows = res.data.map(obj => headers.map(k => obj[k] !== undefined ? obj[k] : ''));
+                    data = [headers, ...rows];
                 }
-                
-                // Dictionary 배열 ➔ 기존 2차원 배열 구조로 복원
-                rawRows = res.data.map(obj => headers.map(k => obj[k] !== undefined ? obj[k] : ''));
-                rawRows.unshift(headers);
             } else if (Array.isArray(res)) {
-                rawRows = res;
+                data = res;
             }
 
-            if (Array.isArray(rawRows) && rawRows.length > 0) {
-                detectColumnIndexes(rawRows[0]); 
-                allOrders = rawRows;
+            if (Array.isArray(data) && data.length > 0) {
+                detectColumnIndexes(data[0]); 
+                allOrders = data;
                 processData();
+            } else {
+                document.getElementById('last-updated-text').innerText = "🕒 동기화: 데이터 없음";
             }
         }
 
