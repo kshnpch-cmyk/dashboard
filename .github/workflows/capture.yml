@@ -13,7 +13,7 @@ on:
         description: '종료일'
         required: false
 
-# 동시 실행 방지 설정 (이미 실행 중이면 중복 실행 방지)
+# 동시 실행 방지 설정
 concurrency:
   group: sync-bot-group
   cancel-in-progress: false
@@ -34,7 +34,7 @@ jobs:
       - name: 필수 라이브러리 설치
         run: |
           python -m pip install --upgrade pip
-          pip install selenium beautifulsoup4 requests pandas openpyxl xlrd lxml
+          pip install selenium beautifulsoup4 requests pandas openpyxl xlrd lxml html5lib
 
       - name: 동기화 스크립트 실행
         env:
