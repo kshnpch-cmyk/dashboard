@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>더본 OMS 주문 현황 대시보드1</title>
+    <title>더본 OMS 주문 현황 대시보드</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
@@ -28,7 +28,7 @@
         .brand-title { display: flex; align-items: center; gap: 10px; }
         .brand-title h1 { margin: 0; font-size: 20px; font-weight: 700; }
         .version-tag {
-            background-color: #3b82f6;
+            background-color: #10b981;
             color: white;
             font-size: 11px;
             font-weight: 800;
@@ -107,16 +107,16 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <!-- 💡 DuckDB 제거 후 v1.3.0 적용 -->
-            <span class="version-tag" id="app-version-tag">v1.3.0</span>
+            <!-- 💡 Supabase 클라우드 DB 전용 v2.0.0 -->
+            <span class="version-tag" id="app-version-tag">v2.0.0 DB</span>
         </div>
         <div class="control-panel">
-            <div class="last-updated-tag" id="last-updated-text">🕒 동기화: 대기 중</div>
+            <div class="last-updated-tag" id="last-updated-text">🕒 동기화: DB 대기 중</div>
             <div class="date-picker-group">
                 <label>조회 기간:</label>
-                <input type="date" id="start-date" class="date-input" onchange="processData()">
+                <input type="date" id="start-date" class="date-input" onchange="fetchSheetData()">
                 <span>~</span>
-                <input type="date" id="end-date" class="date-input" onchange="processData()">
+                <input type="date" id="end-date" class="date-input" onchange="fetchSheetData()">
             </div>
             <button class="btn btn-query" onclick="fetchSheetData()">🔍 데이터 새로고침</button>
             <button class="btn btn-reset" onclick="resetToTomorrow()">🔄 일주일 초기화</button>
@@ -203,14 +203,15 @@
     </div>
 
     <script>
+        // 💡 Supabase 접속 키 세팅 (본인의 설정값으로 확인 및 입력)
+        const SUPABASE_URL = "https://your-project-ref.supabase.co"; // 본인 Project URL로 변경
+        const SUPABASE_ANON_KEY = "sb_publishable_0Ww3nk7m7Vy3Ex0205ypgg_IG3xd..."; // Publishable Key 변경
+
         const githubId = 'kshnpch-cmyk'; 
         const repoName = 'dashboard'; 
         const token = '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'; 
-        const dataJsonUrl = `https://kshnpch-cmyk.github.io/dashboard/dashboard_data.json`;
 
-        let colOrderDate = 3, colDeliveryDate = 5, colStoreCode = 6, colStoreName = 7, colBrandName = 8, colItemCode = 15, colItemName = 16, colQty = 24, colPrice = 25, colTotal = 26;
-
-        let allOrders = [], filteredOrders = [], baseDetailOrders = [], currentDetailOrders = [];
+        let rawOrders = [], filteredOrders = [], baseDetailOrders = [], currentDetailOrders = [];
         let trendChart = null;
 
         function formatDate(dateObj) {
@@ -218,11 +219,6 @@
             const m = String(dateObj.getMonth() + 1).padStart(2, '0');
             const d = String(dateObj.getDate()).padStart(2, '0');
             return `${y}-${m}-${d}`;
-        }
-
-        function cleanDateNum(dateStr) {
-            if (!dateStr) return 0;
-            return parseInt(String(dateStr).replace(/[^0-9]/g, '').substring(0, 8), 10) || 0;
         }
 
         function formatDisplayDate(dateStr) {
@@ -244,73 +240,63 @@
 
             document.getElementById('start-date').value = formatDate(startObj);
             document.getElementById('end-date').value = formatDate(endObj);
-            processData();
+            fetchSheetData();
         }
 
-        function fetchSheetData() {
-            document.getElementById('last-updated-text').innerText = "🕒 동기화: 로딩 중...";
+        // 🚀 Supabase DB 기간 필터링 초고속 API 수신 함수 (0.05초)
+        async function fetchSheetData() {
+            document.getElementById('last-updated-text').innerText = "🕒 동기화: DB 쿼리 중...";
 
-            fetch(`${dataJsonUrl}?_=${new Date().getTime()}`)
-                .then(res => {
-                    if (!res.ok) throw new Error("HTTP 오류");
-                    return res.json();
-                })
-                .then(res => {
-                    if (res && res.updated_at) document.getElementById('last-updated-text').innerText = `🕒 동기화: ${res.updated_at}`;
-                    let data = Array.isArray(res.data) ? res.data : [];
-                    if (data.length > 0) {
-                        detectColumnIndexes(data[0]);
-                        allOrders = data;
-                        processData();
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+
+            if (!startDate || !endDate) return;
+
+            // delivery_date 기준 기간 쿼리
+            const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=*&order=delivery_date.desc`;
+
+            try {
+                const response = await fetch(queryUrl, {
+                    method: 'GET',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json'
                     }
-                })
-                .catch(err => {
-                    console.error(err);
-                    document.getElementById('last-updated-text').innerText = "🕒 동기화: 실패";
                 });
-        }
 
-        function detectColumnIndexes(headerRow) {
-            if (!headerRow) return;
-            for (let i = 0; i < headerRow.length; i++) {
-                const title = String(headerRow[i]).trim();
-                if (title === "주문일자") colOrderDate = i;
-                else if (title === "배송일자") colDeliveryDate = i;
-                else if (title === "거래처코드" || title === "점포코드") colStoreCode = i;
-                else if (title === "거래처명" || title === "점포명") colStoreName = i;
-                else if (title === "브랜드명") colBrandName = i;
-                else if (title === "품목코드") colItemCode = i;
-                else if (title === "품목명") colItemName = i;
-                else if (title === "수량" || title === "주문수량") colQty = i;
-                else if (title === "단가" || title === "공급단가") colPrice = i;
-                else if (title === "금액" || title === "공급가액") colTotal = i;
+                if (!response.ok) throw new Error("Supabase API 응답 오류");
+
+                rawOrders = await response.json();
+
+                const now = new Date();
+                const updateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+                document.getElementById('last-updated-text').innerText = `🕒 동기화 완료: ${updateStr}`;
+
+                processData();
+
+            } catch (err) {
+                console.error("데이터 로드 오류:", err);
+                document.getElementById('last-updated-text').innerText = "🕒 동기화: DB 로드 실패";
             }
         }
 
         function processData() {
-            if (!allOrders || allOrders.length <= 1) return;
-
-            const startNum = cleanDateNum(document.getElementById('start-date').value);
-            const endNum = cleanDateNum(document.getElementById('end-date').value);
-
-            filteredOrders = allOrders.slice(1).filter(row => {
-                let rowDateNum = cleanDateNum(row[colDeliveryDate]) || cleanDateNum(row[colOrderDate]);
-                return rowDateNum >= startNum && rowDateNum <= endNum;
-            });
+            filteredOrders = rawOrders;
 
             document.getElementById('total-qty').innerText = `${filteredOrders.length.toLocaleString()} 건`;
-            const uniqueItems = new Set(filteredOrders.map(r => r[colItemName]));
+            const uniqueItems = new Set(filteredOrders.map(r => r.item_name));
             document.getElementById('total-items').innerText = `${uniqueItems.size.toLocaleString()} 종`;
 
             let totalAmount = 0;
             filteredOrders.forEach(r => {
-                let amt = cleanNumber(r[colTotal]) || (cleanNumber(r[colQty]) * cleanNumber(r[colPrice]));
+                let amt = cleanNumber(r.total_amount) || (cleanNumber(r.qty) * cleanNumber(r.price));
                 totalAmount += amt;
             });
             document.getElementById('total-amount').innerText = `${totalAmount.toLocaleString()} 원`;
 
             const brandSelect = document.getElementById('brand-select');
-            const brands = [...new Set(filteredOrders.map(r => r[colBrandName]))].filter(Boolean);
+            const brands = [...new Set(filteredOrders.map(r => r.brand_name))].filter(Boolean);
             brandSelect.innerHTML = '<option value="ALL">🌐 전체 브랜드</option>';
             brands.forEach(b => brandSelect.innerHTML += `<option value="${b}">${b}</option>`);
 
@@ -321,15 +307,15 @@
         function renderChart(orders) {
             const dailyData = {};
             orders.forEach(row => {
-                let dateKey = formatDisplayDate(row[colDeliveryDate]) || formatDisplayDate(row[colOrderDate]);
+                let dateKey = formatDisplayDate(row.delivery_date) || formatDisplayDate(row.order_date);
                 if (!dateKey || dateKey === '-') return;
 
                 if (!dailyData[dateKey]) dailyData[dateKey] = { stores: new Set(), qty: 0, amount: 0 };
-                if (row[colStoreName]) dailyData[dateKey].stores.add(row[colStoreName]);
+                if (row.store_name) dailyData[dateKey].stores.add(row.store_name);
                 
-                const q = cleanNumber(row[colQty]);
-                const p = cleanNumber(row[colPrice]);
-                let t = cleanNumber(row[colTotal]) || (q * p);
+                const q = cleanNumber(row.qty);
+                const p = cleanNumber(row.price);
+                let t = cleanNumber(row.total_amount) || (q * p);
                 dailyData[dateKey].qty += q; dailyData[dateKey].amount += t;
             });
 
@@ -365,11 +351,11 @@
 
         function onBrandChange() {
             const selectedBrand = document.getElementById('brand-select').value;
-            let brandOrders = (selectedBrand === 'ALL' || !selectedBrand) ? filteredOrders : filteredOrders.filter(r => r[colBrandName] === selectedBrand);
+            let brandOrders = (selectedBrand === 'ALL' || !selectedBrand) ? filteredOrders : filteredOrders.filter(r => r.brand_name === selectedBrand);
 
-            const stores = [...new Set(brandOrders.map(r => r[colStoreName]))].filter(Boolean);
+            const stores = [...new Set(brandOrders.map(r => r.store_name))].filter(Boolean);
             document.getElementById('brand-store-count').innerText = stores.length;
-            document.getElementById('brand-item-count').innerText = new Set(brandOrders.map(r => r[colItemName])).size;
+            document.getElementById('brand-item-count').innerText = new Set(brandOrders.map(r => r.item_name)).size;
 
             const storeListEl = document.getElementById('store-list');
             let html = `<li class="store-item total-item active" onclick="onStoreSelect('ALL', '${selectedBrand}', this)">
@@ -377,7 +363,7 @@
             </li>`;
 
             stores.forEach(store => {
-                const count = brandOrders.filter(r => r[colStoreName] === store).length;
+                const count = brandOrders.filter(r => r.store_name === store).length;
                 html += `<li class="store-item" onclick="onStoreSelect('${store}', '${selectedBrand}', this)">
                     <span>${store}</span><span style="color:#64748b;">${count}건</span>
                 </li>`;
@@ -399,10 +385,10 @@
 
             if (storeName === 'ALL') {
                 document.getElementById('selected-store-title').innerText = `🛒 전체 점포 합산 상세`;
-                baseDetailOrders = (brandName === 'ALL' || !brandName) ? filteredOrders : filteredOrders.filter(r => r[colBrandName] === brandName);
+                baseDetailOrders = (brandName === 'ALL' || !brandName) ? filteredOrders : filteredOrders.filter(r => r.brand_name === brandName);
             } else {
                 document.getElementById('selected-store-title').innerText = `🛒 [${storeName}] 주문 상세`;
-                baseDetailOrders = filteredOrders.filter(r => r[colStoreName] === storeName);
+                baseDetailOrders = filteredOrders.filter(r => r.store_name === storeName);
             }
             applyColumnFilters();
         }
@@ -416,12 +402,12 @@
             const qIN = document.getElementById('filter-itemName').value.toLowerCase().trim();
 
             currentDetailOrders = baseDetailOrders.filter(row => {
-                if (qSC && !String(row[colStoreCode]||'').toLowerCase().includes(qSC)) return false;
-                if (qSN && !String(row[colStoreName]||'').toLowerCase().includes(qSN)) return false;
-                if (qOD && !formatDisplayDate(row[colOrderDate]).toLowerCase().includes(qOD)) return false;
-                if (qDD && !formatDisplayDate(row[colDeliveryDate]).toLowerCase().includes(qDD)) return false;
-                if (qIC && !String(row[colItemCode]||'').toLowerCase().includes(qIC)) return false;
-                if (qIN && !String(row[colItemName]||'').toLowerCase().includes(qIN)) return false;
+                if (qSC && !String(row.store_code||'').toLowerCase().includes(qSC)) return false;
+                if (qSN && !String(row.store_name||'').toLowerCase().includes(qSN)) return false;
+                if (qOD && !formatDisplayDate(row.order_date).toLowerCase().includes(qOD)) return false;
+                if (qDD && !formatDisplayDate(row.delivery_date).toLowerCase().includes(qDD)) return false;
+                if (qIC && !String(row.item_code||'').toLowerCase().includes(qIC)) return false;
+                if (qIN && !String(row.item_name||'').toLowerCase().includes(qIN)) return false;
                 return true;
             });
 
@@ -440,31 +426,28 @@
             }
 
             let sumQty = 0, sumAmount = 0;
-            const limit = Math.min(200, currentDetailOrders.length);
             const fragment = document.createDocumentFragment();
 
             for (let i = 0; i < currentDetailOrders.length; i++) {
                 const row = currentDetailOrders[i];
-                const q = cleanNumber(row[colQty]);
-                const p = cleanNumber(row[colPrice]);
-                let t = cleanNumber(row[colTotal]) || (q * p);
+                const q = cleanNumber(row.qty);
+                const p = cleanNumber(row.price);
+                let t = cleanNumber(row.total_amount) || (q * p);
                 sumQty += q; sumAmount += t;
 
-                if (i < limit) {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td><span class="code-tag">${row[colStoreCode]||'-'}</span></td>
-                        <td><b>${row[colStoreName]||'-'}</b></td>
-                        <td>${formatDisplayDate(row[colOrderDate])}</td>
-                        <td><span style="color:#2563eb; font-weight:bold;">${formatDisplayDate(row[colDeliveryDate])}</span></td>
-                        <td><span class="code-tag">${row[colItemCode]||'-'}</span></td>
-                        <td>${row[colItemName]||'-'}</td>
-                        <td class="text-right">${q.toLocaleString()}</td>
-                        <td class="text-right">${p > 0 ? p.toLocaleString() + '원' : '-'}</td>
-                        <td class="text-right"><b>${t > 0 ? t.toLocaleString() + '원' : '-'}</b></td>
-                    `;
-                    fragment.appendChild(tr);
-                }
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><span class="code-tag">${row.store_code||'-'}</span></td>
+                    <td><b>${row.store_name||'-'}</b></td>
+                    <td>${formatDisplayDate(row.order_date)}</td>
+                    <td><span style="color:#2563eb; font-weight:bold;">${formatDisplayDate(row.delivery_date)}</span></td>
+                    <td><span class="code-tag">${row.item_code||'-'}</span></td>
+                    <td>${row.item_name||'-'}</td>
+                    <td class="text-right">${q.toLocaleString()}</td>
+                    <td class="text-right">${p > 0 ? p.toLocaleString() + '원' : '-'}</td>
+                    <td class="text-right"><b>${t > 0 ? t.toLocaleString() + '원' : '-'}</b></td>
+                `;
+                fragment.appendChild(tr);
             }
 
             tbody.appendChild(fragment);
@@ -475,11 +458,11 @@
         function exportToExcel() {
             if (!currentDetailOrders || currentDetailOrders.length === 0) return alert("저장할 데이터가 없습니다.");
             const exportData = currentDetailOrders.map(row => ({
-                '점포코드': row[colStoreCode] || '-', '점포명': row[colStoreName] || '-',
-                '주문일자': formatDisplayDate(row[colOrderDate]), '배송일자': formatDisplayDate(row[colDeliveryDate]),
-                '품목코드': row[colItemCode] || '-', '품목명': row[colItemName] || '-',
-                '수량': cleanNumber(row[colQty]), '단가': cleanNumber(row[colPrice]),
-                '금액': cleanNumber(row[colTotal]) || (cleanNumber(row[colQty]) * cleanNumber(row[colPrice]))
+                '점포코드': row.store_code || '-', '점포명': row.store_name || '-',
+                '주문일자': formatDisplayDate(row.order_date), '배송일자': formatDisplayDate(row.delivery_date),
+                '품목코드': row.item_code || '-', '품목명': row.item_name || '-',
+                '수량': cleanNumber(row.qty), '단가': cleanNumber(row.price),
+                '금액': cleanNumber(row.total_amount) || (cleanNumber(row.qty) * cleanNumber(row.price))
             }));
             const ws = XLSX.utils.json_to_sheet(exportData);
             const wb = XLSX.utils.book_new();
@@ -489,7 +472,6 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             resetToTomorrow();
-            fetchSheetData();
         });
 
         async function triggerBot() {
