@@ -44,7 +44,7 @@ try:
     print(f"[{now_kst.strftime('%Y-%m-%d %H:%M:%S')}] 동기화 진행")
     print(f"조회 지정 기간: {target_start_date} ~ {target_end_date} ➔ [저장 대상 시트 탭: '{target_tab_name}']")
 
-    # 2. 로그인 (변경된 계정 정보 반영)
+    # 2. 로그인 (최신 계정 정보 반영)
     driver.get('https://admin.theborn.co.kr/oms-manager/login')
     time.sleep(2) 
 
