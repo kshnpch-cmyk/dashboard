@@ -57,9 +57,7 @@
         .btn:hover { background-color: #1d4ed8; }
         .btn-query { background-color: #0284c7; }
         .btn-reset { background-color: #475569; }
-        .btn-save-width { background-color: #10b981; padding: 5px 10px; font-size: 12px; }
         .btn-excel { background-color: #16a34a; padding: 5px 10px; font-size: 12px; }
-        .btn-reset-width { background-color: #64748b; padding: 5px 10px; font-size: 12px; }
 
         .container { padding: 20px; max-width: 98%; margin: 0 auto; }
         .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 20px; }
@@ -109,8 +107,8 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <!-- 💡 v1.5.0 초경량 병목 제거 패치 -->
-            <span class="version-tag" id="app-version-tag">v1.5.0</span>
+            <!-- 💡 DuckDB 제거 후 v1.3.0 적용 -->
+            <span class="version-tag" id="app-version-tag">v1.3.0</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag" id="last-updated-text">🕒 동기화: 대기 중</div>
@@ -354,7 +352,7 @@
                     ]
                 },
                 options: {
-                    animation: false, // 💡 애니메이션 끄기로 렌더링 멈춤 방지
+                    animation: false,
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: {
@@ -430,7 +428,6 @@
             renderDetailTable();
         }
 
-        // 💡 초고속 200건 끊어 그리기 (화면 멈춤 완전 해소)
         function renderDetailTable() {
             const tbody = document.getElementById('order-detail-table');
             tbody.innerHTML = "";
