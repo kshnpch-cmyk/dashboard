@@ -2,7 +2,6 @@ name: Auto Order Data Sync Bot
 
 on:
   schedule:
-    # 10분마다 주기적 자동 실행 (UTC 기준)
     - cron: '*/10 * * * *'
   workflow_dispatch:
     inputs:
@@ -13,7 +12,9 @@ on:
         description: '종료일'
         required: false
 
-# 동시 실행 방지 설정
+permissions:
+  contents: write  # 깃허브 저장소에 DB 파일을 커밋/푸시하기 위한 권한 부여
+
 concurrency:
   group: sync-bot-group
   cancel-in-progress: false
@@ -34,13 +35,21 @@ jobs:
       - name: 필수 라이브러리 설치
         run: |
           python -m pip install --upgrade pip
-          pip install selenium beautifulsoup4 requests pandas openpyxl xlrd lxml html5lib
+          pip install selenium beautifulsoup4 requests pandas openpyxl xlrd lxml html5lib pyarrow
 
       - name: 동기화 스크립트 실행
         env:
           START_DATE: ${{ github.event.inputs.start_date }}
           END_DATE: ${{ github.event.inputs.end_date }}
         run: python screenshot.py
+
+      - name: DB 파일 및 변경사항 깃허브 커밋/푸시
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add oms_database.parquet || true
+          git commit -m "auto: update oms_database.parquet [skip ci]" || true
+          git push
 
       - name: 캡처 이미지 저장 (Artifact Upload)
         uses: actions/upload-artifact@v4
