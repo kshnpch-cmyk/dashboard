@@ -1,6 +1,7 @@
 import os
 import glob
 import time
+import json
 import warnings
 import pandas as pd
 from datetime import datetime, timedelta, timezone
@@ -9,7 +10,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 
-# openpyxl CellStyle count 속성 오류 무시 패치
+# openpyxl CellStyle count 속성 오류 방지 패치
 import openpyxl.styles.cell_style
 _original_cell_style_init = openpyxl.styles.cell_style.CellStyle.__init__
 
@@ -53,7 +54,7 @@ driver.execute("send_command", params)
 
 try:
     print(f"[{now_kst.strftime('%Y-%m-%d %H:%M:%S')}] OMS GitHub DB 동기화 시작")
-    print(f"조회 기간: {target_start_date} ~ {target_end_date}")
+    print(f"조회 지정 기간: {target_start_date} ~ {target_end_date}")
 
     # 3. 로그인
     driver.get('https://admin.theborn.co.kr/oms-manager/login')
@@ -90,7 +91,7 @@ try:
         driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.F2)
     time.sleep(6)
 
-    # 6. 컬럼 헤더 우클릭 엑셀 다운로드
+    # 6. 컬럼 헤더 영역 우클릭
     header_element = driver.find_element(By.CSS_SELECTOR, 'thead th') or driver.find_element(By.TAG_NAME, 'th')
     try:
         ActionChains(driver).context_click(header_element).perform()
@@ -98,10 +99,12 @@ try:
         pass
     time.sleep(1.5)
 
+    # 7. '엑셀다운로드' 메뉴 클릭
     excel_btn = driver.find_element(By.XPATH, "//*[contains(text(), '엑셀다운로드')]")
     driver.execute_script("arguments[0].click();", excel_btn)
     time.sleep(2)
 
+    # 8. 파일명 입력 팝업 처리 및 다운로드
     try:
         swal_input = driver.find_element(By.CSS_SELECTOR, "input.swal2-input")
         swal_input.clear()
@@ -121,7 +124,7 @@ try:
         pass
     time.sleep(5)
 
-    # 7. 엑셀 파일 수신 및 파싱
+    # 9. 다운로드 파일 읽기
     list_of_files = glob.glob(os.path.join(download_dir, '*.xlsx')) or glob.glob(os.path.join(download_dir, '*.xls'))
     if not list_of_files:
         raise Exception("다운로드 파일 수신 실패")
@@ -130,17 +133,15 @@ try:
     new_df = pd.read_excel(latest_file, engine='openpyxl')
     new_df = new_df.fillna('').astype(str)
 
-    print(f"📥 당일 수신 원본 데이터: {len(new_df):,}행")
+    print(f"📥 당일 다운로드 원본 데이터: {len(new_df):,}행 수신")
 
-    # 8. GitHub 데이터베이스 (Parquet 파일) 적재 및 중복 제거
+    # 10. GitHub 데이터베이스 (Parquet 파일) 누적 저장
     db_file_path = "oms_database.parquet"
     
     if os.path.exists(db_file_path):
         existing_df = pd.read_parquet(db_file_path)
-        print(f"📂 기존 DB 로드 완료: {len(existing_df):,}행 누적 상태")
+        print(f"📂 기존 GitHub DB 로드 완료: {len(existing_df):,}행 누적 상태")
         combined_df = pd.concat([existing_df, new_df], ignore_index=True)
-        
-        # 주문번호 + 주문순번 기준 중복 제거
         if '주문번호' in combined_df.columns and '주문순번' in combined_df.columns:
             combined_df = combined_df.drop_duplicates(subset=['주문번호', '주문순번'], keep='last')
         else:
@@ -148,13 +149,29 @@ try:
     else:
         combined_df = new_df
 
-    # 초고속 압축 DB 저장
     combined_df.to_parquet(db_file_path, index=False, compression='snappy')
     db_size_mb = round(os.path.getsize(db_file_path) / (1024 * 1024), 2)
-    
-    print(f"✅ GitHub DB 저장 완료! 총 누적 데이터: {len(combined_df):,}행 (DB 파일 크기: {db_size_mb} MB)")
+    print(f"💾 GitHub DB 저장 완료: 총 {len(combined_df):,}행 누적 (파일용량: {db_size_mb} MB)")
 
-    # 다운로드 원본 엑셀 정리
+    # 💡 11. 대시보드 웹페이지(index.html 등) 연동용 JSON 파일 자동 생성
+    # 전체 누적 데이터 중 웹에서 바로 보여줄 최신 데이터/집계 데이터를 JSON으로 파싱
+    json_file_path = "dashboard_data.json"
+    
+    # 웹 로딩 속도를 위해 최근 데이터 및 요약 데이터 위주로 구성
+    json_data = {
+        "updated_at": now_kst.strftime("%Y-%m-%d %H:%M:%S"),
+        "total_rows": len(combined_df),
+        "columns": combined_df.columns.tolist(),
+        "data": combined_df.to_dict(orient="records") # 웹 페이지에서 fetch()로 바로 사용할 JSON 배열
+    }
+
+    with open(json_file_path, "w", encoding="utf-8") as f:
+        json.dump(json_data, f, ensure_ascii=False, indent=2)
+
+    json_size_mb = round(os.path.getsize(json_file_path) / (1024 * 1024), 2)
+    print(f"📄 대시보드 연동용 'dashboard_data.json' 파일 생성 완료 ({json_size_mb} MB)")
+
+    # 원본 다운로드 파일 삭제
     if os.path.exists(latest_file):
         os.remove(latest_file)
 
