@@ -1,7 +1,6 @@
 import os
 import glob
 import time
-import requests
 import warnings
 import pandas as pd
 from datetime import datetime, timedelta, timezone
@@ -10,17 +9,17 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 
-# openpyxl 패치
+# openpyxl CellStyle count 속성 오류 무시 패치
 import openpyxl.styles.cell_style
 _original_cell_style_init = openpyxl.styles.cell_style.CellStyle.__init__
+
 def _patched_cell_style_init(self, *args, **kwargs):
     kwargs.pop('count', None)
     _original_cell_style_init(self, *args, **kwargs)
+
 openpyxl.styles.cell_style.CellStyle.__init__ = _patched_cell_style_init
 
 warnings.filterwarnings('ignore')
-
-WEBHOOK_URL = "https://script.google.com/macros/s/AKfycby2-YHNufhOlHJcIBspE1bljMNtIEf3aXoXWqqakUgqvndDCf0nT1MSVuZkopmuEOvK/exec"
 
 # 1. KST 및 날짜 계산
 KST = timezone(timedelta(hours=9))
@@ -32,11 +31,7 @@ end_date_obj = now_kst + timedelta(days=3) if now_kst.hour >= 11 else now_kst + 
 target_start_date = os.environ.get('START_DATE') or start_date_obj.strftime("%Y/%m/%d")
 target_end_date = os.environ.get('END_DATE') or end_date_obj.strftime("%Y/%m/%d")
 
-clean_start_date = target_start_date.replace('-', '/').replace('.', '/')
-date_parts = clean_start_date.split('/')
-target_tab_name = f"{date_parts[0]}{date_parts[1].zfill(2)}" if len(date_parts) >= 2 else start_date_obj.strftime("%Y%m")
-
-# 2. 크롬 환경 구성
+# 2. 크롬 다운로드 환경 구성
 download_dir = os.getcwd()
 options = webdriver.ChromeOptions()
 options.add_argument('--headless')
@@ -58,8 +53,9 @@ driver.execute("send_command", params)
 
 try:
     print(f"[{now_kst.strftime('%Y-%m-%d %H:%M:%S')}] OMS GitHub DB 동기화 시작")
+    print(f"조회 기간: {target_start_date} ~ {target_end_date}")
 
-    # 3~8. 로그인 및 엑셀 다운로드 (동일)
+    # 3. 로그인
     driver.get('https://admin.theborn.co.kr/oms-manager/login')
     time.sleep(2)
     driver.find_element(By.ID, 'companyCd').send_keys('1000')
@@ -67,11 +63,13 @@ try:
     driver.find_element(By.ID, 'userPw').send_keys('theborn8@' + Keys.ENTER)
     time.sleep(4)
 
+    # 4. 메뉴 이동
     driver.find_element(By.CSS_SELECTOR, "a[data-menu-id='BOR']").click()
     time.sleep(2)
     driver.find_element(By.XPATH, "//*[contains(text(), '기간별 주문현황')]").click()
     time.sleep(5)
 
+    # 5. 날짜 세팅 및 조회
     js_script = f"""
         var rangeInput = document.getElementsByName('BOR111_dateRange')[0];
         if(rangeInput) {{
@@ -92,6 +90,7 @@ try:
         driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.F2)
     time.sleep(6)
 
+    # 6. 컬럼 헤더 우클릭 엑셀 다운로드
     header_element = driver.find_element(By.CSS_SELECTOR, 'thead th') or driver.find_element(By.TAG_NAME, 'th')
     try:
         ActionChains(driver).context_click(header_element).perform()
@@ -122,25 +121,26 @@ try:
         pass
     time.sleep(5)
 
-    # 9. 엑셀 파일 열기
+    # 7. 엑셀 파일 수신 및 파싱
     list_of_files = glob.glob(os.path.join(download_dir, '*.xlsx')) or glob.glob(os.path.join(download_dir, '*.xls'))
     if not list_of_files:
-        raise Exception("다운로드 파일 찾기 실패")
+        raise Exception("다운로드 파일 수신 실패")
 
     latest_file = max(list_of_files, key=os.path.getctime)
     new_df = pd.read_excel(latest_file, engine='openpyxl')
     new_df = new_df.fillna('').astype(str)
 
-    print(f"📥 당일 다운로드 원본 데이터: {len(new_df):,}행 수신")
+    print(f"📥 당일 수신 원본 데이터: {len(new_df):,}행")
 
-    # 💡 10. GitHub 데이터베이스 (Parquet 파일) 업데이트
+    # 8. GitHub 데이터베이스 (Parquet 파일) 적재 및 중복 제거
     db_file_path = "oms_database.parquet"
     
     if os.path.exists(db_file_path):
         existing_df = pd.read_parquet(db_file_path)
-        print(f"📂 기존 GitHub DB 로드 완료: {len(existing_df):,}행 누적됨")
-        # 기존 DB + 새 데이터 병합 후 중복 제거 (주문번호 + 주문순번 기준)
+        print(f"📂 기존 DB 로드 완료: {len(existing_df):,}행 누적 상태")
         combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+        
+        # 주문번호 + 주문순번 기준 중복 제거
         if '주문번호' in combined_df.columns and '주문순번' in combined_df.columns:
             combined_df = combined_df.drop_duplicates(subset=['주문번호', '주문순번'], keep='last')
         else:
@@ -148,39 +148,13 @@ try:
     else:
         combined_df = new_df
 
-    # Parquet 압축 DB로 저장
+    # 초고속 압축 DB 저장
     combined_df.to_parquet(db_file_path, index=False, compression='snappy')
     db_size_mb = round(os.path.getsize(db_file_path) / (1024 * 1024), 2)
-    print(f"💾 GitHub DB 업데이트 완료: 총 {len(combined_df):,}행 누적 저장됨 (파일용량: {db_size_mb} MB)")
-
-    # 💡 11. 구글 시트용 '요약/집계 데이터' 생성 (대시보드가 멈추지 않는 핵심)
-    # 원본 3.5만 건 대신 일자/품목/거래처별로 그룹화하여 데이터 크기를 1/100 수준으로 축소
-    print("📊 구글 시트 전송용 통계/집계 데이터 가공 중...")
     
-    # 예시: 일자별/품목별/거래처별 주문 건수 요약표 (필요 컬럼에 따라 자동 조정)
-    group_cols = [c for c in ['배송일자', '거래처명', '품목명', '브랜드명'] if c in combined_df.columns]
-    
-    if group_cols:
-        summary_df = combined_df.groupby(group_cols).size().reset_index(name='주문건수')
-    else:
-        summary_df = combined_df.head(1000) # 기본 fallback
+    print(f"✅ GitHub DB 저장 완료! 총 누적 데이터: {len(combined_df):,}행 (DB 파일 크기: {db_size_mb} MB)")
 
-    summary_df = summary_df.fillna('').astype(str)
-    header = summary_df.columns.tolist()
-    data_rows = summary_df.values.tolist()
-    final_rows = [header] + data_rows
-
-    print(f"🚀 구글 시트 전송 규모: {len(final_rows):,}행 (요약 집계 데이터)")
-
-    # 12. 구글 시트로 집계 데이터 전송
-    payload = {
-        "tabName": target_tab_name,
-        "data": final_rows
-    }
-
-    response = requests.post(WEBHOOK_URL, json=payload, allow_redirects=True, timeout=60)
-    print(f"✅ 구글 시트 전송 완료: {response.text}")
-
+    # 다운로드 원본 엑셀 정리
     if os.path.exists(latest_file):
         os.remove(latest_file)
 
