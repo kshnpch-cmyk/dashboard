@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>더본 OMS 주문 현황 대시보드</title>
-    <!-- Chart.js 및 SheetJS -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
@@ -318,8 +317,8 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <!-- 💡 Public 저장소 초고속 연동 반영 v1.2.1 -->
-            <span class="version-tag" id="app-version-tag">v1.2.1</span>
+            <!-- 💡 v1.3.0 경량 초고속 엔진 반영 -->
+            <span class="version-tag" id="app-version-tag">v1.3.0</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag" id="last-updated-text">
@@ -458,16 +457,11 @@
         </div>
     </div>
 
-    <!-- 🚀 DuckDB-Wasm 초고속 Parquet DB 라이브러리 모듈 -->
-    <script type="module">
-        import * as duckdb from 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/+esm';
-
+    <script>
         const githubId = 'kshnpch-cmyk'; 
         const repoName = 'dashboard'; 
         const token = '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'; 
-        
-        let db = null;
-        let conn = null;
+        const dataJsonUrl = `https://raw.githubusercontent.com/${githubId}/${repoName}/main/dashboard_data.json`;
 
         let colOrderDate    = 3;  
         let colDeliveryDate = 5;  
@@ -490,40 +484,6 @@
         let currentSortAsc = true;
 
         const DEFAULT_WIDTHS = ['100px', '180px', '110px', '110px', '120px', '250px', '80px', '100px', '120px'];
-
-        // 전역 함수 바인딩
-        window.fetchSheetData = fetchSheetData;
-        window.resetToTomorrow = resetToTomorrow;
-        window.onDateFilterChange = onDateFilterChange;
-        window.onBrandChange = onBrandChange;
-        window.filterStoreList = filterStoreList;
-        window.onStoreSelect = onStoreSelect;
-        window.applyColumnFilters = applyColumnFilters;
-        window.exportToExcel = exportToExcel;
-        window.sortTable = sortTable;
-        window.saveColumnWidths = saveColumnWidths;
-        window.resetColumnWidths = resetColumnWidths;
-        window.triggerBot = triggerBot;
-        window.onChartToggleChange = onChartToggleChange;
-
-        // 1. DuckDB 엔진 초기화
-        async function initDuckDB() {
-            try {
-                const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles();
-                const bundle = await duckdb.selectBundle(JSDELIVR_BUNDLES);
-                const worker_url = URL.createObjectURL(
-                    new Blob([`importScripts("${bundle.mainWorker}");`], { type: 'text/javascript' })
-                );
-                const worker = new Worker(worker_url);
-                const logger = new duckdb.ConsoleLogger();
-                db = new duckdb.AsyncDuckDB(logger, worker);
-                await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
-                conn = await db.connect();
-                console.log("⚡ DuckDB-Wasm 엔진 초고속 로드 완료!");
-            } catch (e) {
-                console.error("DuckDB 초기화 오류:", e);
-            }
-        }
 
         function formatDate(dateObj) {
             const year = dateObj.getFullYear();
@@ -561,40 +521,22 @@
             processData();
         }
 
-        // 💡 Public 저장소 전용 Raw URL 수신 함수 (인증 헤더 없이 초고속 로드)
-        async function fetchSheetData() {
-            document.getElementById('last-updated-text').innerText = "🕒 동기화: DB 로드 중...";
-            if (!conn) await initDuckDB();
+        // 💡 초고속 JSON 직접 수신 함수
+        function fetchSheetData() {
+            document.getElementById('last-updated-text').innerText = "🕒 동기화: 수신 중...";
 
-            try {
-                const rawUrl = `https://raw.githubusercontent.com/${githubId}/${repoName}/main/oms_database.parquet?_=${new Date().getTime()}`;
-                
-                const response = await fetch(rawUrl, { cache: 'no-store' });
-
-                if (!response.ok) throw new Error("Parquet DB 수신 실패 (404/Network)");
-
-                const buffer = new Uint8Array(await response.arrayBuffer());
-                await db.registerFileBuffer('oms_database.parquet', buffer);
-
-                // DuckDB 가상 가공 쿼리 실행
-                const res = await conn.query(`SELECT * FROM 'oms_database.parquet'`);
-                const rows = res.toArray().map(r => Object.values(r.toJSON()));
-                const headers = res.schema.fields.map(f => f.name);
-
-                const dataMatrix = [headers, ...rows];
-
-                const now = new Date();
-                const updateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-                document.getElementById('last-updated-text').innerText = `🕒 동기화: ${updateStr}`;
-
-                detectColumnIndexes(headers);
-                allOrders = dataMatrix;
-                processData();
-
-            } catch (err) {
-                console.error("데이터 로드 오류:", err);
-                document.getElementById('last-updated-text').innerText = "🕒 동기화: 로드 실패";
-            }
+            fetch(`${dataJsonUrl}?_=${new Date().getTime()}`)
+                .then(response => {
+                    if (!response.ok) throw new Error("데이터 수신 실패");
+                    return response.json();
+                })
+                .then(res => {
+                    handleSheetResponse(res);
+                })
+                .catch(err => {
+                    console.error("데이터 로드 오류:", err);
+                    document.getElementById('last-updated-text').innerText = "🕒 동기화: 로드 실패";
+                });
         }
 
         function detectColumnIndexes(headerRow) {
@@ -629,6 +571,38 @@
             if (colQty === -1) colQty = 24;
             if (colPrice === -1) colPrice = 25;
             if (colTotal === -1) colTotal = 26;
+        }
+
+        function handleSheetResponse(res) {
+            let data = [];
+
+            if (res && res.updated_at) {
+                document.getElementById('last-updated-text').innerText = `🕒 동기화: ${res.updated_at}`;
+            }
+
+            if (res && res.version) {
+                document.getElementById('app-version-tag').innerText = `v${res.version}`;
+            }
+
+            if (res && res.data && Array.isArray(res.data)) {
+                if (res.data.length > 0 && Array.isArray(res.data[0])) {
+                    data = res.data;
+                } else if (res.data.length > 0 && typeof res.data[0] === 'object') {
+                    const headers = res.columns || Object.keys(res.data[0]);
+                    const rows = res.data.map(obj => headers.map(k => obj[k] !== undefined ? obj[k] : ''));
+                    data = [headers, ...rows];
+                }
+            } else if (Array.isArray(res)) {
+                data = res;
+            }
+
+            if (Array.isArray(data) && data.length > 0) {
+                detectColumnIndexes(data[0]); 
+                allOrders = data;
+                processData();
+            } else {
+                document.getElementById('last-updated-text').innerText = "🕒 동기화: 데이터 없음";
+            }
         }
 
         function cleanNumber(val) {
@@ -908,6 +882,7 @@
             updateDashboardChart();
         }
 
+        // 💡 상위 1,000건 청크 렌더링으로 렌더링 멈춤 방지
         function renderDetailTable() {
             const detailTable = document.getElementById('order-detail-table');
             detailTable.innerHTML = "";
@@ -922,39 +897,44 @@
             let sumQty = 0;
             let sumAmount = 0;
 
-            currentDetailOrders.forEach(row => {
-                const storeCode    = row[colStoreCode] || '-';
-                const storeName    = row[colStoreName] || '-';
-                const orderDate    = formatDisplayDate(row[colOrderDate]);
-                const deliveryDate = formatDisplayDate(row[colDeliveryDate]);
-                const itemCode     = row[colItemCode] || '-';
-                const itemName     = row[colItemName] || '-';
-                const qty          = cleanNumber(row[colQty]);
-                const price        = cleanNumber(row[colPrice]);
-                let total          = cleanNumber(row[colTotal]);
-                
-                if (total === 0 && qty > 0 && price > 0) {
-                    total = qty * price;
-                }
+            const displayLimit = Math.min(1000, currentDetailOrders.length);
+            let htmlBuffer = "";
+
+            for (let i = 0; i < currentDetailOrders.length; i++) {
+                const row = currentDetailOrders[i];
+                const qty = cleanNumber(row[colQty]);
+                const price = cleanNumber(row[colPrice]);
+                let total = cleanNumber(row[colTotal]);
+                if (total === 0 && qty > 0 && price > 0) total = qty * price;
 
                 sumQty += qty;
                 sumAmount += total;
 
-                detailTable.innerHTML += `
-                    <tr>
-                        <td><span class="code-tag">${storeCode}</span></td>
-                        <td><b>${storeName}</b></td>
-                        <td>${orderDate}</td>
-                        <td><span style="color:#2563eb; font-weight:bold;">${deliveryDate}</span></td>
-                        <td><span class="code-tag">${itemCode}</span></td>
-                        <td>${itemName}</td>
-                        <td class="text-right">${qty.toLocaleString()}</td>
-                        <td class="text-right">${price > 0 ? price.toLocaleString() + '원' : '-'}</td>
-                        <td class="text-right"><b>${total > 0 ? total.toLocaleString() + '원' : '-'}</b></td>
-                    </tr>
-                `;
-            });
+                if (i < displayLimit) {
+                    const storeCode = row[colStoreCode] || '-';
+                    const storeName = row[colStoreName] || '-';
+                    const orderDate = formatDisplayDate(row[colOrderDate]);
+                    const deliveryDate = formatDisplayDate(row[colDeliveryDate]);
+                    const itemCode = row[colItemCode] || '-';
+                    const itemName = row[colItemName] || '-';
 
+                    htmlBuffer += `
+                        <tr>
+                            <td><span class="code-tag">${storeCode}</span></td>
+                            <td><b>${storeName}</b></td>
+                            <td>${orderDate}</td>
+                            <td><span style="color:#2563eb; font-weight:bold;">${deliveryDate}</span></td>
+                            <td><span class="code-tag">${itemCode}</span></td>
+                            <td>${itemName}</td>
+                            <td class="text-right">${qty.toLocaleString()}</td>
+                            <td class="text-right">${price > 0 ? price.toLocaleString() + '원' : '-'}</td>
+                            <td class="text-right"><b>${total > 0 ? total.toLocaleString() + '원' : '-'}</b></td>
+                        </tr>
+                    `;
+                }
+            }
+
+            detailTable.innerHTML = htmlBuffer;
             document.getElementById('list-total-qty').innerText = sumQty.toLocaleString();
             document.getElementById('list-total-amount').innerText = sumAmount.toLocaleString();
         }
