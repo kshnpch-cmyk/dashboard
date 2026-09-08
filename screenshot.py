@@ -132,54 +132,39 @@ try:
 
     time.sleep(1.5)
 
-    # 7. '엑셀다운로드' 클릭 (자바스크립트로 레이어 방해 우회)
+    # 7. '엑셀다운로드' 메뉴 클릭
     excel_btn = driver.find_element(By.XPATH, "//*[contains(text(), '엑셀다운로드')]")
     driver.execute_script("arguments[0].click();", excel_btn)
-    print("🖱️ '엑셀다운로드' 메뉴 강제 클릭 완료. 팝업창 대기 중...")
+    print("🖱️ '엑셀다운로드' 메뉴 클릭 완료. SweetAlert2 팝업 대기 중...")
 
     time.sleep(2)
 
-    # 8. 파일명 입력 팝업창 처리
-    print("📝 파일명 입력 팝업창 처리 중...")
+    # 8. SweetAlert2 팝업 파일명 입력 및 [다운로드](swal2-confirm) 버튼 정밀 클릭
+    print("📝 SweetAlert2 다운로드 버튼 클릭 중...")
     
-    # 팝업 입력창 찾아 파일명 입력
+    # 팝업창 내 input에 파일명 입력
     try:
-        input_box = driver.find_element(By.CSS_SELECTOR, "input[placeholder*='파일명']")
-        input_box.clear()
-        input_box.send_keys("oms_download")
+        swal_input = driver.find_element(By.CSS_SELECTOR, "input.swal2-input") or driver.find_element(By.CSS_SELECTOR, ".swal2-popup input")
+        swal_input.clear()
+        swal_input.send_keys("oms_download")
     except Exception:
         driver.execute_script("""
-            var inputs = document.querySelectorAll('input[type="text"]');
-            for(var i=0; i<inputs.length; i++){
-                if(inputs[i].offsetParent !== null){
-                    inputs[i].value = 'oms_download';
-                    inputs[i].dispatchEvent(new Event('input', { bubbles: true }));
-                    break;
-                }
+            var input = document.querySelector('.swal2-input') || document.querySelector('.swal2-popup input');
+            if(input){
+                input.value = 'oms_download';
+                input.dispatchEvent(new Event('input', { bubbles: true }));
             }
         """)
 
     time.sleep(1)
 
-    # '다운로드' 버튼 강제 클릭
-    try:
-        download_btn = driver.find_element(By.XPATH, "//*[contains(text(), '다운로드')]")
-        driver.execute_script("arguments[0].click();", download_btn)
-    except Exception:
-        driver.execute_script("""
-            var btns = document.querySelectorAll('button, a, div');
-            for(var i=0; i<btns.length; i++){
-                if(btns[i].innerText.trim() === '다운로드'){
-                    btns[i].click();
-                    break;
-                }
-            }
-        """)
+    # swal2-confirm 버튼 클릭
+    download_btn = driver.find_element(By.CSS_SELECTOR, "button.swal2-confirm")
+    driver.execute_script("arguments[0].click();", download_btn)
 
-    print("📥 엑셀 파일 생성 요청 완료! 수신 대기 중...")
-    time.sleep(6) # 엑셀 다운로드 대기
+    print("📥 SweetAlert2 [다운로드] 버튼 클릭 성공! 엑셀 파일 수신 대기 중...")
+    time.sleep(8) # 엑셀 다운로드 완료 대기
 
-    # 정상 처리 시 스크린샷 저장
     driver.save_screenshot("oms_result.png")
 
     # 9. 다운로드된 엑셀 파일 찾기 및 pandas 파싱
@@ -216,7 +201,6 @@ try:
 
 except Exception as e:
     print(f"❌ 오류 발생: {e}")
-    # 오류 발생시에도 스크린샷을 찍어 원인 파악 가능하도록 조치
     try:
         driver.save_screenshot("oms_result.png")
         print("📸 에러 시점 화면 캡처 완료: oms_result.png")
