@@ -33,6 +33,12 @@ jobs:
 
       - name: 필수 라이브러리 설치
         run: pip install selenium beautifulsoup4 requests
+        
+      - name: 캡처 이미지 저장 (Artifact Upload)
+        uses: actions/upload-artifact@v4
+        with:
+          name: oms-screenshot-result
+          path: oms_result.png
 
       - name: 동기화 스크립트 실행
         env:
