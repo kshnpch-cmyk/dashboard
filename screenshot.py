@@ -49,9 +49,9 @@ try:
     driver.get('https://admin.theborn.co.kr/oms-manager/login')
     time.sleep(2) 
 
-    driver.find_element(By.ID, 'companyCd').send_keys('9000')
-    driver.find_element(By.ID, 'userId').send_keys('admin')
-    driver.find_element(By.ID, 'userPw').send_keys('1234' + Keys.ENTER)
+    driver.find_element(By.ID, 'companyCd').send_keys('1000')
+    driver.find_element(By.ID, 'userId').send_keys('1220503')
+    driver.find_element(By.ID, 'userPw').send_keys('theborn8@' + Keys.ENTER)
     time.sleep(4) 
 
     # 3. 메뉴 이동
