@@ -1,132 +1,88 @@
 import os
-import sys
+import glob
 import time
+import json
+import warnings
 import requests
 import pandas as pd
-from datetime import datetime
-from playwright.sync_api import sync_playwright
+from datetime import datetime, timedelta, timezone
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
 
-# 💡 GitHub Secrets 환경변수 수신 (보안 정보)
+# openpyxl CellStyle count 속성 오류 방지 패치
+import openpyxl.styles.cell_style
+_original_cell_style_init = openpyxl.styles.cell_style.CellStyle.__init__
+
+def _patched_cell_style_init(self, *args, **kwargs):
+    kwargs.pop('count', None)
+    _original_cell_style_init(self, *args, **kwargs)
+
+openpyxl.styles.cell_style.CellStyle.__init__ = _patched_cell_style_init
+
+warnings.filterwarnings('ignore')
+
+# 💡 GitHub Secrets 및 환경변수 로드
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://kshnpch-cmyk.supabase.co")
 SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY", "")
 
-OMS_COMPANY_CODE = os.environ.get("OMS_COMPANY_CODE", "")
-OMS_ID = os.environ.get("OMS_ID", "")
-OMS_PW = os.environ.get("OMS_PW", "")
+OMS_COMPANY_CODE = os.environ.get("OMS_COMPANY_CODE", "1000")
+OMS_ID = os.environ.get("OMS_ID", "1220503")
+OMS_PW = os.environ.get("OMS_PW", "theborn8@")
 
-START_DATE = os.environ.get("START_DATE", "")
-END_DATE = os.environ.get("END_DATE", "")
+# 1. KST 날짜 계산 및 지정 기간 파라미터 수신
+KST = timezone(timedelta(hours=9))
+now_kst = datetime.now(KST)
 
+start_date_obj = now_kst + timedelta(days=1)
+end_date_obj = now_kst + timedelta(days=3) if now_kst.hour >= 11 else now_kst + timedelta(days=2)
 
-def download_oms_data():
-    """더본 OMS 어드민(admin.theborn.co.kr) 접속, 로그인 및 팝업 대응 엑셀 다운로드"""
-    print("🌐 더본 OMS 어드민 접속 및 데이터 수집을 시작합니다...", flush=True)
+target_start_date = os.environ.get('START_DATE') or start_date_obj.strftime("%Y/%m/%d")
+target_end_date = os.environ.get('END_DATE') or end_date_obj.strftime("%Y/%m/%d")
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(accept_downloads=True)
-        page = context.new_page()
+# 2. 크롬 브라우저 다운로드 설정
+download_dir = os.getcwd()
+options = webdriver.ChromeOptions()
+options.add_argument('--headless')
+options.add_argument('--no-sandbox')
+options.add_argument('--disable-dev-shm-usage')
+options.add_experimental_option("prefs", {
+    "download.default_directory": download_dir,
+    "download.prompt_for_download": False,
+    "download.directory_upgrade": True,
+    "safebrowsing.enabled": True
+})
 
-        try:
-            # 1) OMS 어드민 로그인 페이지 접속
-            page.goto("https://admin.theborn.co.kr", timeout=60000)
-            page.wait_for_load_state("domcontentloaded")
-            time.sleep(2)
-
-            print("🔑 로그인 정보 입력 중...", flush=True)
-
-            # 2) 확인된 HTML id 속성을 지정하여 입력 (#companyCd, #userId, #userPw)
-            if page.locator("#companyCd").is_visible():
-                page.fill("#companyCd", OMS_COMPANY_CODE)
-
-            page.wait_for_selector("#userId", timeout=10000)
-            page.fill("#userId", OMS_ID)
-            page.fill("#userPw", OMS_PW)
-
-            # 로그인 버튼 클릭
-            login_btn = page.locator(
-                "button[type='submit'], .btn_login, #btnLogin, button:has-text('로그인')"
-            ).first
-            login_btn.click()
-
-            page.wait_for_load_state("networkidle")
-            time.sleep(3)
-
-            # 3) 주문 현황 메뉴 이동
-            print("📦 주문 내역 메뉴로 이동 중...", flush=True)
-            page.goto("https://admin.theborn.co.kr/order/list", timeout=60000)
-            page.wait_for_load_state("networkidle")
-
-            # 4) 날짜 조건 설정
-            if START_DATE and END_DATE:
-                print(f"📅 조회 기간 설정: {START_DATE} ~ {END_DATE}", flush=True)
-                if page.locator("input[name='start_date']").is_visible():
-                    page.fill("input[name='start_date']", START_DATE)
-                    page.fill("input[name='end_date']", END_DATE)
-                    page.click(".btn_search, button:has-text('조회')")
-                    time.sleep(3)
-
-            # 5) 🎯 1단계: 컨텍스트 메뉴의 '엑셀다운로드' 클릭
-            print("🖱️ 엑셀다운로드 메뉴 클릭 중...", flush=True)
-            excel_menu_btn = page.locator("*:has-text('엑셀다운로드')").last
-            excel_menu_btn.click()
-            time.sleep(2)
-
-            # 🎯 2단계: 파일명 입력 팝업창 대응 및 다운로드 실행
-            print("📝 파일명 입력 팝업 처리 중...", flush=True)
-            
-            # 파일명 입력창 찾기 및 입력
-            file_name_input = page.locator("input[placeholder*='파일명'], .popup input[type='text'], div[role='dialog'] input").first
-            if file_name_input.is_visible():
-                file_name_input.fill("temp_oms")
-                time.sleep(1)
-
-            # 🎯 3단계: [다운로드] 버튼 클릭 시 파일 이벤트 수신
-            print("📥 [다운로드] 버튼 클릭 및 파일 수신 중...", flush=True)
-            with page.expect_download(timeout=30000) as download_info:
-                # 팝업 내부의 '다운로드' 버튼 클릭
-                download_btn = page.locator("button:has-text('다운로드'), a:has-text('다운로드'), .btn:has-text('다운로드')").first
-                download_btn.click()
-
-            download = download_info.value
-            download_path = os.path.join(os.getcwd(), "temp_oms.xlsx")
-            download.save_as(download_path)
-            print(f"✅ 엑셀 파일 저장 완료: {download_path}", flush=True)
-
-            browser.close()
-
-            # 6) 다운로드한 엑셀 읽기
-            df = pd.read_excel(download_path)
-            return df
-
-        except Exception as e:
-            print(f"❌ OMS 수집 중 오류 발생: {e}", flush=True)
-            browser.close()
-            return None
+driver = webdriver.Chrome(options=options)
+driver.set_window_size(1920, 1080)
+driver.command_executor._commands["send_command"] = ("POST", '/session/$sessionId/chromium/send_command')
+params = {'cmd': 'Page.setDownloadBehavior', 'params': {'behavior': 'allow', 'downloadPath': download_dir}}
+driver.execute_script("return null;")
+driver.execute("send_command", params)
 
 
 def sync_to_supabase(combined_df):
-    """수집된 OMS 데이터를 Supabase 클라우드 DB(oms_orders)로 Bulk Insert"""
+    """수집된 Dataframe을 Supabase oms_orders 테이블로 업로드"""
     if combined_df is None or combined_df.empty:
         print("⚠️ Supabase에 업로드할 데이터가 없습니다.", flush=True)
         return
 
-    print("🚀 Supabase 클라우드 DB로 데이터 전송을 시작합니다...", flush=True)
+    print("🚀 Supabase 클라우드 DB 동기화를 시작합니다...", flush=True)
 
-    df_clean = combined_df.fillna("").astype(str)
+    df_clean = combined_df.fillna('').astype(str)
     records = []
 
     for _, row in df_clean.iterrows():
-
         def parse_num(val):
             try:
-                s = str(val).replace(",", "").strip()
+                s = str(val).replace(',', '').strip()
                 return float(s) if s else 0
             except:
                 return 0
 
         def parse_date(val):
-            s = str(val).split("T")[0].replace("/", "-").strip()
+            s = str(val).split('T')[0].replace('/', '-').strip()
             return s if len(s) >= 8 else None
 
         record = {
@@ -139,9 +95,7 @@ def sync_to_supabase(combined_df):
             "item_name": str(row.get("품목명", "")),
             "qty": int(parse_num(row.get("수량", row.get("주문수량", 0)))),
             "price": parse_num(row.get("단가", row.get("공급단가", 0))),
-            "total_amount": parse_num(
-                row.get("금액", row.get("공급가액", 0))
-            ),
+            "total_amount": parse_num(row.get("금액", row.get("공급가액", 0)))
         }
         records.append(record)
 
@@ -149,31 +103,116 @@ def sync_to_supabase(combined_df):
         "apikey": SUPABASE_SECRET_KEY,
         "Authorization": f"Bearer {SUPABASE_SECRET_KEY}",
         "Content-Type": "application/json",
-        "Prefer": "return=minimal",
+        "Prefer": "return=minimal"
     }
 
     batch_size = 1000
     total_records = len(records)
 
     for i in range(0, total_records, batch_size):
-        batch = records[i : i + batch_size]
-        res = requests.post(
-            f"{SUPABASE_URL}/rest/v1/oms_orders", headers=headers, json=batch
-        )
+        batch = records[i:i + batch_size]
+        res = requests.post(f"{SUPABASE_URL}/rest/v1/oms_orders", headers=headers, json=batch)
 
         if res.status_code in [200, 201]:
-            print(
-                f"✅ DB 동기화 완료: {min(i + batch_size, total_records)} / {total_records} 건",
-                flush=True,
-            )
+            print(f"✅ DB 동기화 완료: {min(i + batch_size, total_records)} / {total_records} 건", flush=True)
         else:
             print(f"❌ DB 동기화 오류 ({res.status_code}): {res.text}", flush=True)
 
 
-if __name__ == "__main__":
-    print("🚀 OMS 동기화 봇 실행 중...", flush=True)
-    df_oms = download_oms_data()
-    if df_oms is not None and not df_oms.empty:
-        sync_to_supabase(df_oms)
-    else:
-        print("⚠️ 데이터 수집에 실패하여 DB 동기화를 중단합니다.", flush=True)
+try:
+    print(f"[{now_kst.strftime('%Y-%m-%d %H:%M:%S')}] OMS 자동 수집 시작", flush=True)
+    print(f"조회 지정 기간: {target_start_date} ~ {target_end_date}", flush=True)
+
+    # 3. 로그인
+    driver.get('https://admin.theborn.co.kr/oms-manager/login')
+    time.sleep(2)
+    driver.find_element(By.ID, 'companyCd').send_keys(OMS_COMPANY_CODE)
+    driver.find_element(By.ID, 'userId').send_keys(OMS_ID)
+    driver.find_element(By.ID, 'userPw').send_keys(OMS_PW + Keys.ENTER)
+    time.sleep(4)
+
+    # 4. 메뉴 이동
+    driver.find_element(By.CSS_SELECTOR, "a[data-menu-id='BOR']").click()
+    time.sleep(2)
+    driver.find_element(By.XPATH, "//*[contains(text(), '기간별 주문현황')]").click()
+    time.sleep(5)
+
+    # 5. 날짜 세팅 및 조회
+    js_script = f"""
+        var rangeInput = document.getElementsByName('BOR111_dateRange')[0];
+        if(rangeInput) {{
+            rangeInput.value = '{target_start_date} ~ {target_end_date}';
+            rangeInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
+        }}
+        var startInput = document.getElementById('BOR111_startDt');
+        var endInput = document.getElementById('BOR111_endDt');
+        if(startInput) startInput.value = '{target_start_date}';
+        if(endInput) endInput.value = '{target_end_date}';
+    """
+    driver.execute_script(js_script)
+    time.sleep(2)
+
+    try:
+        driver.find_element(By.CSS_SELECTOR, "button.form_btn_search[data-shortcut='F2']").click()
+    except Exception:
+        driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.F2)
+    time.sleep(6)
+
+    # 6. 컬럼 헤더 영역 우클릭
+    header_element = driver.find_element(By.CSS_SELECTOR, 'thead th') or driver.find_element(By.TAG_NAME, 'th')
+    try:
+        ActionChains(driver).context_click(header_element).perform()
+    except Exception:
+        pass
+    time.sleep(1.5)
+
+    # 7. '엑셀다운로드' 메뉴 클릭
+    excel_btn = driver.find_element(By.XPATH, "//*[contains(text(), '엑셀다운로드')]")
+    driver.execute_script("arguments[0].click();", excel_btn)
+    time.sleep(2)
+
+    # 8. SweetAlert 팝업 처리 및 파일 다운로드 실행
+    try:
+        swal_input = driver.find_element(By.CSS_SELECTOR, "input.swal2-input")
+        swal_input.clear()
+        swal_input.send_keys("oms_download")
+    except Exception:
+        pass
+    time.sleep(1)
+
+    download_btn = driver.find_element(By.CSS_SELECTOR, "button.swal2-confirm")
+    driver.execute_script("arguments[0].click();", download_btn)
+    time.sleep(5)
+
+    try:
+        ok_btn = driver.find_element(By.CSS_SELECTOR, "button.swal2-confirm")
+        driver.execute_script("arguments[0].click();", ok_btn)
+    except Exception:
+        pass
+    time.sleep(5)
+
+    # 9. 다운로드한 엑셀 파일 읽기
+    list_of_files = glob.glob(os.path.join(download_dir, '*.xlsx')) or glob.glob(os.path.join(download_dir, '*.xls'))
+    if not list_of_files:
+        raise Exception("다운로드 파일 수신 실패")
+
+    latest_file = max(list_of_files, key=os.path.getctime)
+    new_df = pd.read_excel(latest_file, engine='openpyxl')
+
+    print(f"📥 수신된 원본 데이터: {len(new_df):,}행", flush=True)
+
+    # 10. Supabase DB로 동기화 전송
+    sync_to_supabase(new_df)
+
+    # 임시 다운로드 파일 정제
+    if os.path.exists(latest_file):
+        os.remove(latest_file)
+
+except Exception as e:
+    print(f"❌ 오류 발생: {e}", flush=True)
+    try:
+        driver.save_screenshot("oms_result.png")
+    except Exception:
+        pass
+finally:
+    driver.quit()
