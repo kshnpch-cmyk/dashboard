@@ -2,7 +2,6 @@ name: Auto Order Data Sync Bot
 
 on:
   schedule:
-    # 10분마다 주기적 자동 실행 (UTC 기준)
     - cron: '*/10 * * * *'
   workflow_dispatch:
     inputs:
@@ -13,7 +12,6 @@ on:
         description: '종료일'
         required: false
 
-# 동시 실행 방지 설정
 concurrency:
   group: sync-bot-group
   cancel-in-progress: false
@@ -32,16 +30,16 @@ jobs:
           python-version: '3.10'
 
       - name: 필수 라이브러리 설치
-        run: pip install selenium beautifulsoup4 requests
+        run: |
+          python -m pip install --upgrade pip
+          pip install selenium beautifulsoup4 requests pandas openpyxl
 
-      # 1. 파이썬 크롤링 스크립트를 먼저 실행하여 이미지를 생성합니다.
       - name: 동기화 스크립트 실행
         env:
           START_DATE: ${{ github.event.inputs.start_date }}
           END_DATE: ${{ github.event.inputs.end_date }}
         run: python screenshot.py
 
-      # 2. 스크립트 실행 완료 후(오류 발생 시 포함) 스크린샷을 아티팩트로 업로드합니다.
       - name: 캡처 이미지 저장 (Artifact Upload)
         uses: actions/upload-artifact@v4
         if: always()
