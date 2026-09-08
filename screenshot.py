@@ -10,7 +10,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 
-# 💡 [핵심] openpyxl 버그(CellStyle count 인자 오류) 강제 방지 패치
+# 💡 openpyxl 버그(CellStyle count 인자 오류) 강제 방지 패치
 import openpyxl.styles.cell_style
 _original_cell_style_init = openpyxl.styles.cell_style.CellStyle.__init__
 
@@ -218,7 +218,6 @@ try:
         print("💡 [파싱 성공] openpyxl 엔진 (패치 적용)으로 데이터 수집 완료!")
     except Exception as e:
         print(f"    └─ openpyxl 파싱 실패: {e}")
-        # 예외 대비 범용 순회
         parse_methods = [
             ("openpyxl_data_only", lambda f: pd.read_excel(f, engine='openpyxl', data_only=True)),
             ("default_read_excel", lambda f: pd.read_excel(f))
@@ -250,9 +249,10 @@ try:
     if data_rows:
         print(f"    └─ 데이터 샘플(1행): {data_rows[0][:3]}")
 
-    # 10. 구글 스프레드시트 Webhook 전송
+    # 10. 구글 스프레드시트 Webhook 전송 (대용량 전송 대응 타임아웃 300초 적용)
     print("\n--------------------------------------------------")
     print(f"🚀 [STEP 5/5] 구글 시트 '{target_tab_name}' 탭으로 데이터 전송 중...")
+    print(f"📦 전송 데이터 규모: 총 {len(final_rows):,}행 (헤더 포함)")
     
     payload = {
         "tabName": target_tab_name,
@@ -260,7 +260,7 @@ try:
     }
 
     start_time = time.time()
-    response = requests.post(WEBHOOK_URL, json=payload, allow_redirects=True, timeout=30)
+    response = requests.post(WEBHOOK_URL, json=payload, allow_redirects=True, timeout=300)
     elapsed = round(time.time() - start_time, 2)
 
     print(f"📡 구글 시트 서버 응답 코드: {response.status_code} (소요시간: {elapsed}초)")
