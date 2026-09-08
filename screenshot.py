@@ -10,7 +10,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 
-# openpyxl 스타일 및 구형 엑셀 경고 무시
+# 경고 메시지 숨김
 warnings.filterwarnings('ignore')
 
 WEBHOOK_URL = "https://script.google.com/macros/s/AKfycby2-YHNufhOlHJcIBspE1bljMNtIEf3aXoXWqqakUgqvndDCf0nT1MSVuZkopmuEOvK/exec"
@@ -106,7 +106,7 @@ try:
     time.sleep(6) # 데이터 로딩 대기
 
     # 6. 컬럼 헤더 영역 우클릭
-    print("🖱️ 컬럼 헤더 영역 우클릭 실행...")
+    print("🖱️ [STEP 1/5] 컬럼 헤더 영역 우클릭 실행...")
     
     header_element = None
     for col_text in ['배송일자', '품목코드', '품목명', '거래처코드', '주문번호']:
@@ -139,12 +139,12 @@ try:
     # 7. '엑셀다운로드' 메뉴 클릭
     excel_btn = driver.find_element(By.XPATH, "//*[contains(text(), '엑셀다운로드')]")
     driver.execute_script("arguments[0].click();", excel_btn)
-    print("🖱️ '엑셀다운로드' 메뉴 클릭 완료. 파일명 입력 팝업 대기 중...")
+    print("🖱️ [STEP 2/5] '엑셀다운로드' 메뉴 클릭 완료. 파일명 입력 팝업 대기 중...")
 
     time.sleep(2)
 
     # 8. 파일명 입력 팝업 처리
-    print("📝 파일명 입력 및 다운로드 요청...")
+    print("📝 [STEP 3/5] 파일명 입력 및 다운로드 요청...")
     
     try:
         swal_input = driver.find_element(By.CSS_SELECTOR, "input.swal2-input") or driver.find_element(By.CSS_SELECTOR, ".swal2-popup input")
@@ -188,54 +188,69 @@ try:
 
     driver.save_screenshot("oms_result.png")
 
-    # 💡 9. 다운로드된 엑셀 파일 열고 데이터 추출(복사)하기
+    # 💡 9. 다운로드된 엑셀 파일 열고 데이터 읽기 (복사 과정 디버깅 로그 출력)
+    print("\n--------------------------------------------------")
+    print("📂 [STEP 4/5] 다운로드된 엑셀 파일 열기 및 데이터 복사 시작")
     list_of_files = glob.glob(os.path.join(download_dir, '*.xlsx')) or glob.glob(os.path.join(download_dir, '*.xls'))
     
     if not list_of_files:
-        raise Exception("다운로드된 엑셀 파일을 찾지 못했습니다.")
+        raise Exception("다운로드 폴더 내에서 엑셀 파일(.xlsx/.xls)을 찾지 못했습니다.")
 
     latest_file = max(list_of_files, key=os.path.getctime)
-    print(f"📄 파일 열기 시도: {latest_file}")
+    file_size_bytes = os.path.getsize(latest_file)
+    print(f"📄 대상 엑셀 파일 감지 완료: {os.path.basename(latest_file)} (용량: {file_size_bytes} bytes)")
 
-    # 다양한 엑셀 포맷 대응 파싱
+    # 파일 읽기 수행
+    df = None
     try:
         df = pd.read_excel(latest_file, engine='openpyxl')
-    except Exception:
+        print("    └─ openpyxl 엔진으로 파일 읽기 성공")
+    except Exception as e1:
         try:
             df = pd.read_excel(latest_file, engine='xlrd')
-        except Exception:
+            print("    └─ xlrd 엔진으로 파일 읽기 성공")
+        except Exception as e2:
             dfs = pd.read_html(latest_file)
             df = dfs[0]
+            print("    └─ HTML 파서 엔진으로 파일 읽기 성공")
 
-    # 결측치(NaN) 빈 문자열로 처리 및 데이터 타입 문자열화
+    # 데이터 복사 가공
     df = df.fillna('')
     df = df.astype(str)
 
-    # 헤더(1행)와 전체 데이터 행 추출
     header = df.columns.tolist()
     data_rows = df.values.tolist()
-    
-    # 2차원 배열 구조로 가공 ([ [헤더목록], [1행 데이터], [2행 데이터]... ])
     final_rows = [header] + data_rows
 
-    print(f"📊 데이터 추출 완료 - 총 {len(header)}개 열 / {len(data_rows)}개 행 복사 성공")
+    print(f"📋 [데이터 복사 완료] 총 {len(header)}개 컬럼 / 데이터 {len(data_rows)}개 행 추출됨")
+    if header:
+        print(f"    └─ 컬럼 헤더 일부: {header[:5]}...")
+    if data_rows:
+        print(f"    └─ 첫 번째 데이터 샘플: {data_rows[0][:3]}...")
 
-    # 💡 10. 구글 스프레드시트 Webhook으로 데이터 전송(붙여넣기)
+    # 💡 10. 구글 스프레드시트 Webhook 전송 (붙여넣기)
+    print("\n--------------------------------------------------")
+    print(f"🚀 [STEP 5/5] 구글 시트 '{target_tab_name}' 탭으로 데이터 전송(붙여넣기) 중...")
+    
     payload = {
         "tabName": target_tab_name,
         "data": final_rows
     }
 
-    print(f"🚀 구글 시트 '{target_tab_name}' 탭으로 데이터 전송 중...")
-    response = requests.post(WEBHOOK_URL, json=payload, allow_redirects=True)
-    print(f"✅ 구글 시트 반영 결과: {response.text}")
+    start_time = time.time()
+    response = requests.post(WEBHOOK_URL, json=payload, allow_redirects=True, timeout=30)
+    elapsed = round(time.time() - start_time, 2)
 
-    # 임시 저장된 엑셀 파일 삭제 정리
+    print(f"📡 구글 시트 서버 응답 코드: {response.status_code} (소요시간: {elapsed}초)")
+    print(f"✅ 구글 시트 웹훅 처리 결과 메시지: {response.text}")
+    print("--------------------------------------------------\n")
+
+    # 다운로드된 엑셀 파일 삭제
     if os.path.exists(latest_file):
         os.remove(latest_file)
 
 except Exception as e:
-    print(f"❌ 오류 발생: {e}")
+    print(f"\n❌ [오류 발생]: {e}")
     try:
         driver.save_screenshot("oms_result.png")
         print("📸 에러 시점 화면 캡처 완료: oms_result.png")
