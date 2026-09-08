@@ -25,7 +25,22 @@
             flex-wrap: wrap;
             gap: 15px;
         }
-        .navbar h1 { margin: 0; font-size: 20px; font-weight: 700; }
+        .brand-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .brand-title h1 { margin: 0; font-size: 20px; font-weight: 700; }
+        .version-tag {
+            background-color: #3b82f6;
+            color: white;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 3px 8px;
+            border-radius: 12px;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
         .control-panel {
             display: flex;
             gap: 10px;
@@ -300,7 +315,10 @@
 <body>
 
     <div class="navbar">
-        <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
+        <div class="brand-title">
+            <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
+            <span class="version-tag">v1.0.0</span>
+        </div>
         <div class="control-panel">
             <div class="last-updated-tag" id="last-updated-text">
                 🕒 동기화: 확인 중...
@@ -324,7 +342,7 @@
     </div>
 
     <div class="container">
-        <!-- 1단계: 요약 KPI -->
+        <!-- 요약 KPI -->
         <div class="kpi-grid">
             <div class="kpi-card">
                 <div class="kpi-title">전체 총 주문수량</div>
@@ -340,7 +358,7 @@
             </div>
         </div>
 
-        <!-- 2단계: 일자별 추이 그래프 -->
+        <!-- 일자별 추이 그래프 -->
         <div class="chart-panel">
             <div class="panel-title">
                 <span id="chart-panel-title">📊 일자별 주문 추이 그래프 (전체 데이터)</span>
@@ -350,7 +368,7 @@
             </div>
         </div>
 
-        <!-- 3단계: 점포 목록 및 상세 목록 -->
+        <!-- 점포 목록 및 상세 목록 -->
         <div class="dashboard-layout">
             <div class="panel">
                 <div class="panel-title">
