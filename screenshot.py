@@ -44,7 +44,7 @@ try:
     print(f"[{now_kst.strftime('%Y-%m-%d %H:%M:%S')}] 동기화 진행")
     print(f"조회 지정 기간: {target_start_date} ~ {target_end_date} ➔ [저장 대상 시트 탭: '{target_tab_name}']")
 
-    # 2. 로그인 (최신 계정 정보 반영)
+    # 2. 로그인
     driver.get('https://admin.theborn.co.kr/oms-manager/login')
     time.sleep(2) 
 
@@ -84,7 +84,36 @@ try:
         body = driver.find_element(By.TAG_NAME, 'body')
         body.send_keys(Keys.F2)
 
-    time.sleep(10)
+    time.sleep(5)
+
+    # 💡 5-1. 가상 스크롤(Virtual Scroll) 강제 작동 및 전체 로딩
+    print("🔄 테이블 전체 데이터 스크롤 로딩 시작...")
+    scroll_js = """
+        var containers = [
+            document.querySelector('.tui-grid-body-area'),
+            document.querySelector('.w2grid_body'),
+            document.querySelector('.ag-body-viewport'),
+            document.querySelector('div[style*="overflow-y: auto"]'),
+            document.querySelector('div[style*="overflow: auto"]'),
+            document.querySelector('.table-container')
+        ];
+        var scrolled = false;
+        for (var i = 0; i < containers.length; i++) {
+            if (containers[i]) {
+                containers[i].scrollTop += 2000;
+                scrolled = true;
+            }
+        }
+        if (!scrolled) {
+            window.scrollBy(0, 2000);
+        }
+    """
+
+    for step in range(20):  # 스크롤을 20번 내리며 30행 이상 전체 로딩
+        driver.execute_script(scroll_js)
+        time.sleep(1)
+
+    print("✅ 스크롤 로딩 완료! 데이터 파싱을 시작합니다.")
 
     # 6. 헤더 및 데이터 파싱
     html = driver.page_source
