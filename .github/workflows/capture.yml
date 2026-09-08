@@ -37,17 +37,17 @@ jobs:
 
       - name: Run Python Screenshot Bot
         env:
-          # 💡 Supabase 클라우드 DB Secrets
+          # Supabase 클라우드 DB Secrets
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           
-          # 💡 더본 OMS 로그인 정보 Secrets (회사코드, 아이디, 비밀번호)
+          # 더본 OMS 로그인 정보 Secrets
           OMS_COMPANY_CODE: ${{ secrets.OMS_COMPANY_CODE }}
           OMS_ID: ${{ secrets.OMS_ID }}
           OMS_PW: ${{ secrets.OMS_PW }}
           
-          # 💡 수동 실행 시 입력받는 날짜 기간 파라미터
+          # 날짜 기간 파라미터
           START_DATE: ${{ github.event.inputs.start_date }}
           END_DATE: ${{ github.event.inputs.end_date }}
         run: |
-          python screenshot.py
+          python -u screenshot.py
