@@ -1,62 +1,44 @@
-name: Auto Order Data Sync Bot
+name: Run OMS Screenshot and Sync Bot
 
 on:
-  schedule:
-    # 10분마다 주기적 자동 실행 (UTC 기준)
-    - cron: '*/10 * * * *'
   workflow_dispatch:
     inputs:
       start_date:
-        description: '시작일'
+        description: '시작일자 (YYYY/MM/DD)'
         required: false
+        default: ''
       end_date:
-        description: '종료일'
+        description: '종료일자 (YYYY/MM/DD)'
         required: false
-
-# 깃허브 저장소에 DB 및 JSON 파일 커밋/푸시를 위한 권한 설정
-permissions:
-  contents: write
-
-concurrency:
-  group: sync-bot-group
-  cancel-in-progress: false
+        default: ''
+  schedule:
+    # 매일 정해진 시간에 자동 실행 (필요 시 수정 가능)
+    - cron: '0 22 * * *'
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 저장소 체크아웃
-        uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@v3
 
-      - name: 파이썬 설정
-        uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: 필수 라이브러리 설치
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install selenium beautifulsoup4 requests pandas openpyxl xlrd lxml html5lib pyarrow
+          pip install pandas requests openpyxl
 
-      - name: 동기화 스크립트 실행
+      - name: Run Python Screenshot Bot
         env:
+          # 💡 GitHub Secrets에서 키를 불러와 환경변수로 전달 (코드 노출 방지)
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           START_DATE: ${{ github.event.inputs.start_date }}
           END_DATE: ${{ github.event.inputs.end_date }}
-        run: python screenshot.py
-
-      - name: DB 및 대시보드 JSON 파일 깃허브 커밋/푸시
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add oms_database.parquet dashboard_data.json || true
-          git commit -m "auto: update oms_database.parquet & dashboard_data.json [skip ci]" || true
-          git push
-
-      - name: 캡처 이미지 저장 (Artifact Upload)
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: oms-screenshot-result
-          path: oms_result.png
-          if-no-files-found: warn
+          python screenshot.py
