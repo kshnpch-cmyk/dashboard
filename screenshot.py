@@ -153,23 +153,35 @@ try:
     db_size_mb = round(os.path.getsize(db_file_path) / (1024 * 1024), 2)
     print(f"💾 GitHub DB 저장 완료: 총 {len(combined_df):,}행 누적 (파일용량: {db_size_mb} MB)")
 
-    # 💡 11. 대시보드 웹페이지(index.html 등) 연동용 JSON 파일 자동 생성
-    # 전체 누적 데이터 중 웹에서 바로 보여줄 최신 데이터/집계 데이터를 JSON으로 파싱
+    # 11. 대시보드(index.html) 파싱 규격에 맞는 2차원 배열 구조 dashboard_data.json 생성
     json_file_path = "dashboard_data.json"
-    
-    # 웹 로딩 속도를 위해 최근 데이터 및 요약 데이터 위주로 구성
+    current_version = 1
+
+    if os.path.exists(json_file_path):
+        try:
+            with open(json_file_path, "r", encoding="utf-8") as f:
+                old_json = json.load(f)
+                current_version = old_json.get("version", 0) + 1
+        except Exception:
+            current_version = 1
+
+    # DataFrame을 [헤더행, 데이터행1, 데이터행2, ...] 2차원 배열로 변환
+    headers = combined_df.columns.tolist()
+    rows_matrix = combined_df.values.tolist()
+    final_matrix = [headers] + rows_matrix
+
     json_data = {
+        "version": current_version,
         "updated_at": now_kst.strftime("%Y-%m-%d %H:%M:%S"),
         "total_rows": len(combined_df),
-        "columns": combined_df.columns.tolist(),
-        "data": combined_df.to_dict(orient="records") # 웹 페이지에서 fetch()로 바로 사용할 JSON 배열
+        "data": final_matrix
     }
 
     with open(json_file_path, "w", encoding="utf-8") as f:
         json.dump(json_data, f, ensure_ascii=False, indent=2)
 
     json_size_mb = round(os.path.getsize(json_file_path) / (1024 * 1024), 2)
-    print(f"📄 대시보드 연동용 'dashboard_data.json' 파일 생성 완료 ({json_size_mb} MB)")
+    print(f"📄 대시보드 연동용 'dashboard_data.json' 파일 생성 완료 (버전: v{current_version} / 용량: {json_size_mb} MB)")
 
     # 원본 다운로드 파일 삭제
     if os.path.exists(latest_file):
