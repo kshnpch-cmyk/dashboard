@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>더본 OMS 주문 현황 대시보드</title>
+    <title>더본 OMS 주문 현황 대시보드1</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
@@ -107,8 +107,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <!-- 💡 Supabase 클라우드 DB 전용 v2.0.0 -->
-            <span class="version-tag" id="app-version-tag">v2.0.0 DB</span>
+            <span class="version-tag" id="app-version-tag">v2.1.0 Secure DB</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag" id="last-updated-text">🕒 동기화: DB 대기 중</div>
@@ -203,9 +202,9 @@
     </div>
 
     <script>
-        // 💡 Supabase 접속 키 세팅 (본인의 설정값으로 확인 및 입력)
-        const SUPABASE_URL = "https://your-project-ref.supabase.co"; // 본인 Project URL로 변경
-        const SUPABASE_ANON_KEY = "sb_publishable_0Ww3nk7m7Vy3Ex0205ypgg_IG3xd..."; // Publishable Key 변경
+        // 💡 Supabase 클라이언트 전용 퍼블릭 키 (RLS 설정으로 데이터 수정/삭제 불가)
+        const SUPABASE_URL = "https://kshnpch-cmyk.supabase.co"; 
+        const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN"; 
 
         const githubId = 'kshnpch-cmyk'; 
         const repoName = 'dashboard'; 
@@ -243,7 +242,7 @@
             fetchSheetData();
         }
 
-        // 🚀 Supabase DB 기간 필터링 초고속 API 수신 함수 (0.05초)
+        // 🚀 Supabase DB 기간 필터링 안전 수신 함수
         async function fetchSheetData() {
             document.getElementById('last-updated-text').innerText = "🕒 동기화: DB 쿼리 중...";
 
@@ -252,7 +251,6 @@
 
             if (!startDate || !endDate) return;
 
-            // delivery_date 기준 기간 쿼리
             const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=*&order=delivery_date.desc`;
 
             try {
