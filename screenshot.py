@@ -2,12 +2,16 @@ import os
 import glob
 import time
 import requests
+import warnings
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
+
+# openpyxl 스타일 및 구형 엑셀 경고 무시
+warnings.filterwarnings('ignore')
 
 WEBHOOK_URL = "https://script.google.com/macros/s/AKfycby2-YHNufhOlHJcIBspE1bljMNtIEf3aXoXWqqakUgqvndDCf0nT1MSVuZkopmuEOvK/exec"
 
@@ -139,7 +143,7 @@ try:
 
     time.sleep(2)
 
-    # 8. 파일명 입력 팝업 처리 후 첫 번째 [다운로드] 버튼 클릭
+    # 8. 파일명 입력 팝업 처리
     print("📝 파일명 입력 및 다운로드 요청...")
     
     try:
@@ -161,9 +165,9 @@ try:
     driver.execute_script("arguments[0].click();", download_btn)
 
     print("⏳ 엑셀 파일 생성 대기 중...")
-    time.sleep(5) # 파일 생성 후 "완료" 알림 모달 출력 대기
+    time.sleep(5)
 
-    # 💡 8-1. [신규] "엑셀 다운로드가 완료 되었습니다." [OK] 버튼 클릭
+    # 8-1. 완료 팝업 [OK] 버튼 클릭
     print("🖱️ '다운로드 완료' 팝업 [OK] 버튼 클릭...")
     try:
         ok_btn = driver.find_element(By.CSS_SELECTOR, "button.swal2-confirm")
@@ -184,35 +188,49 @@ try:
 
     driver.save_screenshot("oms_result.png")
 
-    # 9. 다운로드된 엑셀 파일 찾기 및 pandas 파싱
+    # 💡 9. 다운로드된 엑셀 파일 열고 데이터 추출(복사)하기
     list_of_files = glob.glob(os.path.join(download_dir, '*.xlsx')) or glob.glob(os.path.join(download_dir, '*.xls'))
     
     if not list_of_files:
         raise Exception("다운로드된 엑셀 파일을 찾지 못했습니다.")
 
     latest_file = max(list_of_files, key=os.path.getctime)
-    print(f"📄 추출된 엑셀 파일: {latest_file}")
+    print(f"📄 파일 열기 시도: {latest_file}")
 
-    df = pd.read_excel(latest_file)
+    # 다양한 엑셀 포맷 대응 파싱
+    try:
+        df = pd.read_excel(latest_file, engine='openpyxl')
+    except Exception:
+        try:
+            df = pd.read_excel(latest_file, engine='xlrd')
+        except Exception:
+            dfs = pd.read_html(latest_file)
+            df = dfs[0]
+
+    # 결측치(NaN) 빈 문자열로 처리 및 데이터 타입 문자열화
     df = df.fillna('')
+    df = df.astype(str)
 
+    # 헤더(1행)와 전체 데이터 행 추출
     header = df.columns.tolist()
     data_rows = df.values.tolist()
+    
+    # 2차원 배열 구조로 가공 ([ [헤더목록], [1행 데이터], [2행 데이터]... ])
     final_rows = [header] + data_rows
 
-    print(f"✅ 엑셀 파싱 성공! - 헤더: {len(header)}열 / 총 데이터: {len(data_rows)}행")
+    print(f"📊 데이터 추출 완료 - 총 {len(header)}개 열 / {len(data_rows)}개 행 복사 성공")
 
-    # 10. 구글 시트로 데이터 전송
+    # 💡 10. 구글 스프레드시트 Webhook으로 데이터 전송(붙여넣기)
     payload = {
         "tabName": target_tab_name,
         "data": final_rows
     }
 
-    print(f"구글 시트 '{target_tab_name}' 탭으로 전송 중...")
+    print(f"🚀 구글 시트 '{target_tab_name}' 탭으로 데이터 전송 중...")
     response = requests.post(WEBHOOK_URL, json=payload, allow_redirects=True)
-    print(f"✅ 동기화 결과: {response.text}")
+    print(f"✅ 구글 시트 반영 결과: {response.text}")
 
-    # 다운로드 파일 정리 삭제
+    # 임시 저장된 엑셀 파일 삭제 정리
     if os.path.exists(latest_file):
         os.remove(latest_file)
 
