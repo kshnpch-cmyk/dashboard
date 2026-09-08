@@ -9,20 +9,14 @@ from selenium.webdriver.common.keys import Keys
 
 WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxZx_c4oiyDksK2lTKotOl7nkd--MthKng_bRQkztjXECQQqGko3HzRxzuv6hFkNlKj/exec"
 
-# 1. KST 기준 시간별 자동 조회 범위 및 동적 탭 이름 계산
-# 1. KST 기준 시간별 자동 조회 범위 계산
+# 1. KST 기준 시간별 자동 조회 범위 및 탭 이름 계산
 KST = timezone(timedelta(hours=9))
 now_kst = datetime.now(KST)
 
-# 기본 시작일: 내일 (D+1)
 start_date_obj = now_kst + timedelta(days=1)
-
-# AM 11:00 기준 조건 분기
 if now_kst.hour >= 11:
-    # 11시 이후: 오늘 + 3일 (D+3) 까지
     end_date_obj = now_kst + timedelta(days=3)
 else:
-    # 자정 ~ 11시 이전: 오늘 + 2일 (D+2) 까지
     end_date_obj = now_kst + timedelta(days=2)
 
 auto_start_str = start_date_obj.strftime("%Y/%m/%d")
@@ -30,6 +24,7 @@ auto_end_str = end_date_obj.strftime("%Y/%m/%d")
 
 target_start_date = os.environ.get('START_DATE') or auto_start_str
 target_end_date = os.environ.get('END_DATE') or auto_end_str
+
 clean_start_date = target_start_date.replace('-', '/').replace('.', '/')
 date_parts = clean_start_date.split('/')
 if len(date_parts) >= 2:
@@ -49,7 +44,7 @@ try:
     print(f"[{now_kst.strftime('%Y-%m-%d %H:%M:%S')}] 동기화 진행")
     print(f"조회 지정 기간: {target_start_date} ~ {target_end_date} ➔ [저장 대상 시트 탭: '{target_tab_name}']")
 
-    # 2. 로그인
+    # 2. 로그인 (변경된 계정 정보 반영)
     driver.get('https://admin.theborn.co.kr/oms-manager/login')
     time.sleep(2) 
 
@@ -91,22 +86,12 @@ try:
 
     time.sleep(10)
 
-    # 6. 헤더 및 전체 컬럼(규격, 세액, 부가세, 등록일시, 등록자ID 등) 끝까지 완벽 파싱
+    # 6. 헤더 및 데이터 파싱
     html = driver.page_source
     soup = BeautifulSoup(html, 'html.parser')
     
     rows = []
-    
-    # 6-1. 첫 번째 데이터 행의 컬럼 수에 맞춰 헤더 태그 전체 탐색
     table_rows = soup.select('tbody tr') or soup.select('tr')
-    sample_cols_len = 0
-    for tr in table_rows:
-        cols = [td.get_text(strip=True) for td in tr.select('td')]
-        if cols and any("OMS" in c for c in cols):
-            sample_cols_len = len(cols)
-            break
-
-    # 💡 모든 th 태그 수집 및 빈 셀명 보정
     th_elements = soup.select('thead tr th') or soup.select('tr th') or soup.select('th')
     dynamic_header = []
     
@@ -117,7 +102,6 @@ try:
     if dynamic_header and dynamic_header[0] != "No.":
         dynamic_header.insert(0, "No.")
 
-    # 6-2. 실제 데이터 행 수집
     row_count = 1
     for tr in table_rows:
         cols = [td.get_text(strip=True) for td in tr.select('td')]
@@ -132,7 +116,6 @@ try:
                     row_count += 1
                 rows.append(cols)
 
-    # 💡 헤더 길이가 실제 데이터 길이보다 짧을 경우 끝까지 자동 확장 처리
     max_data_len = max([len(r) for r in rows]) if rows else 0
     while len(dynamic_header) < max_data_len:
         dynamic_header.append(f"추가컬럼_{len(dynamic_header)+1}")
@@ -141,6 +124,11 @@ try:
 
     print(f"파싱 완료된 총 헤더 컬럼 수: {len(dynamic_header)}개")
     print(f"파싱 완료된 총 데이터 행 수: {len(rows)-1}개")
+
+    # 6-1. 현재 화면 스크린샷 파일 저장
+    screenshot_filename = "oms_result.png"
+    driver.save_screenshot(screenshot_filename)
+    print(f"📸 현재 OMS 조회 화면 캡처 완료: {screenshot_filename}")
 
     # 7. 구글 시트로 페이로드 전송
     payload = {
