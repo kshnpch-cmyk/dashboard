@@ -10,22 +10,26 @@ from selenium.webdriver.common.keys import Keys
 WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxZx_c4oiyDksK2lTKotOl7nkd--MthKng_bRQkztjXECQQqGko3HzRxzuv6hFkNlKj/exec"
 
 # 1. KST 기준 시간별 자동 조회 범위 및 동적 탭 이름 계산
+# 1. KST 기준 시간별 자동 조회 범위 계산
 KST = timezone(timedelta(hours=9))
 now_kst = datetime.now(KST)
 
+# 기본 시작일: 내일 (D+1)
 start_date_obj = now_kst + timedelta(days=1)
+
+# AM 11:00 기준 조건 분기
 if now_kst.hour >= 11:
+    # 11시 이후: 오늘 + 3일 (D+3) 까지
     end_date_obj = now_kst + timedelta(days=3)
 else:
+    # 자정 ~ 11시 이전: 오늘 + 2일 (D+2) 까지
     end_date_obj = now_kst + timedelta(days=2)
 
 auto_start_str = start_date_obj.strftime("%Y/%m/%d")
 auto_end_str = end_date_obj.strftime("%Y/%m/%d")
 
-# 💡 수동 지정 시 탭 이름(YYYYMM) 파싱 로직
 target_start_date = os.environ.get('START_DATE') or auto_start_str
 target_end_date = os.environ.get('END_DATE') or auto_end_str
-
 clean_start_date = target_start_date.replace('-', '/').replace('.', '/')
 date_parts = clean_start_date.split('/')
 if len(date_parts) >= 2:
