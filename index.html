@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>더본 OMS 주문 현황 대시보드</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -46,7 +47,6 @@
             font-weight: 600;
         }
         
-        /* 💡 달력 입력창 및 아이콘 선명도 개선 */
         .date-input {
             background-color: #0f172a;
             color: #ffffff;
@@ -56,11 +56,11 @@
             font-size: 13px;
             font-family: inherit;
             cursor: pointer;
-            color-scheme: dark; /* 브라우저 기본 달력 아이콘을 흰색으로 전환 */
+            color-scheme: dark;
         }
         .date-input::-webkit-calendar-picker-indicator {
             cursor: pointer;
-            filter: invert(1); /* 아이콘 흰색 반전 */
+            filter: invert(1);
             opacity: 0.9;
         }
         .date-input::-webkit-calendar-picker-indicator:hover {
@@ -94,6 +94,8 @@
         .btn-reset:hover { background-color: #334155; }
         .btn-save-width { background-color: #10b981; padding: 5px 10px; font-size: 12px; }
         .btn-save-width:hover { background-color: #059669; }
+        .btn-excel { background-color: #16a34a; padding: 5px 10px; font-size: 12px; }
+        .btn-excel:hover { background-color: #15803d; }
         .btn-reset-width { background-color: #64748b; padding: 5px 10px; font-size: 12px; }
         .btn-reset-width:hover { background-color: #475569; }
         .btn:disabled { background-color: #94a3b8; cursor: not-allowed; }
@@ -305,7 +307,6 @@
             </div>
             <div class="date-picker-group">
                 <label>조회 기간:</label>
-                <!-- 💡 클릭 시 달력 바로 열림 기능(onclick) 적용 -->
                 <input type="date" id="start-date" class="date-input" onchange="onDateFilterChange()" onclick="this.showPicker && this.showPicker()">
                 <span style="color:#94a3b8;">~</span>
                 <input type="date" id="end-date" class="date-input" onchange="onDateFilterChange()" onclick="this.showPicker && this.showPicker()">
@@ -380,6 +381,7 @@
                             <input type="checkbox" id="chart-only-detail-check" onchange="onChartToggleChange(this)">
                             📊 차트보기
                         </label>
+                        <button class="btn btn-excel" onclick="exportToExcel()">📥 엑셀 저장</button>
                         <button class="btn btn-reset-width" onclick="resetColumnWidths()">🔄 너비 초기화</button>
                         <span class="summary-badge">수량합계: <b id="list-total-qty">0</b>개</span>
                         <span class="summary-badge">금액합계: <b id="list-total-amount">0</b>원</span>
@@ -440,7 +442,7 @@
         const githubId = 'kshnpch-cmyk'; 
         const repoName = 'dashboard'; 
         const token = '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'; 
-        const webhookUrl = "https://script.google.com/macros/s/AKfycbxZx_c4oiyDksK2lTKotOl7nkd--MthKng_bRQkztjXECQQqGko3HzRxzuv6hFkNlKj/exec";
+        const webhookUrl = "https://script.google.com/macros/s/AKfycbxO0uYMmBZ3_VMf-k-NiDKcglY-eiSaZ2uMMSdtsmEEWWOjrgACq7qCSEzFubfOPdRf/exec";
 
         let colOrderDate    = 3;  
         let colDeliveryDate = 5;  
@@ -488,23 +490,20 @@
             return s.replace(/-/g, '/');
         }
 
-       // 💡 대시보드 기본 조회 범위: 직전 7일부터 미래 D+2까지 포함
         function resetToTomorrow() {
-    const today = new Date();
-    
-    // 시작일: 직전 7일 전
-    const startObj = new Date(today);
-    startObj.setDate(startObj.getDate() - 7); 
+            const today = new Date();
+            
+            const startObj = new Date(today);
+            startObj.setDate(startObj.getDate() - 7);
 
-    // 종료일: 미래 D+2일 후 (스크랩 최대 범위 표출)
-    const endObj = new Date(today);
-    endObj.setDate(endObj.getDate() + 2); 
+            const endObj = new Date(today);
+            endObj.setDate(endObj.getDate() + 2);
 
-    document.getElementById('start-date').value = formatDate(startObj);
-    document.getElementById('end-date').value = formatDate(endObj);
-    
-    processData();
-}
+            document.getElementById('start-date').value = formatDate(startObj);
+            document.getElementById('end-date').value = formatDate(endObj);
+            
+            processData();
+        }
 
         function onDateFilterChange() {
             processData();
@@ -899,6 +898,41 @@
 
             document.getElementById('list-total-qty').innerText = sumQty.toLocaleString();
             document.getElementById('list-total-amount').innerText = sumAmount.toLocaleString();
+        }
+
+        function exportToExcel() {
+            if (!currentDetailOrders || currentDetailOrders.length === 0) {
+                alert("⚠️ 저장할 데이터가 없습니다.");
+                return;
+            }
+
+            const exportData = currentDetailOrders.map(row => {
+                const qty = cleanNumber(row[colQty]);
+                const price = cleanNumber(row[colPrice]);
+                let total = cleanNumber(row[colTotal]);
+                if (total === 0 && qty > 0 && price > 0) total = qty * price;
+
+                return {
+                    '점포코드': row[colStoreCode] || '-',
+                    '점포명': row[colStoreName] || '-',
+                    '주문일자': formatDisplayDate(row[colOrderDate]),
+                    '배송일자': formatDisplayDate(row[colDeliveryDate]),
+                    '품목코드': row[colItemCode] || '-',
+                    '품목명': row[colItemName] || '-',
+                    '수량': qty,
+                    '단가': price,
+                    '금액': total
+                };
+            });
+
+            const worksheet = XLSX.utils.json_to_sheet(exportData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "주문상세목록");
+
+            const storeTitle = document.getElementById('selected-store-title').innerText.replace('🛒 ', '').replace(/\[|\]/g, '_');
+            const fileName = `OMS주문상세_${storeTitle}_${formatDate(new Date())}.xlsx`;
+
+            XLSX.writeFile(workbook, fileName);
         }
 
         function sortTable(key) {
