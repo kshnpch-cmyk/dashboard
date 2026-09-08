@@ -30,18 +30,25 @@ def download_oms_data():
         try:
             # 1) OMS 어드민 로그인 페이지 접속
             page.goto("https://admin.theborn.co.kr", timeout=60000)
-            page.wait_for_load_state("networkidle")
+            page.wait_for_load_state("domcontentloaded")
+            time.sleep(2)
 
-            # 2) 회사코드, 아이디, 비밀번호 입력 및 로그인
             print("🔑 로그인 정보 입력 중...")
-            if page.locator("input[name='company_code']").is_visible():
-                page.fill("input[name='company_code']", OMS_COMPANY_CODE)
 
-            page.fill("input[name='id']", OMS_ID)
-            page.fill("input[name='password']", OMS_PW)
+            # 2) 확인된 HTML id 속성을 지정하여 입력 (companyCd, userId, userPw)
+            if page.locator("#companyCd").is_visible():
+                page.fill("#companyCd", OMS_COMPANY_CODE)
 
-            # 로그인 버튼 클릭 (일반적인 버튼 선택자 적용)
-            page.click("button[type='submit'], .btn_login, #btnLogin")
+            page.wait_for_selector("#userId", timeout=10000)
+            page.fill("#userId", OMS_ID)
+            page.fill("#userPw", OMS_PW)
+
+            # 로그인 버튼 클릭 (버튼 또는 폼 제출)
+            login_btn = page.locator(
+                "button[type='submit'], .btn_login, #btnLogin, button:has-text('로그인')"
+            ).first
+            login_btn.click()
+
             page.wait_for_load_state("networkidle")
             time.sleep(3)
 
