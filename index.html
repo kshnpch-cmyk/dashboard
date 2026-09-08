@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>더본 OMS 주문 현황 대시보드</title>
+    <!-- Chart.js 및 SheetJS -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
@@ -317,7 +318,8 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag" id="app-version-tag">v1.0.0</span>
+            <!-- 💡 초고속 DuckDB-Wasm 엔진 전환 및 v1.2.0 버전을 반영했습니다 -->
+            <span class="version-tag" id="app-version-tag">v1.2.0</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag" id="last-updated-text">
@@ -456,11 +458,16 @@
         </div>
     </div>
 
-    <script>
+    <!-- 🚀 DuckDB-Wasm 초고속 Parquet DB 라이브러리 모듈 -->
+    <script type="module">
+        import * as duckdb from 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/+esm';
+
         const githubId = 'kshnpch-cmyk'; 
         const repoName = 'dashboard'; 
         const token = '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'; 
-        const dataJsonUrl = `https://raw.githubusercontent.com/${githubId}/${repoName}/main/dashboard_data.json`;
+        
+        let db = null;
+        let conn = null;
 
         let colOrderDate    = 3;  
         let colDeliveryDate = 5;  
@@ -484,9 +491,39 @@
 
         const DEFAULT_WIDTHS = ['100px', '180px', '110px', '110px', '120px', '250px', '80px', '100px', '120px'];
 
-        loadSavedColumnWidths();
-        resetToTomorrow();
-        fetchSheetData();
+        // 전역 함수 바인딩
+        window.fetchSheetData = fetchSheetData;
+        window.resetToTomorrow = resetToTomorrow;
+        window.onDateFilterChange = onDateFilterChange;
+        window.onBrandChange = onBrandChange;
+        window.filterStoreList = filterStoreList;
+        window.onStoreSelect = onStoreSelect;
+        window.applyColumnFilters = applyColumnFilters;
+        window.exportToExcel = exportToExcel;
+        window.sortTable = sortTable;
+        window.saveColumnWidths = saveColumnWidths;
+        window.resetColumnWidths = resetColumnWidths;
+        window.triggerBot = triggerBot;
+        window.onChartToggleChange = onChartToggleChange;
+
+        // 1. DuckDB 엔진 초기화
+        async function initDuckDB() {
+            try {
+                const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles();
+                const bundle = await duckdb.selectBundle(JSDELIVR_BUNDLES);
+                const worker_url = URL.createObjectURL(
+                    new Blob([`importScripts("${bundle.mainWorker}");`], { type: 'text/javascript' })
+                );
+                const worker = new Worker(worker_url);
+                const logger = new duckdb.ConsoleLogger();
+                db = new duckdb.AsyncDuckDB(logger, worker);
+                await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+                conn = await db.connect();
+                console.log("⚡ DuckDB-Wasm 엔진 초고속 로드 완료!");
+            } catch (e) {
+                console.error("DuckDB 초기화 오류:", e);
+            }
+        }
 
         function formatDate(dateObj) {
             const year = dateObj.getFullYear();
@@ -510,16 +547,13 @@
 
         function resetToTomorrow() {
             const today = new Date();
-            
             const startObj = new Date(today);
             startObj.setDate(startObj.getDate() - 7);
-
             const endObj = new Date(today);
             endObj.setDate(endObj.getDate() + 2);
 
             document.getElementById('start-date').value = formatDate(startObj);
             document.getElementById('end-date').value = formatDate(endObj);
-            
             processData();
         }
 
@@ -527,27 +561,50 @@
             processData();
         }
 
-        // 💡 깃허브 Raw DB 수신 함수 (에러 방지 및 유연한 파싱 적용)
-        function fetchSheetData() {
-            document.getElementById('last-updated-text').innerText = "🕒 동기화: 수신 중...";
+        // 💡 oms_database.parquet 압축 DB 초고속 직접 연동 수신 함수
+        async function fetchSheetData() {
+            document.getElementById('last-updated-text').innerText = "🕒 동기화: DB 로드 중...";
+            if (!conn) await initDuckDB();
 
-            fetch(`${dataJsonUrl}?_=${new Date().getTime()}`)
-                .then(response => {
-                    if (!response.ok) throw new Error("데이터 파일 수신 오류");
-                    return response.json();
-                })
-                .then(res => {
-                    handleSheetResponse(res);
-                })
-                .catch(err => {
-                    console.error("데이터 로드 오류:", err);
-                    document.getElementById('last-updated-text').innerText = "🕒 동기화: 로드 실패";
+            try {
+                // 깃허브 저장소의 oms_database.parquet 직접 다운로드 (0.9MB 수준)
+                const apiUrl = `https://api.github.com/repos/${githubId}/${repoName}/contents/oms_database.parquet`;
+                const response = await fetch(apiUrl, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/vnd.github.v3.raw'
+                    },
+                    cache: 'no-store'
                 });
+
+                if (!response.ok) throw new Error("Parquet DB 수신 실패 (404/401)");
+
+                const buffer = new Uint8Array(await response.arrayBuffer());
+                await db.registerFileBuffer('oms_database.parquet', buffer);
+
+                // DuckDB 가상 가공 쿼리 실행
+                const res = await conn.query(`SELECT * FROM 'oms_database.parquet'`);
+                const rows = res.toArray().map(r => Object.values(r.toJSON()));
+                const headers = res.schema.fields.map(f => f.name);
+
+                const dataMatrix = [headers, ...rows];
+
+                const now = new Date();
+                const updateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+                document.getElementById('last-updated-text').innerText = `🕒 동기화: ${updateStr}`;
+
+                detectColumnIndexes(headers);
+                allOrders = dataMatrix;
+                processData();
+
+            } catch (err) {
+                console.error("데이터 로드 오류:", err);
+                document.getElementById('last-updated-text').innerText = "🕒 동기화: 로드 실패";
+            }
         }
 
         function detectColumnIndexes(headerRow) {
             if (!headerRow) return;
-            
             colOrderDate = -1; colDeliveryDate = -1; colStoreCode = -1;
             colStoreName = -1; colBrandName = -1; colItemCode = -1;
             colItemName = -1; colQty = -1; colPrice = -1; colTotal = -1;
@@ -578,41 +635,6 @@
             if (colQty === -1) colQty = 24;
             if (colPrice === -1) colPrice = 25;
             if (colTotal === -1) colTotal = 26;
-        }
-
-        // 💡 2차원 배열 & 객체 배열 포맷 둘 다 상호 지원하는 파싱 함수
-        function handleSheetResponse(res) {
-            let data = [];
-
-            if (res && res.updated_at) {
-                document.getElementById('last-updated-text').innerText = `🕒 동기화: ${res.updated_at}`;
-            }
-
-            if (res && res.version) {
-                document.getElementById('app-version-tag').innerText = `v${res.version}`;
-            }
-
-            if (res && res.data && Array.isArray(res.data)) {
-                if (res.data.length > 0 && Array.isArray(res.data[0])) {
-                    // 2차원 배열 구조인 경우
-                    data = res.data;
-                } else if (res.data.length > 0 && typeof res.data[0] === 'object') {
-                    // Dictionary 객체 배열 구조인 경우
-                    const headers = res.columns || Object.keys(res.data[0]);
-                    const rows = res.data.map(obj => headers.map(k => obj[k] !== undefined ? obj[k] : ''));
-                    data = [headers, ...rows];
-                }
-            } else if (Array.isArray(res)) {
-                data = res;
-            }
-
-            if (Array.isArray(data) && data.length > 0) {
-                detectColumnIndexes(data[0]); 
-                allOrders = data;
-                processData();
-            } else {
-                document.getElementById('last-updated-text').innerText = "🕒 동기화: 데이터 없음";
-            }
         }
 
         function cleanNumber(val) {
@@ -1018,6 +1040,9 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             initResizableColumns();
+            loadSavedColumnWidths();
+            resetToTomorrow();
+            fetchSheetData();
         });
 
         function initResizableColumns() {
