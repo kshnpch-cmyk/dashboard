@@ -318,8 +318,8 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <!-- 💡 초고속 DuckDB-Wasm 엔진 전환 및 v1.2.0 버전을 반영했습니다 -->
-            <span class="version-tag" id="app-version-tag">v1.2.0</span>
+            <!-- 💡 Public 저장소 초고속 연동 반영 v1.2.1 -->
+            <span class="version-tag" id="app-version-tag">v1.2.1</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag" id="last-updated-text">
@@ -561,23 +561,17 @@
             processData();
         }
 
-        // 💡 oms_database.parquet 압축 DB 초고속 직접 연동 수신 함수
+        // 💡 Public 저장소 전용 Raw URL 수신 함수 (인증 헤더 없이 초고속 로드)
         async function fetchSheetData() {
             document.getElementById('last-updated-text').innerText = "🕒 동기화: DB 로드 중...";
             if (!conn) await initDuckDB();
 
             try {
-                // 깃허브 저장소의 oms_database.parquet 직접 다운로드 (0.9MB 수준)
-                const apiUrl = `https://api.github.com/repos/${githubId}/${repoName}/contents/oms_database.parquet`;
-                const response = await fetch(apiUrl, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/vnd.github.v3.raw'
-                    },
-                    cache: 'no-store'
-                });
+                const rawUrl = `https://raw.githubusercontent.com/${githubId}/${repoName}/main/oms_database.parquet?_=${new Date().getTime()}`;
+                
+                const response = await fetch(rawUrl, { cache: 'no-store' });
 
-                if (!response.ok) throw new Error("Parquet DB 수신 실패 (404/401)");
+                if (!response.ok) throw new Error("Parquet DB 수신 실패 (404/Network)");
 
                 const buffer = new Uint8Array(await response.arrayBuffer());
                 await db.registerFileBuffer('oms_database.parquet', buffer);
