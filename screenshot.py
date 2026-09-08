@@ -10,7 +10,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 
-# 경고 메시지 숨김
+# 경고 메시지 비활성화
 warnings.filterwarnings('ignore')
 
 WEBHOOK_URL = "https://script.google.com/macros/s/AKfycby2-YHNufhOlHJcIBspE1bljMNtIEf3aXoXWqqakUgqvndDCf0nT1MSVuZkopmuEOvK/exec"
@@ -188,7 +188,7 @@ try:
 
     driver.save_screenshot("oms_result.png")
 
-    # 💡 9. 다운로드된 엑셀 파일 열고 데이터 읽기 (복사 과정 디버깅 로그 출력)
+    # 9. 다운로드된 엑셀 파일 열기 (모든 형식 예외 처리)
     print("\n--------------------------------------------------")
     print("📂 [STEP 4/5] 다운로드된 엑셀 파일 열기 및 데이터 복사 시작")
     list_of_files = glob.glob(os.path.join(download_dir, '*.xlsx')) or glob.glob(os.path.join(download_dir, '*.xls'))
@@ -200,21 +200,27 @@ try:
     file_size_bytes = os.path.getsize(latest_file)
     print(f"📄 대상 엑셀 파일 감지 완료: {os.path.basename(latest_file)} (용량: {file_size_bytes} bytes)")
 
-    # 파일 읽기 수행
+    # 포맷별 범용 파싱 알고리즘
     df = None
-    try:
-        df = pd.read_excel(latest_file, engine='openpyxl')
-        print("    └─ openpyxl 엔진으로 파일 읽기 성공")
-    except Exception as e1:
-        try:
-            df = pd.read_excel(latest_file, engine='xlrd')
-            print("    └─ xlrd 엔진으로 파일 읽기 성공")
-        except Exception as e2:
-            dfs = pd.read_html(latest_file)
-            df = dfs[0]
-            print("    └─ HTML 파서 엔진으로 파일 읽기 성공")
+    parse_methods = [
+        ("pd.read_html", lambda f: pd.read_html(f)[0]),
+        ("openpyxl", lambda f: pd.read_excel(f, engine='openpyxl')),
+        ("xlrd", lambda f: pd.read_excel(f, engine='xlrd')),
+        ("default_read_excel", lambda f: pd.read_excel(f))
+    ]
 
-    # 데이터 복사 가공
+    for name, method in parse_methods:
+        try:
+            df = method(latest_file)
+            print(f"    └─ [{name}] 엔진으로 파일 파싱 및 데이터 추출 성공!")
+            break
+        except Exception:
+            continue
+
+    if df is None:
+        raise Exception("모든 엑셀 파서 엔진으로 파일을 읽는 데 실패했습니다.")
+
+    # 데이터 정제 및 문자열 변환
     df = df.fillna('')
     df = df.astype(str)
 
@@ -224,11 +230,9 @@ try:
 
     print(f"📋 [데이터 복사 완료] 총 {len(header)}개 컬럼 / 데이터 {len(data_rows)}개 행 추출됨")
     if header:
-        print(f"    └─ 컬럼 헤더 일부: {header[:5]}...")
-    if data_rows:
-        print(f"    └─ 첫 번째 데이터 샘플: {data_rows[0][:3]}...")
+        print(f"    └─ 컬럼 헤더 샘플: {header[:5]}")
 
-    # 💡 10. 구글 스프레드시트 Webhook 전송 (붙여넣기)
+    # 10. 구글 스프레드시트 Webhook 전송 (붙여넣기)
     print("\n--------------------------------------------------")
     print(f"🚀 [STEP 5/5] 구글 시트 '{target_tab_name}' 탭으로 데이터 전송(붙여넣기) 중...")
     
@@ -245,7 +249,7 @@ try:
     print(f"✅ 구글 시트 웹훅 처리 결과 메시지: {response.text}")
     print("--------------------------------------------------\n")
 
-    # 다운로드된 엑셀 파일 삭제
+    # 임시 파일 정리 삭제
     if os.path.exists(latest_file):
         os.remove(latest_file)
 
