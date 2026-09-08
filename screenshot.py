@@ -25,9 +25,9 @@ openpyxl.styles.cell_style.CellStyle.__init__ = _patched_cell_style_init
 warnings.filterwarnings('ignore')
 
 # 💡 GitHub Secrets 환경변수 수신 및 정규식 URL 파싱 (괄호/마크다운 자동 제거)
-raw_url = os.environ.get("SUPABASE_URL", "https://kshnpch-cmyk.supabase.co").strip()
+raw_url = os.environ.get("SUPABASE_URL", "https://zbilhsgfgyfrolveaego.supabase.co").strip()
 url_match = re.search(r'https?://[^\s\)\>\]\"\']+', raw_url)
-SUPABASE_URL = url_match.group(0) if url_match else "https://kshnpch-cmyk.supabase.co"
+SUPABASE_URL = url_match.group(0) if url_match else "https://zbilhsgfgyfrolveaego.supabase.co"
 
 SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY", "").strip()
 
@@ -89,6 +89,7 @@ def sync_to_supabase(combined_df):
             s = str(val).split('T')[0].replace('/', '-').strip()
             return s if len(s) >= 8 else None
 
+        # 💡 Supabase DB oms_orders 테이블 스키마 매핑
         record = {
             "order_date": parse_date(row.get("주문일자", "")),
             "delivery_date": parse_date(row.get("배송일자", "")),
