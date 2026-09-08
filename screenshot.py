@@ -1,4 +1,5 @@
 import os
+import re
 import glob
 import time
 import json
@@ -23,13 +24,16 @@ openpyxl.styles.cell_style.CellStyle.__init__ = _patched_cell_style_init
 
 warnings.filterwarnings('ignore')
 
-# 💡 GitHub Secrets 및 환경변수 로드
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://kshnpch-cmyk.supabase.co")
-SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY", "")
+# 💡 GitHub Secrets 환경변수 수신 및 정규식 URL 파싱 (괄호/마크다운 자동 제거)
+raw_url = os.environ.get("SUPABASE_URL", "https://kshnpch-cmyk.supabase.co").strip()
+url_match = re.search(r'https?://[^\s\)\>\]\"\']+', raw_url)
+SUPABASE_URL = url_match.group(0) if url_match else "https://kshnpch-cmyk.supabase.co"
 
-OMS_COMPANY_CODE = os.environ.get("OMS_COMPANY_CODE", "1000")
-OMS_ID = os.environ.get("OMS_ID", "1220503")
-OMS_PW = os.environ.get("OMS_PW", "theborn8@")
+SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY", "").strip()
+
+OMS_COMPANY_CODE = os.environ.get("OMS_COMPANY_CODE", "1000").strip()
+OMS_ID = os.environ.get("OMS_ID", "1220503").strip()
+OMS_PW = os.environ.get("OMS_PW", "theborn8@").strip()
 
 # 1. KST 날짜 계산 및 지정 기간 파라미터 수신
 KST = timezone(timedelta(hours=9))
@@ -68,7 +72,7 @@ def sync_to_supabase(combined_df):
         print("⚠️ Supabase에 업로드할 데이터가 없습니다.", flush=True)
         return
 
-    print("🚀 Supabase 클라우드 DB 동기화를 시작합니다...", flush=True)
+    print(f"🚀 Supabase 클라우드 DB 동기화를 시작합니다... (Target: {SUPABASE_URL})", flush=True)
 
     df_clean = combined_df.fillna('').astype(str)
     records = []
@@ -108,10 +112,11 @@ def sync_to_supabase(combined_df):
 
     batch_size = 1000
     total_records = len(records)
+    endpoint = f"{SUPABASE_URL}/rest/v1/oms_orders"
 
     for i in range(0, total_records, batch_size):
         batch = records[i:i + batch_size]
-        res = requests.post(f"{SUPABASE_URL}/rest/v1/oms_orders", headers=headers, json=batch)
+        res = requests.post(endpoint, headers=headers, json=batch)
 
         if res.status_code in [200, 201]:
             print(f"✅ DB 동기화 완료: {min(i + batch_size, total_records)} / {total_records} 건", flush=True)
