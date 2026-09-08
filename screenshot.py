@@ -19,7 +19,7 @@ END_DATE = os.environ.get("END_DATE", "")
 
 
 def download_oms_data():
-    """더본 OMS 어드민(admin.theborn.co.kr) 접속, 로그인 및 엑셀 다운로드"""
+    """더본 OMS 어드민(admin.theborn.co.kr) 접속, 로그인 및 팝업 대응 엑셀 다운로드"""
     print("🌐 더본 OMS 어드민 접속 및 데이터 수집을 시작합니다...", flush=True)
 
     with sync_playwright() as p:
@@ -35,7 +35,7 @@ def download_oms_data():
 
             print("🔑 로그인 정보 입력 중...", flush=True)
 
-            # 2) 확인된 HTML id 속성을 지정하여 입력 (companyCd, userId, userPw)
+            # 2) 확인된 HTML id 속성을 지정하여 입력 (#companyCd, #userId, #userPw)
             if page.locator("#companyCd").is_visible():
                 page.fill("#companyCd", OMS_COMPANY_CODE)
 
@@ -43,7 +43,7 @@ def download_oms_data():
             page.fill("#userId", OMS_ID)
             page.fill("#userPw", OMS_PW)
 
-            # 로그인 버튼 클릭 (버튼 또는 폼 제출)
+            # 로그인 버튼 클릭
             login_btn = page.locator(
                 "button[type='submit'], .btn_login, #btnLogin, button:has-text('로그인')"
             ).first
@@ -52,12 +52,12 @@ def download_oms_data():
             page.wait_for_load_state("networkidle")
             time.sleep(3)
 
-            # 3) 주문 현황 메뉴로 이동
+            # 3) 주문 현황 메뉴 이동
             print("📦 주문 내역 메뉴로 이동 중...", flush=True)
             page.goto("https://admin.theborn.co.kr/order/list", timeout=60000)
             page.wait_for_load_state("networkidle")
 
-            # 4) 날짜 파라미터가 들어온 경우 기간 세팅
+            # 4) 날짜 조건 설정
             if START_DATE and END_DATE:
                 print(f"📅 조회 기간 설정: {START_DATE} ~ {END_DATE}", flush=True)
                 if page.locator("input[name='start_date']").is_visible():
@@ -66,10 +66,27 @@ def download_oms_data():
                     page.click(".btn_search, button:has-text('조회')")
                     time.sleep(3)
 
-            # 5) 엑셀 다운로드 수행
-            print("📥 엑셀 데이터 다운로드 시도 중...", flush=True)
-            with page.expect_download() as download_info:
-                page.click("button:has-text('엑셀'), .btn_excel, #btnExcel")
+            # 5) 🎯 1단계: 컨텍스트 메뉴의 '엑셀다운로드' 클릭
+            print("🖱️ 엑셀다운로드 메뉴 클릭 중...", flush=True)
+            excel_menu_btn = page.locator("*:has-text('엑셀다운로드')").last
+            excel_menu_btn.click()
+            time.sleep(2)
+
+            # 🎯 2단계: 파일명 입력 팝업창 대응 및 다운로드 실행
+            print("📝 파일명 입력 팝업 처리 중...", flush=True)
+            
+            # 파일명 입력창 찾기 및 입력
+            file_name_input = page.locator("input[placeholder*='파일명'], .popup input[type='text'], div[role='dialog'] input").first
+            if file_name_input.is_visible():
+                file_name_input.fill("temp_oms")
+                time.sleep(1)
+
+            # 🎯 3단계: [다운로드] 버튼 클릭 시 파일 이벤트 수신
+            print("📥 [다운로드] 버튼 클릭 및 파일 수신 중...", flush=True)
+            with page.expect_download(timeout=30000) as download_info:
+                # 팝업 내부의 '다운로드' 버튼 클릭
+                download_btn = page.locator("button:has-text('다운로드'), a:has-text('다운로드'), .btn:has-text('다운로드')").first
+                download_btn.click()
 
             download = download_info.value
             download_path = os.path.join(os.getcwd(), "temp_oms.xlsx")
@@ -78,7 +95,7 @@ def download_oms_data():
 
             browser.close()
 
-            # 6) 다운로드한 엑셀 파일을 Pandas Dataframe으로 로드
+            # 6) 다운로드한 엑셀 읽기
             df = pd.read_excel(download_path)
             return df
 
@@ -96,7 +113,6 @@ def sync_to_supabase(combined_df):
 
     print("🚀 Supabase 클라우드 DB로 데이터 전송을 시작합니다...", flush=True)
 
-    # 결측치 정제 및 문자열 변환
     df_clean = combined_df.fillna("").astype(str)
     records = []
 
@@ -136,7 +152,6 @@ def sync_to_supabase(combined_df):
         "Prefer": "return=minimal",
     }
 
-    # 1,000건씩 배치 분할 전송
     batch_size = 1000
     total_records = len(records)
 
