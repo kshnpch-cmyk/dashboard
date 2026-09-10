@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>더본 OMS 주문 실시간 대시보드</title>
+    <!-- 📱 모바일 접속 시 mobile.html 자동 리다이렉트 -->
     <script>
         if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
             location.replace('/mobile.html');
@@ -154,7 +155,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v5.0 Unified Filter</span>
+            <span class="version-tag">v5.1 Chart Fixed</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -579,7 +580,7 @@
             }
         }
 
-        /* 📊 추이 그래프 */
+        /* 📊 추이 그래프 데이터 안전 조회 및 즉시 예외 렌더링 */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -590,8 +591,10 @@
 
             safeSetStorage('cached_chart_start_date', startDate);
             safeSetStorage('cached_chart_end_date', endDate);
+            safeSetStorage('cached_brand_input', brandInputValue);
+            safeSetStorage('cached_item_input', itemKeyword);
 
-            let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,qty,total_amount,item_name`;
+            let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,order_date,qty,total_amount,brand_name,item_name`;
 
             if (brandInputValue) {
                 const brandList = brandInputValue.split(',').map(b => b.trim()).filter(Boolean);
@@ -607,21 +610,33 @@
                     const data = await res.json();
                     renderChartAndKPI(data);
                 }
-            } catch (err) {}
+            } catch (err) {
+                console.warn("⚠️ DB 조회 지연:", err.message);
+            }
         }
 
         function renderChartAndKPI(data) {
-            if (!data || !Array.isArray(data)) return;
-            let totalQty = 0, totalAmount = 0, uniqueItems = new Set(), dailyMap = {};
+            if (!data || !Array.isArray(data) || data.length === 0) return;
+
+            let totalQty = 0, totalAmount = 0;
+            const uniqueItems = new Set();
+            const dailyMap = {};
 
             data.forEach(r => {
-                const q = cleanNumber(r.qty), amt = cleanNumber(r.total_amount);
-                totalQty += q; totalAmount += amt;
+                const q = cleanNumber(r.qty);
+                const amt = cleanNumber(r.total_amount);
+
+                totalQty += q;
+                totalAmount += amt;
                 if (r.item_name) uniqueItems.add(r.item_name);
 
-                let dateKey = formatDisplayDate(r.delivery_date);
+                // 💡 배송일자 없으면 주문일자로 대체 매핑
+                let dateKey = formatDisplayDate(r.delivery_date) || formatDisplayDate(r.order_date);
+                if (!dateKey || dateKey === '-') return;
+
                 if (!dailyMap[dateKey]) dailyMap[dateKey] = { qty: 0, amount: 0 };
-                dailyMap[dateKey].qty += q; dailyMap[dateKey].amount += amt;
+                dailyMap[dateKey].qty += q;
+                dailyMap[dateKey].amount += amt;
             });
 
             document.getElementById('kpi-total-qty').innerText = `${totalQty.toLocaleString()} 건`;
@@ -629,7 +644,13 @@
             document.getElementById('kpi-total-amount').innerText = `${totalAmount.toLocaleString()} 원`;
 
             const labels = Object.keys(dailyMap).sort();
-            const ctx = document.getElementById('dailyTrendChart').getContext('2d');
+            const qtyData = labels.map(k => dailyMap[k].qty);
+            const amtData = labels.map(k => dailyMap[k].amount);
+
+            const canvas = document.getElementById('dailyTrendChart');
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
             if (trendChart) trendChart.destroy();
 
             trendChart = new Chart(ctx, {
@@ -637,15 +658,21 @@
                 data: {
                     labels: labels,
                     datasets: [
-                        { label: '주문수량', data: labels.map(k => dailyMap[k].qty), backgroundColor: 'rgba(37, 99, 235, 0.6)', yAxisID: 'y1' },
-                        { label: '주문금액', data: labels.map(k => dailyMap[k].amount), type: 'line', borderColor: '#8b5cf6', yAxisID: 'y2' }
+                        { label: '주문수량', data: qtyData, backgroundColor: 'rgba(37, 99, 235, 0.6)', yAxisID: 'y1' },
+                        { label: '주문금액', data: amtData, type: 'line', borderColor: '#8b5cf6', borderWidth: 2, yAxisID: 'y2' }
                     ]
                 },
-                options: { responsive: true, maintainAspectRatio: false, scales: { y1: { beginAtZero: true }, y2: { beginAtZero: true, grid: { drawOnChartArea: false } } } }
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        y1: { type: 'linear', position: 'left', beginAtZero: true },
+                        y2: { type: 'linear', position: 'right', beginAtZero: true, grid: { drawOnChartArea: false } }
+                    }
+                }
             });
         }
 
-        /* 🛒 상세 하루 내역 */
+        /* 🛒 하루치 상세 내역 */
         async function fetchDetailData() {
             const targetDate = document.getElementById('detail-target-date').value;
             if (!targetDate) return;
