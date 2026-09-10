@@ -14,7 +14,6 @@
             background-color: #f8fafc; color: #0f172a; padding-bottom: 30px;
         }
 
-        /* 📱 모바일 전용 헤더 */
         .m-navbar {
             background-color: #0f172a; color: white; padding: 12px 16px;
             display: flex; justify-content: space-between; align-items: center;
@@ -25,7 +24,6 @@
 
         .container { padding: 12px; }
 
-        /* ⚙️ 컨트롤 패널 카드 */
         .m-card {
             background: white; border-radius: 12px; padding: 14px; margin-bottom: 12px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;
@@ -45,9 +43,7 @@
         }
         .btn-blue { background-color: #2563eb; }
         .btn-dark { background-color: #334155; }
-        .btn-green { background-color: #16a34a; }
 
-        /* 📊 1열 KPI 지표 카드 */
         .kpi-scroll-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
         .kpi-mini-card {
             background: #fff; padding: 12px 16px; border-radius: 10px; border-left: 4px solid #2563eb;
@@ -61,7 +57,7 @@
 
         .chart-wrapper { position: relative; height: 210px; width: 100%; }
 
-        /* 🛒 모바일 접이식 점포/주문 카드 UI */
+        /* 🛒 카드리스트 스타일 */
         .store-card {
             background: white; border-radius: 10px; border: 1px solid #e2e8f0;
             margin-bottom: 8px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.03);
@@ -70,19 +66,18 @@
             padding: 12px 14px; background: #fff; display: flex; justify-content: space-between;
             align-items: center; font-size: 14px; font-weight: 700; cursor: pointer;
         }
-        .store-card-header:active { background-color: #f1f5f9; }
+        .store-card-header.total-header { background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; }
         .badge-cnt { background-color: #eff6ff; color: #2563eb; font-size: 11px; padding: 3px 8px; border-radius: 12px; font-weight: 800; }
         
-        .item-detail-list { display: none; background: #f8fafc; padding: 10px; border-top: 1px dashed #e2e8f0; }
+        .item-detail-list { display: none; background: #f8fafc; padding: 10px; }
         .item-detail-list.open { display: block; }
         .item-row {
-            background: white; padding: 8px 10px; border-radius: 6px; border: 1px solid #f1f5f9;
+            background: white; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0;
             margin-bottom: 6px; font-size: 12px; display: flex; flex-direction: column; gap: 4px;
         }
         .item-row-header { display: flex; justify-content: space-between; font-weight: 700; color: #0f172a; }
         .item-row-sub { display: flex; justify-content: space-between; color: #64748b; font-size: 11px; }
 
-        /* 🔍 바텀시트 모달 (모바일 전용) */
         .bottom-sheet-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(15, 23, 42, 0.6); z-index: 999; justify-content: flex-end; flex-direction: column;
@@ -100,14 +95,14 @@
     <div class="m-navbar">
         <div class="m-brand">
             <span>📱 더본 OMS 모바일</span>
-            <span class="m-version">v1.0</span>
+            <span class="m-version">v2.0</span>
         </div>
         <button class="btn-m btn-dark" style="width: auto; padding: 6px 10px; font-size: 11px;" onclick="openCalendarModal()">📅 캘린더</button>
     </div>
 
     <div class="container">
         
-        <!-- 🚀 OMS 수동 동기화 카드 -->
+        <!-- 🚀 OMS 동기화 -->
         <div class="m-card">
             <div class="m-card-title">
                 <span>🚀 OMS 수동 동기화</span>
@@ -119,7 +114,7 @@
             </div>
         </div>
 
-        <!-- 📊 기간별 추이 그래프 및 KPI -->
+        <!-- 📊 추이 차트 -->
         <div class="m-card">
             <div class="m-card-title">📈 기간별 주문 추이</div>
             
@@ -133,8 +128,8 @@
             </div>
 
             <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-                <input type="text" id="chart-brand-input" class="m-input" placeholder="브랜드 선택..." readonly onclick="openBrandModal()">
-                <button class="btn-m btn-dark" style="width: 70px;" onclick="openBrandModal()">선택</button>
+                <input type="text" id="chart-brand-input" class="m-input" placeholder="브랜드 선택 (다중)" readonly onclick="openBrandModal('chart')">
+                <button class="btn-m btn-dark" style="width: 70px;" onclick="openBrandModal('chart')">🔍</button>
             </div>
 
             <button class="btn-m btn-blue" style="margin-bottom: 14px;" onclick="fetchChartData()">🔍 추이 조회</button>
@@ -159,7 +154,7 @@
             </div>
         </div>
 
-        <!-- 🛒 하루치 상세 내역 (카드형 조작) -->
+        <!-- 🛒 하루 상세 내역 -->
         <div class="m-card">
             <div class="m-card-title">🛒 하루 상세 내역</div>
             <div class="input-group">
@@ -170,21 +165,21 @@
                 </div>
             </div>
 
-            <div style="margin-top: 10px;">
-                <select id="brand-select" class="m-input" onchange="onBrandChange()">
-                    <option value="ALL">🌐 전체 브랜드</option>
-                </select>
+            <div style="display: flex; gap: 8px; margin-top: 10px;">
+                <input type="text" id="detail-brand-input" class="m-input" placeholder="브랜드 필터 선택..." readonly onclick="openBrandModal('detail')">
+                <button class="btn-m btn-dark" style="width: 70px;" onclick="openBrandModal('detail')">🔍</button>
             </div>
             
-            <input type="text" id="store-search-input" class="m-input" style="margin-top: 8px;" placeholder="🔍 점포명 실시간 검색..." onkeyup="debouncedFilterStoreList()">
+            <!-- 통합 다중 검색 입력창 -->
+            <input type="text" id="store-search-input" class="m-input" style="margin-top: 8px;" placeholder="🔍 점포코드, 점포명, 품목코드, 품목명, 날짜 검색..." onkeyup="debouncedFilterCards()">
         </div>
 
-        <!-- 점포별 카드 리스트 뷰 -->
+        <!-- 카드리스트 컨테이너 (전체합산 상세가 기본 표시) -->
         <div id="store-card-list-container"></div>
 
     </div>
 
-    <!-- 🔍 브랜드 선택 바텀시트 모달 -->
+    <!-- 🔍 브랜드 다중 선택 모달 -->
     <div class="bottom-sheet-overlay" id="brand-modal">
         <div class="bottom-sheet-content">
             <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 16px;">
@@ -214,6 +209,7 @@
 
         let rawDetailOrders = [], filteredDetailOrders = [];
         let trendChart = null, allBrandList = [];
+        let activeBrandTarget = 'chart';
 
         function safeSetStorage(key, value) {
             try { localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); }
@@ -242,7 +238,7 @@
             };
         }
 
-        const debouncedFilterStoreList = debounce(filterStoreList, 150);
+        const debouncedFilterCards = debounce(filterCards, 150);
 
         function formatDate(d) {
             const y = d.getFullYear();
@@ -262,8 +258,16 @@
             return parseFloat(String(val).replace(/[^0-9.-]/g, '')) || 0;
         }
 
-        /* 🏢 모바일 전용 브랜드 선택 바텀시트 */
-        async function openBrandModal() {
+        function cleanCode(val) {
+            if (!val && val !== 0) return '-';
+            let str = String(val).trim();
+            if (str.endsWith('.0')) str = str.substring(0, str.length - 2);
+            return str || '-';
+        }
+
+        /* 🏢 모바일 브랜드 선택 바텀시트 */
+        async function openBrandModal(target = 'chart') {
+            activeBrandTarget = target;
             document.getElementById('brand-modal').style.display = 'flex';
             if (allBrandList.length === 0) {
                 try {
@@ -282,7 +286,8 @@
         function closeBrandModal() { document.getElementById('brand-modal').style.display = 'none'; }
 
         function renderBrandModalList() {
-            const selected = document.getElementById('chart-brand-input').value.split(',').map(s => s.trim());
+            const inputId = activeBrandTarget === 'chart' ? 'chart-brand-input' : 'detail-brand-input';
+            const selected = document.getElementById(inputId).value.split(',').map(s => s.trim());
             const keyword = document.getElementById('modal-brand-search').value.toLowerCase().trim();
             const filtered = allBrandList.filter(b => b.toLowerCase().includes(keyword));
 
@@ -301,12 +306,28 @@
 
         function applyBrandSelection() {
             const checked = Array.from(document.querySelectorAll('.m-brand-chk:checked')).map(c => c.value);
-            document.getElementById('chart-brand-input').value = checked.join(', ');
-            safeSetStorage('cached_brand_input', checked.join(', '));
+            const brandStr = checked.join(', ');
+
+            if (activeBrandTarget === 'chart') {
+                document.getElementById('chart-brand-input').value = brandStr;
+                safeSetStorage('cached_brand_input', brandStr);
+            } else {
+                document.getElementById('detail-brand-input').value = brandStr;
+                onDetailBrandChange(checked);
+            }
             closeBrandModal();
         }
 
-        /* 📊 차트 데이터 가져오기 */
+        function onDetailBrandChange(selectedBrands) {
+            if (!selectedBrands || selectedBrands.length === 0) {
+                filteredDetailOrders = rawDetailOrders;
+            } else {
+                filteredDetailOrders = rawDetailOrders.filter(r => selectedBrands.includes(r.brand_name));
+            }
+            renderStoreCardList(filteredDetailOrders);
+        }
+
+        /* 📊 차트 */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -372,7 +393,7 @@
             });
         }
 
-        /* 🛒 상세 하루 내역 터치 카드 뷰 로딩 */
+        /* 🛒 하루 상세 내역 불러오기 */
         async function fetchDetailData() {
             const targetDate = document.getElementById('detail-target-date').value;
             if (!targetDate) return;
@@ -384,36 +405,36 @@
                 const res = await fetchWithRetry(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                 if (res.ok) {
                     rawDetailOrders = await res.json();
-                    processDetailData();
+                    filteredDetailOrders = rawDetailOrders;
+                    document.getElementById('detail-brand-input').value = '';
+                    renderStoreCardList(filteredDetailOrders);
                 }
             } catch (e) {}
         }
 
-        function processDetailData() {
-            filteredDetailOrders = rawDetailOrders;
-            const brands = [...new Set(filteredDetailOrders.map(r => r.brand_name))].filter(Boolean);
-            const select = document.getElementById('brand-select');
-            select.innerHTML = '<option value="ALL">🌐 전체 브랜드</option>';
-            brands.forEach(b => select.innerHTML += `<option value="${b}">${b}</option>`);
+        /* 모바일 통합 필터링 (점포코드, 점포명, 주문일자, 배송일자, 품목코드, 품목명) */
+        function filterCards() {
+            const query = document.getElementById('store-search-input').value.toLowerCase().trim();
+            if (!query) {
+                renderStoreCardList(filteredDetailOrders);
+                return;
+            }
 
-            onBrandChange();
-        }
+            const searchedOrders = filteredDetailOrders.filter(row => {
+                const sCode = cleanCode(row.store_code).toLowerCase();
+                const sName = String(row.store_name||'').toLowerCase();
+                const oDate = formatDisplayDate(row.order_date).toLowerCase();
+                const dDate = formatDisplayDate(row.delivery_date).toLowerCase();
+                const iCode = cleanCode(row.item_code).toLowerCase();
+                const iName = String(row.item_name||'').toLowerCase();
 
-        function onBrandChange() {
-            const brand = document.getElementById('brand-select').value;
-            let orders = (brand === 'ALL' || !brand) ? filteredDetailOrders : filteredDetailOrders.filter(r => r.brand_name === brand);
-            renderStoreCardList(orders);
-        }
-
-        function filterStoreList() {
-            const query = document.getElementById('store-search-input').value.toLowerCase();
-            document.querySelectorAll('.store-card').forEach(card => {
-                const name = card.getAttribute('data-store-name').toLowerCase();
-                card.style.display = name.includes(query) ? 'block' : 'none';
+                return sCode.includes(query) || sName.includes(query) || oDate.includes(query) || dDate.includes(query) || iCode.includes(query) || iName.includes(query);
             });
+
+            renderStoreCardList(searchedOrders);
         }
 
-        /* 모바일 터치 카드 리스트 렌더링 */
+        /* 🛒 모바일 카드 리스트 렌더링 (전체점포 합산 상세 기본 포함) */
         function renderStoreCardList(orders) {
             const container = document.getElementById('store-card-list-container');
             if (!orders || orders.length === 0) {
@@ -421,6 +442,39 @@
                 return;
             }
 
+            // 1. 전체 점포 합산 카드 생성
+            const totalQty = orders.reduce((sum, r) => sum + cleanNumber(r.qty), 0);
+            const totalAmt = orders.reduce((sum, r) => sum + (cleanNumber(r.total_amount) || (cleanNumber(r.qty)*cleanNumber(r.price))), 0);
+
+            const totalItemsHtml = orders.map(o => `
+                <div class="item-row">
+                    <div class="item-row-header">
+                        <span>[${o.store_name||'-'}] ${o.item_name || '-'}</span>
+                        <span style="color:#2563eb;">${cleanNumber(o.qty).toLocaleString()}개</span>
+                    </div>
+                    <div class="item-row-sub">
+                        <span>점포코드: ${cleanCode(o.store_code)} | 품목코드: ${cleanCode(o.item_code)}</span>
+                        <span><b>${cleanNumber(o.total_amount || (cleanNumber(o.qty)*cleanNumber(o.price))).toLocaleString()}원</b></span>
+                    </div>
+                    <div class="item-row-sub" style="color: #94a3b8; font-size: 10px;">
+                        <span>주문: ${formatDisplayDate(o.order_date)} | 배송: ${formatDisplayDate(o.delivery_date)}</span>
+                    </div>
+                </div>
+            `).join('');
+
+            let html = `
+                <div class="store-card">
+                    <div class="store-card-header total-header" onclick="toggleStoreCard('total')">
+                        <span>🏢 전체점포 합산 상세 (${orders.length}건)</span>
+                        <span class="badge-cnt">${totalQty.toLocaleString()}개 / ${totalAmt.toLocaleString()}원 ▼</span>
+                    </div>
+                    <div class="item-detail-list open" id="store-card-body-total">
+                        ${totalItemsHtml}
+                    </div>
+                </div>
+            `;
+
+            // 2. 개별 점포별 그룹핑 카드
             const storeMap = {};
             orders.forEach(r => {
                 const sName = r.store_name || '기타';
@@ -428,8 +482,10 @@
                 storeMap[sName].push(r);
             });
 
-            const cardsHtml = Object.keys(storeMap).map((store, idx) => {
+            Object.keys(storeMap).forEach((store, idx) => {
                 const storeOrders = storeMap[store];
+                const sQty = storeOrders.reduce((sum, r) => sum + cleanNumber(r.qty), 0);
+
                 const itemsHtml = storeOrders.map(o => `
                     <div class="item-row">
                         <div class="item-row-header">
@@ -437,26 +493,29 @@
                             <span style="color:#2563eb;">${cleanNumber(o.qty).toLocaleString()}개</span>
                         </div>
                         <div class="item-row-sub">
-                            <span>코드: ${o.item_code || '-'}</span>
-                            <span>${cleanNumber(o.total_amount).toLocaleString()}원</span>
+                            <span>품목코드: ${cleanCode(o.item_code)}</span>
+                            <span>${cleanNumber(o.total_amount || (cleanNumber(o.qty)*cleanNumber(o.price))).toLocaleString()}원</span>
+                        </div>
+                        <div class="item-row-sub" style="color: #94a3b8; font-size: 10px;">
+                            <span>주문: ${formatDisplayDate(o.order_date)} | 배송: ${formatDisplayDate(o.delivery_date)}</span>
                         </div>
                     </div>
                 `).join('');
 
-                return `
-                    <div class="store-card" data-store-name="${store}">
+                html += `
+                    <div class="store-card">
                         <div class="store-card-header" onclick="toggleStoreCard(${idx})">
-                            <span>🏢 ${store}</span>
-                            <span class="badge-cnt">${storeOrders.length}건 ▼</span>
+                            <span>🏪 ${store}</span>
+                            <span class="badge-cnt">${sQty.toLocaleString()}개 (${storeOrders.length}건) ▼</span>
                         </div>
                         <div class="item-detail-list" id="store-card-body-${idx}">
                             ${itemsHtml}
                         </div>
                     </div>
                 `;
-            }).join('');
+            });
 
-            container.innerHTML = cardsHtml;
+            container.innerHTML = html;
         }
 
         function toggleStoreCard(idx) {
@@ -464,7 +523,7 @@
             body.classList.toggle('open');
         }
 
-        /* ⚡ 초기 복원 및 실행 */
+        /* ⚡ 초기 실행 */
         document.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
             const past7 = new Date(); past7.setDate(today.getDate() - 7);
