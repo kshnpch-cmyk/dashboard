@@ -149,7 +149,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v4.4 Quota Safe</span>
+            <span class="version-tag">v4.5 Light & Fast</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -341,25 +341,17 @@
         let allBrandList = [];
         let allItemList = [];
 
-        // ⚡ [용량 초과 방지] 안전한 localStorage 저장 유틸리티
+        // ⚡ 안전한 로컬 스토리지 저장 (용량 초과 시 자동 정리)
         function safeSetStorage(key, value) {
             try {
                 localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
             } catch (e) {
-                if (e.name === 'QuotaExceededError' || e.code === 22) {
-                    console.warn("⚠️ localStorage 용량 초과 발생. 오래된 캐시 정리 중...");
-                    localStorage.removeItem('cached_detail_orders');
-                    localStorage.removeItem('cached_chart_data');
-                    try {
-                        localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
-                    } catch (retryErr) {
-                        console.error("캐시 재저장 실패:", retryErr);
-                    }
-                }
+                console.warn("⚠️ Storage 용량 한도 초과. 무거운 캐시 데이터를 안전하게 비웁니다.");
+                localStorage.clear();
             }
         }
 
-        async function fetchWithRetry(url, options, retries = 2, backoff = 500) {
+        async function fetchWithRetry(url, options, retries = 3, backoff = 600) {
             try {
                 const res = await fetch(url, options);
                 if (!res.ok && res.status >= 500 && retries > 0) {
@@ -369,7 +361,7 @@
             } catch (err) {
                 if (retries > 0) {
                     await new Promise(r => setTimeout(r, backoff));
-                    return fetchWithRetry(url, options, retries - 1, backoff * 2);
+                    return fetchWithRetry(url, options, retries - 1, backoff * 1.5);
                 }
                 throw err;
             }
@@ -430,7 +422,6 @@
                     if (res.ok) {
                         const data = await res.json();
                         allBrandList = [...new Set(data.map(r => r.brand_name))].filter(Boolean).sort();
-                        safeSetStorage('cached_brands', allBrandList);
                     }
                 } catch (err) {
                     console.error("브랜드 로드 오류:", err);
@@ -510,7 +501,6 @@
                             }
                         });
                         allItemList = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-                        safeSetStorage('cached_items', allItemList);
                     }
                 } catch (err) {
                     console.error("품목 로드 오류:", err);
@@ -659,7 +649,7 @@
         }
 
         /* -------------------------------------------------------------
-           📊 추이 그래프 데이터 조회 (500 에러 및 용량 최적화)
+           📊 추이 그래프 데이터 안전 조회 (경량화로 500 에러 방지)
         ------------------------------------------------------------- */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
@@ -674,8 +664,8 @@
             safeSetStorage('cached_brand_input', brandInputValue);
             safeSetStorage('cached_item_input', itemKeyword);
 
-            // ⚡ 필수 집계 컬럼만 선택하여 네트워크 데이터 전송량 감소 (500 타임아웃 해결)
-            let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,order_date,qty,total_amount,brand_name,item_name`;
+            // ⚡ 페이로드 극소화 (수량, 금액, 배송일자만 선택 수신)
+            let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,qty,total_amount,item_name`;
 
             if (brandInputValue) {
                 const brandList = brandInputValue.split(',').map(b => b.trim()).filter(Boolean);
@@ -699,11 +689,10 @@
                 const data = await res.json();
 
                 if (Array.isArray(data) && data.length > 0) {
-                    safeSetStorage('cached_chart_data', data);
                     renderChartAndKPI(data);
                 }
             } catch (err) {
-                console.warn("⚠️ 간헐적 DB 지연으로 캐시 데이터를 유지합니다:", err.message);
+                console.warn("⚠️ DB 조회 지연:", err.message);
             }
         }
 
@@ -722,7 +711,7 @@
                 totalAmount += amt;
                 if (r.item_name) uniqueItems.add(r.item_name);
 
-                let dateKey = formatDisplayDate(r.delivery_date) || formatDisplayDate(r.order_date);
+                let dateKey = formatDisplayDate(r.delivery_date);
                 if (!dateKey || dateKey === '-') return;
 
                 if (!dailyMap[dateKey]) dailyMap[dateKey] = { qty: 0, amount: 0 };
@@ -761,7 +750,7 @@
         }
 
         /* -------------------------------------------------------------
-           🛒 하루치 상세 내역 안전 조회 & 압축 저장 (QuotaExceededError 해결)
+           🛒 하루치 상세 내역 안전 조회
         ------------------------------------------------------------- */
         async function fetchDetailData() {
             const targetDate = document.getElementById('detail-target-date').value;
@@ -780,7 +769,6 @@
                 const data = await res.json();
                 if (Array.isArray(data) && data.length > 0) {
                     rawDetailOrders = data;
-                    safeSetStorage('cached_detail_orders', rawDetailOrders);
                     processDetailData();
                 }
             } catch (err) {
@@ -925,7 +913,7 @@
         }
 
         /* -------------------------------------------------------------
-           ⚡ 초기 로드 및 캐시 안전 복원
+           ⚡ 초기 로드
         ------------------------------------------------------------- */
         document.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
@@ -947,32 +935,7 @@
                 document.getElementById('last-updated-text').innerText = `🕒 최신 배송일자: ${cachedLastUpdated}`;
             }
 
-            try {
-                const cachedBrands = localStorage.getItem('cached_brands');
-                if (cachedBrands) allBrandList = JSON.parse(cachedBrands);
-
-                const cachedItems = localStorage.getItem('cached_items');
-                if (cachedItems) allItemList = JSON.parse(cachedItems);
-
-                const cachedChartData = localStorage.getItem('cached_chart_data');
-                if (cachedChartData) {
-                    const data = JSON.parse(cachedChartData);
-                    if (Array.isArray(data) && data.length > 0) renderChartAndKPI(data);
-                }
-
-                const cachedDetailOrders = localStorage.getItem('cached_detail_orders');
-                if (cachedDetailOrders) {
-                    const data = JSON.parse(cachedDetailOrders);
-                    if (Array.isArray(data) && data.length > 0) {
-                        rawDetailOrders = data;
-                        processDetailData();
-                    }
-                }
-            } catch (e) {
-                console.warn("캐시 데이터 안전 복원 완료:", e);
-            }
-
-            // 백그라운드 서버 동기화
+            // 백그라운드 데이터 수신
             loadCalendarData();
             fetchChartData();
             fetchDetailData();
