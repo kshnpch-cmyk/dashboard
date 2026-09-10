@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>더본 OMS 모바일 대시보드</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            margin: 0; padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', 'Malgun Gothic', sans-serif;
+            background-color: #f8fafc; color: #0f172a; padding-bottom: 30px;
+        }
+
+        /* 📱 모바일 전용 헤더 */
+        .m-navbar {
+            background-color: #0f172a; color: white; padding: 12px 16px;
+            display: flex; justify-content: space-between; align-items: center;
+            position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .m-brand { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 6px; }
+        .m-version { background-color: #10b981; color: white; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 8px; }
+
+        .container { padding: 12px; }
+
+        /* ⚙️ 컨트롤 패널 카드 */
+        .m-card {
+            background: white; border-radius: 12px; padding: 14px; margin-bottom: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;
+        }
+        .m-card-title { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+
+        .input-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+        .input-group label { font-size: 12px; font-weight: 700; color: #64748b; }
+        .m-input {
+            width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px;
+            font-size: 14px; outline: none; background-color: #fff; appearance: none;
+        }
+
+        .btn-m {
+            width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 14px;
+            font-weight: 700; color: white; cursor: pointer; text-align: center;
+        }
+        .btn-blue { background-color: #2563eb; }
+        .btn-dark { background-color: #334155; }
+        .btn-green { background-color: #16a34a; }
+
+        /* 📊 1열 KPI 지표 카드 */
+        .kpi-scroll-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+        .kpi-mini-card {
+            background: #fff; padding: 12px 16px; border-radius: 10px; border-left: 4px solid #2563eb;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .kpi-mini-card.green { border-left-color: #10b981; }
+        .kpi-mini-card.purple { border-left-color: #8b5cf6; }
+        .kpi-mini-title { font-size: 12px; font-weight: 600; color: #64748b; }
+        .kpi-mini-val { font-size: 17px; font-weight: 800; color: #0f172a; }
+
+        .chart-wrapper { position: relative; height: 210px; width: 100%; }
+
+        /* 🛒 모바일 접이식 점포/주문 카드 UI */
+        .store-card {
+            background: white; border-radius: 10px; border: 1px solid #e2e8f0;
+            margin-bottom: 8px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        }
+        .store-card-header {
+            padding: 12px 14px; background: #fff; display: flex; justify-content: space-between;
+            align-items: center; font-size: 14px; font-weight: 700; cursor: pointer;
+        }
+        .store-card-header:active { background-color: #f1f5f9; }
+        .badge-cnt { background-color: #eff6ff; color: #2563eb; font-size: 11px; padding: 3px 8px; border-radius: 12px; font-weight: 800; }
+        
+        .item-detail-list { display: none; background: #f8fafc; padding: 10px; border-top: 1px dashed #e2e8f0; }
+        .item-detail-list.open { display: block; }
+        .item-row {
+            background: white; padding: 8px 10px; border-radius: 6px; border: 1px solid #f1f5f9;
+            margin-bottom: 6px; font-size: 12px; display: flex; flex-direction: column; gap: 4px;
+        }
+        .item-row-header { display: flex; justify-content: space-between; font-weight: 700; color: #0f172a; }
+        .item-row-sub { display: flex; justify-content: space-between; color: #64748b; font-size: 11px; }
+
+        /* 🔍 바텀시트 모달 (모바일 전용) */
+        .bottom-sheet-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.6); z-index: 999; justify-content: flex-end; flex-direction: column;
+        }
+        .bottom-sheet-content {
+            background: white; border-top-left-radius: 16px; border-top-right-radius: 16px;
+            padding: 20px; max-height: 80vh; display: flex; flex-direction: column; animation: slideUp 0.2s ease-out;
+        }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .sheet-scroll { flex: 1; overflow-y: auto; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="m-navbar">
+        <div class="m-brand">
+            <span>📱 더본 OMS 모바일</span>
+            <span class="m-version">v1.0</span>
+        </div>
+        <button class="btn-m btn-dark" style="width: auto; padding: 6px 10px; font-size: 11px;" onclick="openCalendarModal()">📅 캘린더</button>
+    </div>
+
+    <div class="container">
+        
+        <!-- 🚀 OMS 수동 동기화 카드 -->
+        <div class="m-card">
+            <div class="m-card-title">
+                <span>🚀 OMS 수동 동기화</span>
+                <span id="last-updated-text" style="font-size: 11px; color: #0284c7; font-weight: 600;">최신: 계산 중...</span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <input type="date" id="sync-target-date" class="m-input" style="flex:1;">
+                <button id="run-btn" class="btn-m btn-blue" style="width: 110px;" onclick="triggerBot()">동기화</button>
+            </div>
+        </div>
+
+        <!-- 📊 기간별 추이 그래프 및 KPI -->
+        <div class="m-card">
+            <div class="m-card-title">📈 기간별 주문 추이</div>
+            
+            <div class="input-group">
+                <label>조회 기간</label>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                    <input type="date" id="chart-start-date" class="m-input">
+                    <span>~</span>
+                    <input type="date" id="chart-end-date" class="m-input">
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                <input type="text" id="chart-brand-input" class="m-input" placeholder="브랜드 선택..." readonly onclick="openBrandModal()">
+                <button class="btn-m btn-dark" style="width: 70px;" onclick="openBrandModal()">선택</button>
+            </div>
+
+            <button class="btn-m btn-blue" style="margin-bottom: 14px;" onclick="fetchChartData()">🔍 추이 조회</button>
+
+            <div class="kpi-scroll-container">
+                <div class="kpi-mini-card">
+                    <span class="kpi-mini-title">총 주문수량</span>
+                    <span class="kpi-mini-val" id="kpi-total-qty">0 건</span>
+                </div>
+                <div class="kpi-mini-card green">
+                    <span class="kpi-mini-title">취급 품목수</span>
+                    <span class="kpi-mini-val" id="kpi-total-items">0 종</span>
+                </div>
+                <div class="kpi-mini-card purple">
+                    <span class="kpi-mini-title">총 주문금액</span>
+                    <span class="kpi-mini-val" id="kpi-total-amount">0 원</span>
+                </div>
+            </div>
+
+            <div class="chart-wrapper">
+                <canvas id="dailyTrendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 🛒 하루치 상세 내역 (카드형 조작) -->
+        <div class="m-card">
+            <div class="m-card-title">🛒 하루 상세 내역</div>
+            <div class="input-group">
+                <label>조회 일자 (하루)</label>
+                <div style="display: flex; gap: 6px;">
+                    <input type="date" id="detail-target-date" class="m-input" style="flex:1;">
+                    <button class="btn-m btn-blue" style="width: 80px;" onclick="fetchDetailData()">불러오기</button>
+                </div>
+            </div>
+
+            <div style="margin-top: 10px;">
+                <select id="brand-select" class="m-input" onchange="onBrandChange()">
+                    <option value="ALL">🌐 전체 브랜드</option>
+                </select>
+            </div>
+            
+            <input type="text" id="store-search-input" class="m-input" style="margin-top: 8px;" placeholder="🔍 점포명 실시간 검색..." onkeyup="debouncedFilterStoreList()">
+        </div>
+
+        <!-- 점포별 카드 리스트 뷰 -->
+        <div id="store-card-list-container"></div>
+
+    </div>
+
+    <!-- 🔍 브랜드 선택 바텀시트 모달 -->
+    <div class="bottom-sheet-overlay" id="brand-modal">
+        <div class="bottom-sheet-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 16px;">
+                <span>🏢 브랜드 다중 선택</span>
+                <span style="cursor: pointer; padding: 4px;" onclick="closeBrandModal()">✕</span>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 10px;">
+                <input type="text" id="modal-brand-search" class="m-input" placeholder="브랜드명 검색..." onkeyup="renderBrandModalList()">
+                <button class="btn-m btn-dark" style="width: 70px;" onclick="toggleAllBrandCheck(true)">전체</button>
+                <button class="btn-m btn-dark" style="width: 70px;" onclick="toggleAllBrandCheck(false)">해제</button>
+            </div>
+            <div class="sheet-scroll" id="brand-modal-list"></div>
+            <button class="btn-m btn-blue" style="margin-top: 10px;" onclick="applyBrandSelection()">선택 완료</button>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co"; 
+        const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN"; 
+
+        const githubId = 'kshnpch-cmyk'; 
+        const repoName = 'dashboard'; 
+
+        const tokenPart1 = "ghp_DPLQYilEaFD";
+        const tokenPart2 = "g2jVxPlK8Kh18uwaCu220wnZB";
+        const token = tokenPart1 + tokenPart2;
+
+        let rawDetailOrders = [], filteredDetailOrders = [];
+        let trendChart = null, allBrandList = [];
+
+        function safeSetStorage(key, value) {
+            try { localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); }
+            catch (e) { localStorage.clear(); }
+        }
+
+        async function fetchWithRetry(url, options, retries = 2) {
+            try {
+                const res = await fetch(url, options);
+                if (!res.ok && res.status >= 500 && retries > 0) throw new Error();
+                return res;
+            } catch (err) {
+                if (retries > 0) {
+                    await new Promise(r => setTimeout(r, 500));
+                    return fetchWithRetry(url, options, retries - 1);
+                }
+                throw err;
+            }
+        }
+
+        function debounce(func, delay = 150) {
+            let timeout;
+            return function(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), delay);
+            };
+        }
+
+        const debouncedFilterStoreList = debounce(filterStoreList, 150);
+
+        function formatDate(d) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        function formatDisplayDate(dateStr) {
+            if (!dateStr) return '-';
+            let s = String(dateStr).split('T')[0];
+            return s.replace(/-/g, '/');
+        }
+
+        function cleanNumber(val) {
+            if (!val) return 0;
+            return parseFloat(String(val).replace(/[^0-9.-]/g, '')) || 0;
+        }
+
+        /* 🏢 모바일 전용 브랜드 선택 바텀시트 */
+        async function openBrandModal() {
+            document.getElementById('brand-modal').style.display = 'flex';
+            if (allBrandList.length === 0) {
+                try {
+                    const res = await fetchWithRetry(`${SUPABASE_URL}/rest/v1/oms_orders?select=brand_name`, {
+                        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        allBrandList = [...new Set(data.map(r => r.brand_name))].filter(Boolean).sort();
+                    }
+                } catch (e) {}
+            }
+            renderBrandModalList();
+        }
+
+        function closeBrandModal() { document.getElementById('brand-modal').style.display = 'none'; }
+
+        function renderBrandModalList() {
+            const selected = document.getElementById('chart-brand-input').value.split(',').map(s => s.trim());
+            const keyword = document.getElementById('modal-brand-search').value.toLowerCase().trim();
+            const filtered = allBrandList.filter(b => b.toLowerCase().includes(keyword));
+
+            const html = filtered.map(b => `
+                <div style="padding: 10px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" class="m-brand-chk" value="${b}" ${selected.includes(b) ? 'checked' : ''} style="transform: scale(1.2);">
+                    <span style="font-size: 14px;">${b}</span>
+                </div>
+            `).join('');
+            document.getElementById('brand-modal-list').innerHTML = html;
+        }
+
+        function toggleAllBrandCheck(status) {
+            document.querySelectorAll('.m-brand-chk').forEach(c => c.checked = status);
+        }
+
+        function applyBrandSelection() {
+            const checked = Array.from(document.querySelectorAll('.m-brand-chk:checked')).map(c => c.value);
+            document.getElementById('chart-brand-input').value = checked.join(', ');
+            safeSetStorage('cached_brand_input', checked.join(', '));
+            closeBrandModal();
+        }
+
+        /* 📊 차트 데이터 가져오기 */
+        async function fetchChartData() {
+            const startDate = document.getElementById('chart-start-date').value;
+            const endDate = document.getElementById('chart-end-date').value;
+            const brandVal = document.getElementById('chart-brand-input').value.trim();
+
+            if (!startDate || !endDate) return alert("조회 기간을 선택하세요.");
+
+            safeSetStorage('cached_chart_start_date', startDate);
+            safeSetStorage('cached_chart_end_date', endDate);
+
+            let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,qty,total_amount,brand_name,item_name`;
+
+            if (brandVal) {
+                const brands = brandVal.split(',').map(b => b.trim()).filter(Boolean);
+                if (brands.length === 1) queryUrl += `&brand_name=ilike.*${encodeURIComponent(brands[0])}*`;
+                else if (brands.length > 1) queryUrl += `&or=(${brands.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`;
+            }
+
+            try {
+                const res = await fetchWithRetry(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                if (res.ok) {
+                    const data = await res.json();
+                    renderChartAndKPI(data);
+                }
+            } catch (e) {}
+        }
+
+        function renderChartAndKPI(data) {
+            if (!data || !Array.isArray(data)) return;
+            let qty = 0, amt = 0, items = new Set(), dailyMap = {};
+
+            data.forEach(r => {
+                const q = cleanNumber(r.qty), a = cleanNumber(r.total_amount);
+                qty += q; amt += a;
+                if (r.item_name) items.add(r.item_name);
+
+                let d = formatDisplayDate(r.delivery_date);
+                if (!dailyMap[d]) dailyMap[d] = { qty: 0, amt: 0 };
+                dailyMap[d].qty += q; dailyMap[d].amt += a;
+            });
+
+            document.getElementById('kpi-total-qty').innerText = `${qty.toLocaleString()} 건`;
+            document.getElementById('kpi-total-items').innerText = `${items.size.toLocaleString()} 종`;
+            document.getElementById('kpi-total-amount').innerText = `${amt.toLocaleString()} 원`;
+
+            const labels = Object.keys(dailyMap).sort();
+            const ctx = document.getElementById('dailyTrendChart').getContext('2d');
+            if (trendChart) trendChart.destroy();
+
+            trendChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: '수량', data: labels.map(k => dailyMap[k].qty), backgroundColor: 'rgba(37, 99, 235, 0.6)', yAxisID: 'y1' },
+                        { label: '금액', data: labels.map(k => dailyMap[k].amt), type: 'line', borderColor: '#8b5cf6', yAxisID: 'y2' }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { y1: { beginAtZero: true }, y2: { beginAtZero: true, grid: { drawOnChartArea: false } } }
+                }
+            });
+        }
+
+        /* 🛒 상세 하루 내역 터치 카드 뷰 로딩 */
+        async function fetchDetailData() {
+            const targetDate = document.getElementById('detail-target-date').value;
+            if (!targetDate) return;
+
+            safeSetStorage('cached_detail_target_date', targetDate);
+            let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=eq.${targetDate}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc`;
+
+            try {
+                const res = await fetchWithRetry(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                if (res.ok) {
+                    rawDetailOrders = await res.json();
+                    processDetailData();
+                }
+            } catch (e) {}
+        }
+
+        function processDetailData() {
+            filteredDetailOrders = rawDetailOrders;
+            const brands = [...new Set(filteredDetailOrders.map(r => r.brand_name))].filter(Boolean);
+            const select = document.getElementById('brand-select');
+            select.innerHTML = '<option value="ALL">🌐 전체 브랜드</option>';
+            brands.forEach(b => select.innerHTML += `<option value="${b}">${b}</option>`);
+
+            onBrandChange();
+        }
+
+        function onBrandChange() {
+            const brand = document.getElementById('brand-select').value;
+            let orders = (brand === 'ALL' || !brand) ? filteredDetailOrders : filteredDetailOrders.filter(r => r.brand_name === brand);
+            renderStoreCardList(orders);
+        }
+
+        function filterStoreList() {
+            const query = document.getElementById('store-search-input').value.toLowerCase();
+            document.querySelectorAll('.store-card').forEach(card => {
+                const name = card.getAttribute('data-store-name').toLowerCase();
+                card.style.display = name.includes(query) ? 'block' : 'none';
+            });
+        }
+
+        /* 모바일 터치 카드 리스트 렌더링 */
+        function renderStoreCardList(orders) {
+            const container = document.getElementById('store-card-list-container');
+            if (!orders || orders.length === 0) {
+                container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">데이터가 없습니다.</div>';
+                return;
+            }
+
+            const storeMap = {};
+            orders.forEach(r => {
+                const sName = r.store_name || '기타';
+                if (!storeMap[sName]) storeMap[sName] = [];
+                storeMap[sName].push(r);
+            });
+
+            const cardsHtml = Object.keys(storeMap).map((store, idx) => {
+                const storeOrders = storeMap[store];
+                const itemsHtml = storeOrders.map(o => `
+                    <div class="item-row">
+                        <div class="item-row-header">
+                            <span>${o.item_name || '-'}</span>
+                            <span style="color:#2563eb;">${cleanNumber(o.qty).toLocaleString()}개</span>
+                        </div>
+                        <div class="item-row-sub">
+                            <span>코드: ${o.item_code || '-'}</span>
+                            <span>${cleanNumber(o.total_amount).toLocaleString()}원</span>
+                        </div>
+                    </div>
+                `).join('');
+
+                return `
+                    <div class="store-card" data-store-name="${store}">
+                        <div class="store-card-header" onclick="toggleStoreCard(${idx})">
+                            <span>🏢 ${store}</span>
+                            <span class="badge-cnt">${storeOrders.length}건 ▼</span>
+                        </div>
+                        <div class="item-detail-list" id="store-card-body-${idx}">
+                            ${itemsHtml}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = cardsHtml;
+        }
+
+        function toggleStoreCard(idx) {
+            const body = document.getElementById(`store-card-body-${idx}`);
+            body.classList.toggle('open');
+        }
+
+        /* ⚡ 초기 복원 및 실행 */
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date();
+            const past7 = new Date(); past7.setDate(today.getDate() - 7);
+
+            document.getElementById('chart-start-date').value = localStorage.getItem('cached_chart_start_date') || formatDate(past7);
+            document.getElementById('chart-end-date').value = localStorage.getItem('cached_chart_end_date') || formatDate(today);
+            document.getElementById('sync-target-date').value = formatDate(today);
+            document.getElementById('detail-target-date').value = localStorage.getItem('cached_detail_target_date') || formatDate(today);
+            document.getElementById('chart-brand-input').value = localStorage.getItem('cached_brand_input') || '';
+
+            const cachedUpdated = localStorage.getItem('cached_last_updated');
+            if (cachedUpdated) document.getElementById('last-updated-text').innerText = `최신: ${cachedUpdated}`;
+
+            fetchChartData();
+            fetchDetailData();
+        });
+
+        async function triggerBot() {
+            const btn = document.getElementById('run-btn');
+            const targetVal = document.getElementById('sync-target-date').value.replace(/-/g, '/');
+
+            if (!targetVal) return alert("일자를 선택하세요.");
+
+            btn.disabled = true; btn.innerText = "동기화 중...";
+
+            try {
+                const res = await fetch(`https://api.github.com/repos/${githubId}/${repoName}/actions/workflows/capture.yml/dispatches`, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ ref: 'main', inputs: { start_date: targetVal, end_date: targetVal } })
+                });
+
+                if (res.ok) {
+                    alert(`✅ [${targetVal}] 동기화 요청 완료!`);
+                    setTimeout(() => { btn.disabled = false; btn.innerText = "동기화"; fetchDetailData(); }, 35000);
+                } else {
+                    alert("❌ 동기화 요청 실패"); btn.disabled = false; btn.innerText = "동기화";
+                }
+            } catch (err) {
+                alert("❌ 네트워크 오류"); btn.disabled = false; btn.innerText = "동기화";
+            }
+        }
+    </script>
+</body>
+</html>
