@@ -149,7 +149,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v4.2 Retry Protected</span>
+            <span class="version-tag">v4.3 Reliable Cache</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -341,7 +341,6 @@
         let allBrandList = [];
         let allItemList = [];
 
-        // ⚡ Supabase 500 서버 오류 발생 시 자동 재시도 유틸리티 (최대 2회 자동 재요청)
         async function fetchWithRetry(url, options, retries = 2, backoff = 500) {
             try {
                 const res = await fetch(url, options);
@@ -462,7 +461,9 @@
 
         function applyBrandSelection() {
             const checkedVals = Array.from(document.querySelectorAll('.brand-modal-chk:checked')).map(c => c.value);
-            document.getElementById('chart-brand-input').value = checkedVals.join(', ');
+            const brandStr = checkedVals.join(', ');
+            document.getElementById('chart-brand-input').value = brandStr;
+            localStorage.setItem('cached_brand_input', brandStr);
             closeBrandModal();
         }
 
@@ -537,6 +538,7 @@
 
         function selectItemFromModal(itemName) {
             document.getElementById('chart-item-input').value = itemName;
+            localStorage.setItem('cached_item_input', itemName);
             closeItemModal();
         }
 
@@ -633,12 +635,13 @@
 
         function selectDateFromCalendar(dateStr) {
             document.getElementById('detail-target-date').value = dateStr;
+            localStorage.setItem('cached_detail_target_date', dateStr);
             closeCalendarModal();
             fetchDetailData();
         }
 
         /* -------------------------------------------------------------
-           📊 추이 그래프 데이터 안전 조회 (500 에러 재시도 로직 적용)
+           📊 추이 그래프 데이터 안전 조회 & 로컬 저장
         ------------------------------------------------------------- */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
@@ -647,6 +650,12 @@
             const itemKeyword = document.getElementById('chart-item-input').value.trim();
 
             if (!startDate || !endDate) return alert("시작일과 종료일을 선택하세요.");
+
+            // 입력 조건 저장
+            localStorage.setItem('cached_chart_start_date', startDate);
+            localStorage.setItem('cached_chart_end_date', endDate);
+            localStorage.setItem('cached_brand_input', brandInputValue);
+            localStorage.setItem('cached_item_input', itemKeyword);
 
             let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,order_date,qty,price,total_amount,brand_name,item_code,item_name`;
 
@@ -665,22 +674,23 @@
             }
 
             try {
-                // ⚡ 500 에러 발생 시 최대 2회 자동 재요청 유틸리티 적용
                 const res = await fetchWithRetry(queryUrl, {
                     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
                 });
                 if (!res.ok) throw new Error(`API 응답 실패 (${res.status})`);
                 const data = await res.json();
 
-                localStorage.setItem('cached_chart_data', JSON.stringify(data));
-                renderChartAndKPI(data);
+                if (Array.isArray(data) && data.length > 0) {
+                    localStorage.setItem('cached_chart_data', JSON.stringify(data));
+                    renderChartAndKPI(data);
+                }
             } catch (err) {
-                console.warn("⚠️ 간헐적 DB 지연으로 캐시된 데이터로 노출을 유지합니다:", err.message);
+                console.warn("⚠️ 간헐적 DB 지연으로 캐시 데이터를 유지합니다:", err.message);
             }
         }
 
         function renderChartAndKPI(data) {
-            if (!data || data.length === 0) return;
+            if (!data || !Array.isArray(data) || data.length === 0) return;
 
             let totalQty = 0, totalAmount = 0;
             const uniqueItems = new Set();
@@ -734,11 +744,13 @@
         }
 
         /* -------------------------------------------------------------
-           🛒 하루치 상세 내역 안전 조회 & 캐싱
+           🛒 하루치 상세 내역 안전 조회 & 로컬 저장
         ------------------------------------------------------------- */
         async function fetchDetailData() {
             const targetDate = document.getElementById('detail-target-date').value;
             if (!targetDate) return;
+
+            localStorage.setItem('cached_detail_target_date', targetDate);
 
             let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=eq.${targetDate}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc`;
 
@@ -748,13 +760,12 @@
                 });
                 if (!res.ok) throw new Error("API 응답 실패");
                 
-                rawDetailOrders = await res.json();
-                
-                localStorage.setItem('cached_detail_orders', JSON.stringify(rawDetailOrders));
-                localStorage.setItem('cached_detail_target_date', targetDate);
-
-                processDetailData();
-
+                const data = await res.json();
+                if (Array.isArray(data) && data.length > 0) {
+                    rawDetailOrders = data;
+                    localStorage.setItem('cached_detail_orders', JSON.stringify(rawDetailOrders));
+                    processDetailData();
+                }
             } catch (err) {
                 console.error("상세 데이터 로드 실패:", err);
             }
@@ -897,46 +908,56 @@
         }
 
         /* -------------------------------------------------------------
-           ⚡ 초기 로드 및 캐시 복원 (Zero Loading + Background Sync)
+           ⚡ 초기 로드 및 캐시 완벽 복원 (로컬스토리지 보완)
         ------------------------------------------------------------- */
         document.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
             const past7 = new Date(); past7.setDate(today.getDate() - 7);
 
-            document.getElementById('chart-start-date').value = formatDate(past7);
-            document.getElementById('chart-end-date').value = formatDate(today);
+            // 날짜 및 검색 조건 캐시 복원
+            document.getElementById('chart-start-date').value = localStorage.getItem('cached_chart_start_date') || formatDate(past7);
+            document.getElementById('chart-end-date').value = localStorage.getItem('cached_chart_end_date') || formatDate(today);
             document.getElementById('sync-target-date').value = formatDate(today);
-
-            const cachedDetailTargetDate = localStorage.getItem('cached_detail_target_date');
-            document.getElementById('detail-target-date').value = cachedDetailTargetDate || formatDate(today);
+            document.getElementById('detail-target-date').value = localStorage.getItem('cached_detail_target_date') || formatDate(today);
+            
+            document.getElementById('chart-brand-input').value = localStorage.getItem('cached_brand_input') || '';
+            document.getElementById('chart-item-input').value = localStorage.getItem('cached_item_input') || '';
 
             const mStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2, '0')}`;
             document.getElementById('calendar-month-picker').value = mStr;
 
-            // ⚡ 1. 로컬 저장소 캐시 0초 접속 노출
+            // ⚡ 1. 로컬 저장소 데이터 안전 복원
             const cachedLastUpdated = localStorage.getItem('cached_last_updated');
             if (cachedLastUpdated) {
                 document.getElementById('last-updated-text').innerText = `🕒 최신 배송일자: ${cachedLastUpdated}`;
             }
 
-            const cachedBrands = localStorage.getItem('cached_brands');
-            if (cachedBrands) allBrandList = JSON.parse(cachedBrands);
+            try {
+                const cachedBrands = localStorage.getItem('cached_brands');
+                if (cachedBrands) allBrandList = JSON.parse(cachedBrands);
 
-            const cachedItems = localStorage.getItem('cached_items');
-            if (cachedItems) allItemList = JSON.parse(cachedItems);
+                const cachedItems = localStorage.getItem('cached_items');
+                if (cachedItems) allItemList = JSON.parse(cachedItems);
 
-            const cachedChartData = localStorage.getItem('cached_chart_data');
-            if (cachedChartData) {
-                renderChartAndKPI(JSON.parse(cachedChartData));
+                const cachedChartData = localStorage.getItem('cached_chart_data');
+                if (cachedChartData) {
+                    const data = JSON.parse(cachedChartData);
+                    if (Array.isArray(data) && data.length > 0) renderChartAndKPI(data);
+                }
+
+                const cachedDetailOrders = localStorage.getItem('cached_detail_orders');
+                if (cachedDetailOrders) {
+                    const data = JSON.parse(cachedDetailOrders);
+                    if (Array.isArray(data) && data.length > 0) {
+                        rawDetailOrders = data;
+                        processDetailData();
+                    }
+                }
+            } catch (e) {
+                console.warn("캐시 데이터 복원 중 예외 처리:", e);
             }
 
-            const cachedDetailOrders = localStorage.getItem('cached_detail_orders');
-            if (cachedDetailOrders) {
-                rawDetailOrders = JSON.parse(cachedDetailOrders);
-                processDetailData();
-            }
-
-            // ⚡ 2. 백그라운드에서 최신 데이터 비동기 동기화
+            // ⚡ 2. 백그라운드 최신 서버 데이터 동기화
             loadCalendarData();
             fetchChartData();
             fetchDetailData();
