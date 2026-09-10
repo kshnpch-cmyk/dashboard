@@ -15,26 +15,15 @@
             color: #1e293b;
         }
         .navbar {
-            background-color: #0f172a;
-            color: white;
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            flex-wrap: wrap;
-            gap: 15px;
+            background-color: #0f172a; color: white; padding: 15px 30px;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex-wrap: wrap; gap: 15px;
         }
         .brand-title { display: flex; align-items: center; gap: 10px; }
         .brand-title h1 { margin: 0; font-size: 20px; font-weight: 700; }
         .version-tag {
-            background-color: #10b981;
-            color: white;
-            font-size: 11px;
-            font-weight: 800;
-            padding: 3px 8px;
-            border-radius: 12px;
-            letter-spacing: 0.5px;
+            background-color: #10b981; color: white; font-size: 11px; font-weight: 800;
+            padding: 3px 8px; border-radius: 12px; letter-spacing: 0.5px;
         }
         .control-panel { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
         .sync-date-group {
@@ -49,17 +38,18 @@
         .last-updated-tag {
             font-size: 12px; color: #38bdf8; background-color: #1e293b;
             padding: 6px 12px; border-radius: 6px; border: 1px solid #0284c7; font-weight: bold;
+            display: flex; align-items: center; gap: 8px;
         }
         .btn {
-            background-color: #2563eb; color: white; border: none; padding: 9px 16px;
-            border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px;
+            background-color: #2563eb; color: white; border: none; padding: 8px 14px;
+            border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px;
         }
         .btn:hover { background-color: #1d4ed8; }
         .btn-query { background-color: #0284c7; }
+        .btn-cal { background-color: #0f766e; padding: 4px 8px; font-size: 11px; border-radius: 4px; }
         .btn-excel { background-color: #16a34a; padding: 5px 10px; font-size: 12px; }
 
         .container { padding: 20px; max-width: 98%; margin: 0 auto; }
-        
         .section-panel {
             background: white; padding: 20px; border-radius: 12px;
             margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
@@ -75,9 +65,7 @@
             background-color: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 15px;
         }
         .filter-group { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #475569; }
-        .input-box {
-            padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none;
-        }
+        .input-box { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none; }
 
         .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 15px; }
         .kpi-card { background: #f8fafc; padding: 15px 20px; border-radius: 8px; border-left: 5px solid #2563eb; }
@@ -88,24 +76,30 @@
 
         .chart-container { position: relative; height: 260px; width: 100%; }
 
-        /* 📅 캘린더 스타일 */
-        .calendar-grid {
-            display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 10px;
+        /* 📅 캘린더 모달 팝업 스타일 */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.6); z-index: 999; justify-content: center; align-items: center;
         }
-        .calendar-header-day {
-            text-align: center; font-weight: bold; font-size: 12px; color: #64748b; padding: 6px 0; background-color: #f8fafc; border-radius: 4px;
+        .modal-content {
+            background: white; padding: 20px; border-radius: 12px; width: 520px; max-width: 90%;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
         }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .modal-title { font-size: 16px; font-weight: 700; }
+        .close-btn { cursor: pointer; font-size: 18px; font-weight: bold; color: #64748b; }
+
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 10px; }
+        .calendar-header-day { text-align: center; font-weight: bold; font-size: 11px; color: #64748b; padding: 4px 0; background: #f8fafc; }
         .calendar-day-cell {
-            background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; min-height: 55px; padding: 6px;
-            display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; transition: all 0.15s;
+            background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; height: 48px; padding: 4px;
+            display: flex; flex-direction: column; justify-content: space-between; cursor: pointer;
         }
         .calendar-day-cell:hover { border-color: #2563eb; background-color: #eff6ff; }
-        .calendar-day-cell.other-month { background-color: #f8fafc; opacity: 0.4; cursor: default; }
-        .day-number { font-size: 12px; font-weight: bold; color: #334155; }
-        .data-status-badge {
-            font-size: 10.5px; font-weight: bold; padding: 2px 4px; border-radius: 4px; text-align: center; margin-top: 4px;
-        }
-        .badge-has-data { background-color: #d1fae5; color: #047857; border: 1px solid #a7f3d0; }
+        .calendar-day-cell.other-month { background-color: #f8fafc; opacity: 0.3; cursor: default; }
+        .day-number { font-size: 11px; font-weight: bold; }
+        .data-status-badge { font-size: 9.5px; font-weight: bold; padding: 1px 3px; border-radius: 3px; text-align: center; }
+        .badge-has-data { background-color: #d1fae5; color: #047857; }
         .badge-no-data { background-color: #f1f5f9; color: #94a3b8; }
 
         /* 하단 레이아웃 */
@@ -143,10 +137,14 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v2.9 One-Line Header</span>
+            <span class="version-tag">v3.0 Compact</span>
         </div>
         <div class="control-panel">
-            <div class="last-updated-tag" id="last-updated-text">🕒 최신 배송일자: 조회 중...</div>
+            <!-- 💡 최신 배송일자 문구 및 캘린더 버튼 통합 -->
+            <div class="last-updated-tag">
+                <span id="last-updated-text">🕒 최신 배송일자: 조회 중...</span>
+                <button class="btn btn-cal" onclick="openCalendarModal()">📅 캘린더</button>
+            </div>
             
             <div class="sync-date-group">
                 <label>동기화 일자:</label>
@@ -156,22 +154,24 @@
         </div>
     </div>
 
-    <div class="container">
-
-        <!-- 📅 영역 1: 배송일자 데이터 유무 캘린더 -->
-        <div class="section-panel">
-            <div class="panel-header">
-                <span class="panel-title-text">📅 배송일자 데이터 현황 캘린더</span>
-                <div class="filter-group">
-                    <label>월 선택:</label>
-                    <input type="month" id="calendar-month-picker" class="input-box" onchange="loadCalendarData()">
-                    <button class="btn btn-query" onclick="loadCalendarData()">🔄 캘린더 갱신</button>
-                </div>
+    <!-- 📅 캘린더 팝업 모달 -->
+    <div class="modal-overlay" id="calendar-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">📅 배송일자 데이터 존재 현황</span>
+                <span class="close-btn" onclick="closeCalendarModal()">✕</span>
+            </div>
+            <div style="display: flex; gap: 8px; margin-bottom: 10px; align-items: center;">
+                <label style="font-size: 12px; font-weight: bold;">월 선택:</label>
+                <input type="month" id="calendar-month-picker" class="input-box" onchange="loadCalendarData()">
             </div>
             <div class="calendar-grid" id="calendar-grid"></div>
         </div>
+    </div>
+
+    <div class="container">
         
-        <!-- 📊 영역 2: 기간별 추이 차트 분석 (한 줄로 통합된 헤더) -->
+        <!-- 📊 상단 영역: 기간별 추이 차트 분석 (한 줄 통합 헤더) -->
         <div class="section-panel">
             <div class="panel-header" style="margin-bottom: 0; border-bottom: none;">
                 <span class="panel-title-text" style="white-space: nowrap;">📈 기간별 주문 추이 그래프</span>
@@ -215,7 +215,7 @@
             </div>
         </div>
 
-        <!-- 🛒 영역 3: 하루 단위 상세 내역 -->
+        <!-- 🛒 하단 영역: 하루 단위 상세 내역 (v2.1.0 기존 구조 고정) -->
         <div class="filter-row" style="background: white; margin-bottom: 20px;">
             <div class="filter-group">
                 <label style="font-size: 15px; color: #0f172a;">📅 상세 조회 일자 (하루):</label>
@@ -317,6 +317,7 @@
             return str || '-';
         }
 
+        // 💡 최신 배송일자 조회
         async function fetchLatestDeliveryDate() {
             const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?select=delivery_date&order=delivery_date.desc&limit=1`;
             try {
@@ -337,12 +338,22 @@
             }
         }
 
+        // 📅 캘린더 모달 제어
+        function openCalendarModal() {
+            document.getElementById('calendar-modal').style.display = 'flex';
+            loadCalendarData();
+        }
+
+        function closeCalendarModal() {
+            document.getElementById('calendar-modal').style.display = 'none';
+        }
+
         async function loadCalendarData() {
             const monthVal = document.getElementById('calendar-month-picker').value;
             if (!monthVal) return;
 
             const grid = document.getElementById('calendar-grid');
-            grid.innerHTML = '<div style="grid-column: span 7; text-align: center; padding: 20px; color: #2563eb;">⚡ 캘린더 데이터 조회 중...</div>';
+            grid.innerHTML = '<div style="grid-column: span 7; text-align: center; padding: 15px; color: #2563eb;">⚡ 조회 중...</div>';
 
             const [year, month] = monthVal.split('-').map(Number);
             const firstDay = new Date(year, month - 1, 1);
@@ -393,8 +404,8 @@
                 const count = dateCountMap[dString] || 0;
 
                 let badgeHtml = count > 0 
-                    ? `<span class="data-status-badge badge-has-data">🟢 ${count.toLocaleString()}건</span>`
-                    : `<span class="data-status-badge badge-no-data">⚪ 데이터 없음</span>`;
+                    ? `<span class="data-status-badge badge-has-data">🟢 있음</span>`
+                    : `<span class="data-status-badge badge-no-data">⚪ 없음</span>`;
 
                 const cell = document.createElement('div');
                 cell.className = 'calendar-day-cell';
@@ -409,16 +420,18 @@
 
         function selectDateFromCalendar(dateStr) {
             document.getElementById('detail-target-date').value = dateStr;
+            closeCalendarModal();
             fetchDetailData();
         }
 
+        // 📊 추이 차트 조회
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
             const brandKeyword = document.getElementById('chart-brand-input').value.trim();
             const itemKeyword = document.getElementById('chart-item-input').value.trim();
 
-            if (!startDate || !endDate) return alert("추이 조회를 위한 시작일과 종료일을 선택하세요.");
+            if (!startDate || !endDate) return alert("시작일과 종료일을 선택하세요.");
 
             let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,order_date,qty,price,total_amount,brand_name,item_code,item_name`;
 
@@ -490,6 +503,7 @@
             });
         }
 
+        // 🛒 하루 단위 상세 내역 조회
         async function fetchDetailData() {
             const targetDate = document.getElementById('detail-target-date').value;
             if (!targetDate) return alert("상세 내역을 조회할 하루 날짜를 선택하세요.");
@@ -662,7 +676,6 @@
             document.getElementById('calendar-month-picker').value = mStr;
 
             fetchLatestDeliveryDate();
-            loadCalendarData();
             fetchChartData();
             fetchDetailData();
         });
@@ -692,7 +705,6 @@
                         btn.disabled = false; 
                         btn.innerText = "🚀 OMS 수동 동기화"; 
                         fetchLatestDeliveryDate();
-                        loadCalendarData();
                         fetchDetailData(); 
                     }, 35000);
                 } else {
