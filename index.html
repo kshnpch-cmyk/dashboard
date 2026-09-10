@@ -107,7 +107,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag" id="app-version-tag">v2.1.0 Full Data</span>
+            <span class="version-tag" id="app-version-tag">v2.1.0 Secure DB</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag" id="last-updated-text">🕒 동기화: DB 대기 중</div>
@@ -202,12 +202,15 @@
     </div>
 
     <script>
+        // 올바른 Supabase URL 설정
         const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co"; 
-        const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY"; // Supabase anon key 입력
+        
+        // ⚠️ 본인의 실제 Supabase Anon Key를 입력해 주세요. (없으면 401 에러 발생)
+        const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN"; 
 
         const githubId = 'kshnpch-cmyk'; 
         const repoName = 'dashboard'; 
-        const token = 'YOUR_GITHUB_TOKEN'; // GitHub PAT 입력
+        const token = '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'; 
 
         let rawOrders = [], filteredOrders = [], baseDetailOrders = [], currentDetailOrders = [];
         let trendChart = null;
@@ -249,7 +252,6 @@
 
             if (!startDate || !endDate) return;
 
-            // limit 수치를 넣지 않고 전체 데이터 수신
             const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=*&order=delivery_date.desc`;
 
             try {
@@ -411,7 +413,6 @@
             renderDetailTable();
         }
 
-        // 💡 24만 건 이상 모든 데이터를 테이블에 풀 출력하는 함수
         function renderDetailTable() {
             const tbody = document.getElementById('order-detail-table');
             tbody.innerHTML = "";
