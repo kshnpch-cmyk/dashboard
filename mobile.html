@@ -77,7 +77,6 @@
         .item-row-header { display: flex; justify-content: space-between; font-weight: 700; color: #0f172a; }
         .item-row-sub { display: flex; justify-content: space-between; color: #64748b; font-size: 11px; }
 
-        /* 바텀시트 모달 스타일 */
         .bottom-sheet-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(15, 23, 42, 0.6); z-index: 999; justify-content: flex-end; flex-direction: column;
@@ -89,7 +88,6 @@
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         .sheet-scroll { flex: 1; overflow-y: auto; margin-top: 10px; }
 
-        /* 📅 캘린더 그리드 스타일 */
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 10px; }
         .calendar-header-day { text-align: center; font-weight: bold; font-size: 11px; color: #64748b; padding: 4px 0; background: #f8fafc; }
         .calendar-day-cell {
@@ -108,7 +106,7 @@
     <div class="m-navbar">
         <div class="m-brand">
             <span>📱 더본 OMS 모바일</span>
-            <span class="m-version">v2.3</span>
+            <span class="m-version">v3.0 Summary Engine</span>
         </div>
         <button class="btn-m btn-dark" style="width: auto; padding: 6px 10px; font-size: 11px;" onclick="openCalendarModal()">📅 캘린더</button>
     </div>
@@ -190,7 +188,7 @@
 
     </div>
 
-    <!-- 📅 캘린더 바텀시트 모달 (추가) -->
+    <!-- 📅 캘린더 바텀시트 모달 -->
     <div class="bottom-sheet-overlay" id="calendar-modal">
         <div class="bottom-sheet-content">
             <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 16px;">
@@ -313,14 +311,14 @@
 
             let dateCountMap = {}, availableDates = [];
             try {
-                const res = await fetchWithRetry(`${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date`, {
+                const res = await fetchWithRetry(`${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date,total_qty`, {
                     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
                 });
                 if (res.ok) {
                     const rows = await res.json();
                     rows.forEach(r => {
                         let dKey = formatDisplayDate(r.delivery_date).replace(/\//g, '-');
-                        dateCountMap[dKey] = (dateCountMap[dKey] || 0) + 1;
+                        dateCountMap[dKey] = (dateCountMap[dKey] || 0) + cleanNumber(r.total_qty);
                         availableDates.push(dKey);
                     });
                 }
@@ -367,7 +365,7 @@
             document.getElementById('brand-modal').style.display = 'flex';
             if (allBrandList.length === 0) {
                 try {
-                    const res = await fetchWithRetry(`${SUPABASE_URL}/rest/v1/oms_orders?select=brand_name`, {
+                    const res = await fetchWithRetry(`${SUPABASE_URL}/rest/v1/daily_order_summary?select=brand_name`, {
                         headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
                     });
                     if (res.ok) {
@@ -423,7 +421,7 @@
             renderStoreCardList(filteredDetailOrders);
         }
 
-        /* 📊 차트 */
+        /* 📊 [속도 혁신 2] 사전 집계 뷰 (daily_order_summary) 연동 차트 */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -434,7 +432,7 @@
             safeSetStorage('cached_chart_start_date', startDate);
             safeSetStorage('cached_chart_end_date', endDate);
 
-            let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,order_date,qty,total_amount,brand_name,item_name`;
+            let queryUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,brand_name,item_name`;
 
             if (brandVal) {
                 const brands = brandVal.split(',').map(b => b.trim()).filter(Boolean);
@@ -456,11 +454,11 @@
             let qty = 0, amt = 0, items = new Set(), dailyMap = {};
 
             data.forEach(r => {
-                const q = cleanNumber(r.qty), a = cleanNumber(r.total_amount);
+                const q = cleanNumber(r.total_qty), a = cleanNumber(r.total_amount);
                 qty += q; amt += a;
                 if (r.item_name) items.add(r.item_name);
 
-                let d = formatDisplayDate(r.delivery_date) || formatDisplayDate(r.order_date);
+                let d = formatDisplayDate(r.delivery_date);
                 if (!d || d === '-') return;
 
                 if (!dailyMap[d]) dailyMap[d] = { qty: 0, amt: 0 };
