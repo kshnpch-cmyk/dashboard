@@ -137,7 +137,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v3.6 Direct Sync</span>
+            <span class="version-tag">v3.7 Turbo Engine</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -170,7 +170,7 @@
 
     <div class="container">
         
-        <!-- 📊 상단 영역: 기간별 추이 차트 분석 (한 줄 배치) -->
+        <!-- 📊 상단 영역: 기간별 추이 차트 분석 -->
         <div class="section-panel">
             <div class="panel-header" style="margin-bottom: 0; border-bottom: none;">
                 <span class="panel-title-text" style="white-space: nowrap;">📈 기간별 주문 추이 그래프</span>
@@ -229,7 +229,7 @@
                 <select id="brand-select" class="select-box" onchange="onBrandChange()">
                     <option value="ALL">🌐 전체 브랜드</option>
                 </select>
-                <input type="text" id="store-search-input" class="search-input" placeholder="🔍 점포명 검색..." onkeyup="filterStoreList()">
+                <input type="text" id="store-search-input" class="search-input" placeholder="🔍 점포명 검색..." onkeyup="debouncedFilterStoreList()">
                 <div id="brand-summary" style="margin-bottom: 10px; font-size: 12px; color: #64748b;">
                     점포수: <b id="brand-store-count">0</b>개 | 품목수: <b id="brand-item-count">0</b>종
                 </div>
@@ -260,12 +260,12 @@
                                 <th class="text-right">단가</th><th class="text-right">금액</th>
                             </tr>
                             <tr class="filter-row-table">
-                                <th><input type="text" id="filter-storeCode" class="table-filter-input" placeholder="검색" onkeyup="applyColumnFilters()"></th>
-                                <th><input type="text" id="filter-storeName" class="table-filter-input" placeholder="검색" onkeyup="applyColumnFilters()"></th>
-                                <th><input type="text" id="filter-orderDate" class="table-filter-input" placeholder="검색" onkeyup="applyColumnFilters()"></th>
-                                <th><input type="text" id="filter-deliveryDate" class="table-filter-input" placeholder="검색" onkeyup="applyColumnFilters()"></th>
-                                <th><input type="text" id="filter-itemCode" class="table-filter-input" placeholder="검색" onkeyup="applyColumnFilters()"></th>
-                                <th><input type="text" id="filter-itemName" class="table-filter-input" placeholder="검색" onkeyup="applyColumnFilters()"></th>
+                                <th><input type="text" id="filter-storeCode" class="table-filter-input" placeholder="검색" onkeyup="debouncedApplyColumnFilters()"></th>
+                                <th><input type="text" id="filter-storeName" class="table-filter-input" placeholder="검색" onkeyup="debouncedApplyColumnFilters()"></th>
+                                <th><input type="text" id="filter-orderDate" class="table-filter-input" placeholder="검색" onkeyup="debouncedApplyColumnFilters()"></th>
+                                <th><input type="text" id="filter-deliveryDate" class="table-filter-input" placeholder="검색" onkeyup="debouncedApplyColumnFilters()"></th>
+                                <th><input type="text" id="filter-itemCode" class="table-filter-input" placeholder="검색" onkeyup="debouncedApplyColumnFilters()"></th>
+                                <th><input type="text" id="filter-itemName" class="table-filter-input" placeholder="검색" onkeyup="debouncedApplyColumnFilters()"></th>
                                 <th></th><th></th><th></th>
                             </tr>
                         </thead>
@@ -284,14 +284,24 @@
         const githubId = 'kshnpch-cmyk'; 
         const repoName = 'dashboard'; 
 
-        // 💡 GitHub 토큰 분할 결합 (GitHub 보안 자동 파기 방지)
-        // 새로 발급받은 ghp_... 토큰을 반으로 나눠서 입력하세요.
-        const tokenPart1 = "ghp_DPLQYilEaFDg2jV";
-        const tokenPart2 = "xPlK8Kh18uwaCu220wnZB";
+        const tokenPart1 = "ghp_토큰_앞_15자리";
+        const tokenPart2 = "토큰_뒤_나머지";
         const token = tokenPart1 + tokenPart2;
 
         let rawDetailOrders = [], filteredDetailOrders = [], baseDetailOrders = [], currentDetailOrders = [];
         let trendChart = null;
+
+        // ⚡ [최적화 1] 입력 이벤트 렉 방지를 위한 디바운스 유틸리티
+        function debounce(func, delay = 150) {
+            let timeout;
+            return function(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), delay);
+            };
+        }
+
+        const debouncedApplyColumnFilters = debounce(applyColumnFilters, 150);
+        const debouncedFilterStoreList = debounce(filterStoreList, 150);
 
         function formatDate(d) {
             const y = d.getFullYear();
@@ -425,6 +435,7 @@
 
             if (!startDate || !endDate) return alert("시작일과 종료일을 선택하세요.");
 
+            // ⚡ [최적화 2] 수신 컬럼 선택 제한으로 차트 데이터 전송 용량 최소화
             let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,order_date,qty,price,total_amount,brand_name,item_code,item_name`;
 
             if (brandKeyword) queryUrl += `&brand_name=ilike.*${encodeURIComponent(brandKeyword)}*`;
@@ -499,7 +510,8 @@
             const targetDate = document.getElementById('detail-target-date').value;
             if (!targetDate) return alert("상세 내역을 조회할 하루 날짜를 선택하세요.");
 
-            let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=eq.${targetDate}&select=*&order=store_name.asc`;
+            // ⚡ [최적화 3] 하루치 상세 데이터 컬럼 명시적 조회를 통한 파싱 타임 단축
+            let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=eq.${targetDate}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc`;
 
             const tbody = document.getElementById('order-detail-table');
             tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#2563eb;">⚡ 선택한 날짜(${targetDate})의 데이터를 불러오는 중...</td></tr>`;
@@ -529,6 +541,7 @@
             onBrandChange();
         }
 
+        // ⚡ [최적화 4] 점포 목록 배치 결합 처리 (HTML 렌더링 렉 방지)
         function onBrandChange() {
             const selectedBrand = document.getElementById('brand-select').value;
             let brandOrders = (selectedBrand === 'ALL' || !selectedBrand) ? filteredDetailOrders : filteredDetailOrders.filter(r => r.brand_name === selectedBrand);
@@ -538,17 +551,18 @@
             document.getElementById('brand-item-count').innerText = new Set(brandOrders.map(r => r.item_name)).size;
 
             const storeListEl = document.getElementById('store-list');
-            let html = `<li class="store-item total-item active" onclick="onStoreSelect('ALL', '${selectedBrand}', this)">
+            let listItemsHtml = [`<li class="store-item total-item active" onclick="onStoreSelect('ALL', '${selectedBrand}', this)">
                 <span>🏢 전체 점포 합산</span><span style="color:#2563eb;">${brandOrders.length}건</span>
-            </li>`;
+            </li>`];
 
-            stores.forEach(store => {
+            for (let i = 0; i < stores.length; i++) {
+                const store = stores[i];
                 const count = brandOrders.filter(r => r.store_name === store).length;
-                html += `<li class="store-item" onclick="onStoreSelect('${store}', '${selectedBrand}', this)">
+                listItemsHtml.push(`<li class="store-item" onclick="onStoreSelect('${store}', '${selectedBrand}', this)">
                     <span>${store}</span><span style="color:#64748b;">${count}건</span>
-                </li>`;
-            });
-            storeListEl.innerHTML = html;
+                </li>`);
+            }
+            storeListEl.innerHTML = listItemsHtml.join('');
             onStoreSelect('ALL', selectedBrand, storeListEl.firstElementChild);
         }
 
@@ -594,9 +608,9 @@
             renderDetailTable();
         }
 
+        // ⚡ [최적화 5] 대용량 테이블 렌더링 시 배열 결합(join) 처리
         function renderDetailTable() {
             const tbody = document.getElementById('order-detail-table');
-            tbody.innerHTML = "";
 
             if (!currentDetailOrders || currentDetailOrders.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#94a3b8;">데이터가 없습니다.</td></tr>`;
@@ -606,7 +620,7 @@
             }
 
             let sumQty = 0, sumAmount = 0;
-            const fragment = document.createDocumentFragment();
+            const rowsHtml = [];
 
             for (let i = 0; i < currentDetailOrders.length; i++) {
                 const row = currentDetailOrders[i];
@@ -615,22 +629,22 @@
                 let t = cleanNumber(row.total_amount) || (q * p);
                 sumQty += q; sumAmount += t;
 
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td><span class="code-tag">${cleanCode(row.store_code)}</span></td>
-                    <td><b>${row.store_name||'-'}</b></td>
-                    <td>${formatDisplayDate(row.order_date)}</td>
-                    <td><span style="color:#2563eb; font-weight:bold;">${formatDisplayDate(row.delivery_date)}</span></td>
-                    <td><span class="code-tag">${cleanCode(row.item_code)}</span></td>
-                    <td>${row.item_name||'-'}</td>
-                    <td class="text-right">${q.toLocaleString()}</td>
-                    <td class="text-right">${p > 0 ? p.toLocaleString() + '원' : '-'}</td>
-                    <td class="text-right"><b>${t > 0 ? t.toLocaleString() + '원' : '-'}</b></td>
-                `;
-                fragment.appendChild(tr);
+                rowsHtml.push(`
+                    <tr>
+                        <td><span class="code-tag">${cleanCode(row.store_code)}</span></td>
+                        <td><b>${row.store_name||'-'}</b></td>
+                        <td>${formatDisplayDate(row.order_date)}</td>
+                        <td><span style="color:#2563eb; font-weight:bold;">${formatDisplayDate(row.delivery_date)}</span></td>
+                        <td><span class="code-tag">${cleanCode(row.item_code)}</span></td>
+                        <td>${row.item_name||'-'}</td>
+                        <td class="text-right">${q.toLocaleString()}</td>
+                        <td class="text-right">${p > 0 ? p.toLocaleString() + '원' : '-'}</td>
+                        <td class="text-right"><b>${t > 0 ? t.toLocaleString() + '원' : '-'}</b></td>
+                    </tr>
+                `);
             }
 
-            tbody.appendChild(fragment);
+            tbody.innerHTML = rowsHtml.join('');
             document.getElementById('list-total-qty').innerText = sumQty.toLocaleString();
             document.getElementById('list-total-amount').innerText = sumAmount.toLocaleString();
         }
@@ -671,7 +685,6 @@
             fetchDetailData();
         });
 
-        // 🚀 GitHub API 직접 호출 (분할 결합된 토큰 사용)
         async function triggerBot() {
             const btn = document.getElementById('run-btn');
             const targetDateVal = document.getElementById('sync-target-date').value.replace(/-/g, '/');
