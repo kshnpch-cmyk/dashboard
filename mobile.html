@@ -57,7 +57,6 @@
 
         .chart-wrapper { position: relative; height: 210px; width: 100%; }
 
-        /* 🛒 카드리스트 스타일 */
         .store-card {
             background: white; border-radius: 10px; border: 1px solid #e2e8f0;
             margin-bottom: 8px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.03);
@@ -95,7 +94,7 @@
     <div class="m-navbar">
         <div class="m-brand">
             <span>📱 더본 OMS 모바일</span>
-            <span class="m-version">v2.1</span>
+            <span class="m-version">v2.2</span>
         </div>
         <button class="btn-m btn-dark" style="width: auto; padding: 6px 10px; font-size: 11px;" onclick="openCalendarModal()">📅 캘린더</button>
     </div>
@@ -170,11 +169,9 @@
                 <button class="btn-m btn-dark" style="width: 70px;" onclick="openBrandModal('detail')">🔍</button>
             </div>
             
-            <!-- 통합 다중 검색 입력창 -->
             <input type="text" id="store-search-input" class="m-input" style="margin-top: 8px;" placeholder="🔍 점포코드, 점포명, 품목코드, 품목명, 날짜 검색..." onkeyup="debouncedFilterCards()">
         </div>
 
-        <!-- 카드리스트 컨테이너 (전체합산 상세가 기본 표시) -->
         <div id="store-card-list-container"></div>
 
     </div>
@@ -265,7 +262,6 @@
             return str || '-';
         }
 
-        /* 🏢 모바일 브랜드 선택 바텀시트 */
         async function openBrandModal(target = 'chart') {
             activeBrandTarget = target;
             document.getElementById('brand-modal').style.display = 'flex';
@@ -327,7 +323,6 @@
             renderStoreCardList(filteredDetailOrders);
         }
 
-        /* 📊 차트 */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -393,12 +388,14 @@
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
-                    scales: { y1: { beginAtZero: true }, y2: { beginAtZero: true, grid: { drawOnChartArea: false } } }
+                    scales: {
+                        y1: { type: 'linear', position: 'left', beginAtZero: true },
+                        y2: { type: 'linear', position: 'right', beginAtZero: true, grid: { drawOnChartArea: false } }
+                    }
                 }
             });
         }
 
-        /* 🛒 하루 상세 내역 불러오기 */
         async function fetchDetailData() {
             const targetDate = document.getElementById('detail-target-date').value;
             if (!targetDate) return;
@@ -417,7 +414,6 @@
             } catch (e) {}
         }
 
-        /* 모바일 통합 필터링 (점포코드, 점포명, 주문일자, 배송일자, 품목코드, 품목명) */
         function filterCards() {
             const query = document.getElementById('store-search-input').value.toLowerCase().trim();
             if (!query) {
@@ -439,7 +435,6 @@
             renderStoreCardList(searchedOrders);
         }
 
-        /* 🛒 모바일 카드 리스트 렌더링 (전체점포 합산 상세 기본 포함) */
         function renderStoreCardList(orders) {
             const container = document.getElementById('store-card-list-container');
             if (!orders || orders.length === 0) {
@@ -447,7 +442,6 @@
                 return;
             }
 
-            // 1. 전체 점포 합산 카드 생성
             const totalQty = orders.reduce((sum, r) => sum + cleanNumber(r.qty), 0);
             const totalAmt = orders.reduce((sum, r) => sum + (cleanNumber(r.total_amount) || (cleanNumber(r.qty)*cleanNumber(r.price))), 0);
 
@@ -479,7 +473,6 @@
                 </div>
             `;
 
-            // 2. 개별 점포별 그룹핑 카드
             const storeMap = {};
             orders.forEach(r => {
                 const sName = r.store_name || '기타';
@@ -528,7 +521,6 @@
             body.classList.toggle('open');
         }
 
-        /* ⚡ 초기 실행 */
         document.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
             const past7 = new Date(); past7.setDate(today.getDate() - 7);
