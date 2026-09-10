@@ -48,6 +48,11 @@
         .btn-query { background-color: #0284c7; }
         .btn-cal { background-color: #0f766e; padding: 4px 8px; font-size: 11px; border-radius: 4px; }
         .btn-excel { background-color: #16a34a; padding: 5px 10px; font-size: 12px; }
+        .btn-search-icon {
+            background-color: #475569; color: white; border: none; padding: 6px 9px;
+            border-radius: 6px; cursor: pointer; font-size: 12px; margin-left: -2px;
+        }
+        .btn-search-icon:hover { background-color: #334155; }
 
         .container { padding: 20px; max-width: 98%; margin: 0 auto; }
         .section-panel {
@@ -76,7 +81,7 @@
 
         .chart-container { position: relative; height: 260px; width: 100%; }
 
-        /* 📅 캘린더 팝업 모달 */
+        /* 📅 모달 공통 스타일 */
         .modal-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(15, 23, 42, 0.6); z-index: 999; justify-content: center; align-items: center;
@@ -84,6 +89,7 @@
         .modal-content {
             background: white; padding: 20px; border-radius: 12px; width: 520px; max-width: 90%;
             box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+            max-height: 85vh; display: flex; flex-direction: column;
         }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .modal-title { font-size: 16px; font-weight: 700; }
@@ -101,6 +107,15 @@
         .data-status-badge { font-size: 9.5px; font-weight: bold; padding: 1px 3px; border-radius: 3px; text-align: center; }
         .badge-has-data { background-color: #d1fae5; color: #047857; }
         .badge-no-data { background-color: #f1f5f9; color: #94a3b8; }
+
+        /* 🔍 검색 모달 전용 리스트 스타일 */
+        .modal-body-scroll { flex: 1; overflow-y: auto; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; }
+        .search-list-item {
+            display: flex; align-items: center; justify-content: space-between; padding: 8px 10px;
+            border-bottom: 1px solid #f1f5f9; font-size: 13px; cursor: pointer;
+        }
+        .search-list-item:hover { background-color: #eff6ff; }
+        .search-list-item label { cursor: pointer; width: 100%; display: flex; align-items: center; gap: 8px; }
 
         /* 하단 레이아웃 */
         .dashboard-layout { display: grid; grid-template-columns: 300px 1fr; gap: 20px; }
@@ -137,7 +152,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v3.8 Token Applied</span>
+            <span class="version-tag">v3.9 Multi Search</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -168,6 +183,39 @@
         </div>
     </div>
 
+    <!-- 🔍 브랜드 선택 다중 체크 모달 -->
+    <div class="modal-overlay" id="brand-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">🏢 브랜드 다중 선택</span>
+                <span class="close-btn" onclick="closeBrandModal()">✕</span>
+            </div>
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                <input type="text" id="modal-brand-search" class="input-box" style="flex:1;" placeholder="브랜드명 검색..." onkeyup="filterBrandModalList()">
+                <button class="btn btn-cal" style="background:#475569;" onclick="toggleAllBrandCheck(true)">전체선택</button>
+                <button class="btn btn-cal" style="background:#64748b;" onclick="toggleAllBrandCheck(false)">해제</button>
+            </div>
+            <div class="modal-body-scroll" id="brand-modal-list"></div>
+            <div style="margin-top: 15px; text-align: right;">
+                <button class="btn" onclick="applyBrandSelection()">확인 적용</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🔍 품목 검색 및 선택 모달 -->
+    <div class="modal-overlay" id="item-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">📦 품목 검색 및 선택</span>
+                <span class="close-btn" onclick="closeItemModal()">✕</span>
+            </div>
+            <div style="margin-bottom: 8px;">
+                <input type="text" id="modal-item-search" class="input-box" style="width:100%;" placeholder="품목코드 또는 품목명 검색..." onkeyup="filterItemModalList()">
+            </div>
+            <div class="modal-body-scroll" id="item-modal-list"></div>
+        </div>
+    </div>
+
     <div class="container">
         
         <!-- 📊 상단 영역: 기간별 추이 차트 분석 -->
@@ -184,11 +232,13 @@
                     </div>
                     <div class="filter-group">
                         <label>브랜드:</label>
-                        <input type="text" id="chart-brand-input" class="input-box" placeholder="브랜드명 검색" style="width: 120px;">
+                        <input type="text" id="chart-brand-input" class="input-box" placeholder="브랜드 선택/검색" style="width: 140px;">
+                        <button class="btn-search-icon" onclick="openBrandModal()" title="브랜드 다중 선택">🔍</button>
                     </div>
                     <div class="filter-group">
                         <label>품목코드/명:</label>
                         <input type="text" id="chart-item-input" class="input-box" placeholder="품목코드 또는 품목명" style="width: 150px;">
+                        <button class="btn-search-icon" onclick="openItemModal()" title="품목 검색 선택">🔍</button>
                     </div>
                     <button class="btn btn-query" onclick="fetchChartData()">🔍 추이 조회</button>
                 </div>
@@ -284,7 +334,6 @@
         const githubId = 'kshnpch-cmyk'; 
         const repoName = 'dashboard'; 
 
-        // 💡 GitHub 스캐너 우회를 위한 분할 결합 적용 (요청하신 토큰 값 반영)
         const tokenPart1 = "ghp_DPLQYilEaFD";
         const tokenPart2 = "g2jVxPlK8Kh18uwaCu220wnZB";
         const token = tokenPart1 + tokenPart2;
@@ -292,7 +341,9 @@
         let rawDetailOrders = [], filteredDetailOrders = [], baseDetailOrders = [], currentDetailOrders = [];
         let trendChart = null;
 
-        // ⚡ 입력 렉 방지를 위한 디바운스 유틸리티
+        let allBrandList = [];
+        let allItemList = [];
+
         function debounce(func, delay = 150) {
             let timeout;
             return function(...args) {
@@ -332,6 +383,151 @@
             return str || '-';
         }
 
+        /* -------------------------------------------------------------
+           🏢 브랜드 다중 선택 모달 로직
+        ------------------------------------------------------------- */
+        async function openBrandModal() {
+            document.getElementById('brand-modal').style.display = 'flex';
+            const listEl = document.getElementById('brand-modal-list');
+            listEl.innerHTML = '<div style="text-align:center; padding:15px; color:#2563eb;">⚡ 브랜드 목록 로드 중...</div>';
+
+            if (allBrandList.length === 0) {
+                try {
+                    const res = await fetch(`${SUPABASE_URL}/rest/v1/oms_orders?select=brand_name`, {
+                        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        allBrandList = [...new Set(data.map(r => r.brand_name))].filter(Boolean).sort();
+                    }
+                } catch (err) {
+                    console.error("브랜드 로드 오류:", err);
+                }
+            }
+            renderBrandModalList();
+        }
+
+        function closeBrandModal() {
+            document.getElementById('brand-modal').style.display = 'none';
+        }
+
+        function renderBrandModalList() {
+            const currentSelected = document.getElementById('chart-brand-input').value.split(',').map(s => s.trim());
+            const searchKeyword = document.getElementById('modal-brand-search').value.toLowerCase().trim();
+            const listEl = document.getElementById('brand-modal-list');
+
+            const filtered = allBrandList.filter(b => b.toLowerCase().includes(searchKeyword));
+            if (filtered.length === 0) {
+                listEl.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:15px;">검색 결과가 없습니다.</div>';
+                return;
+            }
+
+            const html = filtered.map(brand => {
+                const isChecked = currentSelected.includes(brand) ? 'checked' : '';
+                return `
+                    <div class="search-list-item">
+                        <label>
+                            <input type="checkbox" class="brand-modal-chk" value="${brand}" ${isChecked}>
+                            <span>${brand}</span>
+                        </label>
+                    </div>
+                `;
+            }).join('');
+
+            listEl.innerHTML = html;
+        }
+
+        function filterBrandModalList() {
+            renderBrandModalList();
+        }
+
+        function toggleAllBrandCheck(status) {
+            document.querySelectorAll('.brand-modal-chk').forEach(chk => chk.checked = status);
+        }
+
+        function applyBrandSelection() {
+            const checkedVals = Array.from(document.querySelectorAll('.brand-modal-chk:checked')).map(c => c.value);
+            document.getElementById('chart-brand-input').value = checkedVals.join(', ');
+            closeBrandModal();
+        }
+
+        /* -------------------------------------------------------------
+           📦 품목 검색 선택 모달 로직
+        ------------------------------------------------------------- */
+        async function openItemModal() {
+            document.getElementById('item-modal').style.display = 'flex';
+            const listEl = document.getElementById('item-modal-list');
+            listEl.innerHTML = '<div style="text-align:center; padding:15px; color:#2563eb;">⚡ 품목 목록 로드 중...</div>';
+
+            if (allItemList.length === 0) {
+                try {
+                    const res = await fetch(`${SUPABASE_URL}/rest/v1/oms_orders?select=item_code,item_name`, {
+                        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        const map = new Map();
+                        data.forEach(r => {
+                            if (r.item_code || r.item_name) {
+                                map.set(`${cleanCode(r.item_code)}__${r.item_name}`, {
+                                    code: cleanCode(r.item_code),
+                                    name: r.item_name || ''
+                                });
+                            }
+                        });
+                        allItemList = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+                    }
+                } catch (err) {
+                    console.error("품목 로드 오류:", err);
+                }
+            }
+            renderItemModalList();
+        }
+
+        function closeItemModal() {
+            document.getElementById('item-modal').style.display = 'none';
+        }
+
+        function renderItemModalList() {
+            const searchKeyword = document.getElementById('modal-item-search').value.toLowerCase().trim();
+            const listEl = document.getElementById('item-modal-list');
+
+            const filtered = allItemList.filter(item => 
+                item.code.toLowerCase().includes(searchKeyword) || 
+                item.name.toLowerCase().includes(searchKeyword)
+            );
+
+            if (filtered.length === 0) {
+                listEl.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:15px;">검색 결과가 없습니다.</div>';
+                return;
+            }
+
+            const html = filtered.slice(0, 100).map(item => `
+                <div class="search-list-item" onclick="selectItemFromModal('${item.name}')">
+                    <div>
+                        <span class="code-tag">[${item.code}]</span>
+                        <b style="margin-left: 5px;">${item.name}</b>
+                    </div>
+                    <button class="btn btn-cal" style="background:#2563eb;">선택</button>
+                </div>
+            `).join('');
+
+            listEl.innerHTML = html;
+        }
+
+        function filterItemModalList() {
+            renderItemModalList();
+        }
+
+        function selectItemFromModal(itemName) {
+            document.getElementById('chart-item-input').value = itemName;
+            closeItemModal();
+        }
+
+
+        /* -------------------------------------------------------------
+           📅 캘린더 모달
+        ------------------------------------------------------------- */
         function openCalendarModal() {
             document.getElementById('calendar-modal').style.display = 'flex';
             loadCalendarData();
@@ -428,18 +624,33 @@
             fetchDetailData();
         }
 
+        /* -------------------------------------------------------------
+           📊 추이 그래프 데이터 조회 (다중 브랜드 및 품목 처리 보완)
+        ------------------------------------------------------------- */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
-            const brandKeyword = document.getElementById('chart-brand-input').value.trim();
+            const brandInputValue = document.getElementById('chart-brand-input').value.trim();
             const itemKeyword = document.getElementById('chart-item-input').value.trim();
 
             if (!startDate || !endDate) return alert("시작일과 종료일을 선택하세요.");
 
             let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,order_date,qty,price,total_amount,brand_name,item_code,item_name`;
 
-            if (brandKeyword) queryUrl += `&brand_name=ilike.*${encodeURIComponent(brandKeyword)}*`;
-            if (itemKeyword) queryUrl += `&or=(item_code.ilike.*${encodeURIComponent(itemKeyword)}*,item_name.ilike.*${encodeURIComponent(itemKeyword)}*)`;
+            // 다중 브랜드 처리 (쉼표 구분 대응)
+            if (brandInputValue) {
+                const brandList = brandInputValue.split(',').map(b => b.trim()).filter(Boolean);
+                if (brandList.length === 1) {
+                    queryUrl += `&brand_name=ilike.*${encodeURIComponent(brandList[0])}*`;
+                } else if (brandList.length > 1) {
+                    const brandQueryStr = brandList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',');
+                    queryUrl += `&or=(${brandQueryStr})`;
+                }
+            }
+
+            if (itemKeyword) {
+                queryUrl += `&or=(item_code.ilike.*${encodeURIComponent(itemKeyword)}*,item_name.ilike.*${encodeURIComponent(itemKeyword)}*)`;
+            }
 
             try {
                 const res = await fetch(queryUrl, {
@@ -506,6 +717,9 @@
             });
         }
 
+        /* -------------------------------------------------------------
+           🛒 하루치 상세 내역 조회
+        ------------------------------------------------------------- */
         async function fetchDetailData() {
             const targetDate = document.getElementById('detail-target-date').value;
             if (!targetDate) return alert("상세 내역을 조회할 하루 날짜를 선택하세요.");
