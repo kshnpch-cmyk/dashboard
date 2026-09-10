@@ -106,7 +106,7 @@
     <div class="m-navbar">
         <div class="m-brand">
             <span>📱 더본 OMS 모바일</span>
-            <span class="m-version">v3.0 Summary Engine</span>
+            <span class="m-version">v3.1 Mat Engine</span>
         </div>
         <button class="btn-m btn-dark" style="width: auto; padding: 6px 10px; font-size: 11px;" onclick="openCalendarModal()">📅 캘린더</button>
     </div>
@@ -291,15 +291,8 @@
             return str || '-';
         }
 
-        /* 📅 캘린더 모달 함수 */
-        function openCalendarModal() {
-            document.getElementById('calendar-modal').style.display = 'flex';
-            loadCalendarData();
-        }
-
-        function closeCalendarModal() {
-            document.getElementById('calendar-modal').style.display = 'none';
-        }
+        function openCalendarModal() { document.getElementById('calendar-modal').style.display = 'flex'; loadCalendarData(); }
+        function closeCalendarModal() { document.getElementById('calendar-modal').style.display = 'none'; }
 
         async function loadCalendarData() {
             const monthVal = document.getElementById('calendar-month-picker').value;
@@ -359,7 +352,6 @@
             }
         }
 
-        /* 🏢 브랜드 선택 바텀시트 */
         async function openBrandModal(target = 'chart') {
             activeBrandTarget = target;
             document.getElementById('brand-modal').style.display = 'flex';
@@ -421,7 +413,7 @@
             renderStoreCardList(filteredDetailOrders);
         }
 
-        /* 📊 [속도 혁신 2] 사전 집계 뷰 (daily_order_summary) 연동 차트 */
+        /* 🚀 [초고속 모바일] 구체화된 뷰 기반 차트 데이터 */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -495,7 +487,6 @@
             });
         }
 
-        /* 🛒 하루 상세 내역 불러오기 */
         async function fetchDetailData() {
             const targetDate = document.getElementById('detail-target-date').value;
             if (!targetDate) return;
@@ -631,8 +622,6 @@
             document.getElementById('detail-target-date').value = localStorage.getItem('cached_detail_target_date') || formatDate(today);
             document.getElementById('chart-brand-input').value = localStorage.getItem('cached_brand_input') || '';
 
-            document.getElementById('calendar-month-picker').value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2, '0')}`;
-
             const cachedUpdated = localStorage.getItem('cached_last_updated');
             if (cachedUpdated) document.getElementById('last-updated-text').innerText = `최신: ${cachedUpdated}`;
 
@@ -657,7 +646,19 @@
 
                 if (res.ok) {
                     alert(`✅ [${targetVal}] 동기화 요청 완료!`);
-                    setTimeout(() => { btn.disabled = false; btn.innerText = "동기화"; fetchDetailData(); }, 35000);
+                    setTimeout(async () => { 
+                        try {
+                            await fetch(`${SUPABASE_URL}/rest/v1/rpc/refresh_daily_summary`, {
+                                method: 'POST',
+                                headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                            });
+                        } catch(e) {}
+
+                        btn.disabled = false; 
+                        btn.innerText = "동기화"; 
+                        fetchChartData();
+                        fetchDetailData(); 
+                    }, 35000);
                 } else {
                     alert("❌ 동기화 요청 실패"); btn.disabled = false; btn.innerText = "동기화";
                 }
