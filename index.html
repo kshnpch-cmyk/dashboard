@@ -107,7 +107,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag" id="app-version-tag">v2.1.0 Secure DB</span>
+            <span class="version-tag" id="app-version-tag">v2.1.0 Full Data</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag" id="last-updated-text">🕒 동기화: DB 대기 중</div>
@@ -202,13 +202,12 @@
     </div>
 
     <script>
-        // 💡 Supabase 클라이언트 전용 퍼블릭 키 (RLS 설정으로 데이터 수정/삭제 불가)
         const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co"; 
-        const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN"; 
+        const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY"; // Supabase anon key 입력
 
         const githubId = 'kshnpch-cmyk'; 
         const repoName = 'dashboard'; 
-        const token = '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'; 
+        const token = 'YOUR_GITHUB_TOKEN'; // GitHub PAT 입력
 
         let rawOrders = [], filteredOrders = [], baseDetailOrders = [], currentDetailOrders = [];
         let trendChart = null;
@@ -242,7 +241,6 @@
             fetchSheetData();
         }
 
-        // 🚀 Supabase DB 기간 필터링 안전 수신 함수
         async function fetchSheetData() {
             document.getElementById('last-updated-text').innerText = "🕒 동기화: DB 쿼리 중...";
 
@@ -251,6 +249,7 @@
 
             if (!startDate || !endDate) return;
 
+            // limit 수치를 넣지 않고 전체 데이터 수신
             const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=*&order=delivery_date.desc`;
 
             try {
@@ -412,6 +411,7 @@
             renderDetailTable();
         }
 
+        // 💡 24만 건 이상 모든 데이터를 테이블에 풀 출력하는 함수
         function renderDetailTable() {
             const tbody = document.getElementById('order-detail-table');
             tbody.innerHTML = "";
