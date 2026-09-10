@@ -155,7 +155,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v7.1 Fast Calendar</span>
+            <span class="version-tag">v8.0 Hybrid Chunk Engine</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -186,7 +186,7 @@
         </div>
     </div>
 
-    <!-- 🔍 브랜드 선택 다중 체크 모달 -->
+    <!-- 🔍 브랜드 선택 다중 모달 -->
     <div class="modal-overlay" id="brand-modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -343,6 +343,7 @@
         const token = tokenPart1 + tokenPart2;
 
         let rawDetailOrders = [], filteredDetailOrders = [], baseDetailOrders = [], currentDetailOrders = [];
+        let storeSummaryList = [];
         let trendChart = null;
 
         let allBrandList = [], allItemList = [];
@@ -523,7 +524,7 @@
             closeItemModal();
         }
 
-        /* 📅 캘린더 모달 (calendar_date_summary 전용 뷰 연동 0.02초 초고속 조회) */
+        /* 📅 캘린더 모달 */
         function openCalendarModal() { document.getElementById('calendar-modal').style.display = 'flex'; loadCalendarData(); }
         function closeCalendarModal() { document.getElementById('calendar-modal').style.display = 'none'; }
 
@@ -534,7 +535,6 @@
             const startDateStr = formatDate(new Date(year, month - 1, 1));
             const endDateStr = formatDate(new Date(year, month, 0));
 
-            // ⚡ 캘린더 전용 요약 뷰 조회 (수십만 건 스캔 제거)
             const queryUrl = `${SUPABASE_URL}/rest/v1/calendar_date_summary?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date,order_count`;
 
             let dateCountMap = {}, availableDates = [];
@@ -583,7 +583,7 @@
             }
         }
 
-        /* 📊 구체화된 뷰(daily_order_summary) 연동 차트 조회 */
+        /* 📊 추이 차트 수신 */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -674,37 +674,91 @@
             });
         }
 
-        /* 🛒 하루치 상세 내역 */
+        /* 🚀 [전략 1 적용] 점포별 요약 뷰(store_order_summary) 우선 로드 (0.01초 소요) */
         async function fetchDetailData() {
             const targetDate = document.getElementById('detail-target-date').value;
             if (!targetDate) return;
 
             safeSetStorage('cached_detail_target_date', targetDate);
-            let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=eq.${targetDate}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc`;
+
+            // 1단계: 점포 목록 요약 뷰 수신
+            const summaryUrl = `${SUPABASE_URL}/rest/v1/store_order_summary?delivery_date=eq.${targetDate}&select=store_code,store_name,brand_name,order_count,total_qty,total_amount&order=store_name.asc`;
 
             try {
-                const res = await fetchWithRetry(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                const res = await fetchWithRetry(summaryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                 if (res.ok) {
-                    rawDetailOrders = await res.json();
-                    filteredDetailOrders = rawDetailOrders;
-                    document.getElementById('detail-brand-input').value = '';
+                    storeSummaryList = await res.json();
+                    rawDetailOrders = [];
                     updateStoreListAndSummary();
+                    // 2단계: 전체 합산 데이터 분할 수신 자동 트리거
+                    fetchAllOrdersInChunks(targetDate);
                 }
             } catch (err) {}
         }
 
+        /* 🚀 [전략 2 적용] 200건 단위 Chunk 분할 백그라운드 수신 */
+        async function fetchAllOrdersInChunks(targetDate) {
+            let offset = 0;
+            const limit = 200;
+            let hasMore = true;
+            rawDetailOrders = [];
+
+            while (hasMore) {
+                const chunkUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=eq.${targetDate}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc&limit=${limit}&offset=${offset}`;
+                try {
+                    const res = await fetchWithRetry(chunkUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                    if (res.ok) {
+                        const chunk = await res.json();
+                        rawDetailOrders = rawDetailOrders.concat(chunk);
+                        filteredDetailOrders = rawDetailOrders;
+
+                        // 현재 전체점포가 선택되어 있다면 실시간 바인딩
+                        const activeStore = document.querySelector('#store-list .active');
+                        if (activeStore && activeStore.innerText.includes('전체 점포 합산')) {
+                            baseDetailOrders = filteredDetailOrders;
+                            applyColumnFilters();
+                        }
+
+                        if (chunk.length < limit) hasMore = false;
+                        else offset += limit;
+                    } else {
+                        hasMore = false;
+                    }
+                } catch(e) {
+                    hasMore = false;
+                }
+            }
+        }
+
+        /* 개별 점포 선택 시 Drill-down 지연 수신 */
+        async function fetchStoreDetailOrders(storeName) {
+            const targetDate = document.getElementById('detail-target-date').value;
+            const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=eq.${targetDate}&store_name=eq.${encodeURIComponent(storeName)}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name`;
+
+            try {
+                const res = await fetchWithRetry(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                if (res.ok) {
+                    baseDetailOrders = await res.json();
+                    applyColumnFilters();
+                }
+            } catch(e) {}
+        }
+
         function updateStoreListAndSummary() {
-            const stores = [...new Set(filteredDetailOrders.map(r => r.store_name))].filter(Boolean);
+            const stores = [...new Set(storeSummaryList.map(r => r.store_name))].filter(Boolean);
             document.getElementById('brand-store-count').innerText = stores.length;
-            document.getElementById('brand-item-count').innerText = new Set(filteredDetailOrders.map(r => r.item_name)).size;
+            document.getElementById('brand-item-count').innerText = '-';
 
             const storeListEl = document.getElementById('store-list');
+            const totalCount = storeSummaryList.reduce((sum, r) => sum + cleanNumber(r.order_count), 0);
+
             let listItemsHtml = [`<li class="store-item total-item active" onclick="onStoreSelect('ALL', this)">
-                <span>🏢 전체 점포 합산</span><span style="color:#2563eb;">${filteredDetailOrders.length}건</span>
+                <span>🏢 전체 점포 합산</span><span style="color:#2563eb;">${totalCount}건</span>
             </li>`];
 
             stores.forEach(store => {
-                const count = filteredDetailOrders.filter(r => r.store_name === store).length;
+                const sData = storeSummaryList.filter(r => r.store_name === store);
+                const count = sData.reduce((sum, r) => sum + cleanNumber(r.order_count), 0);
                 listItemsHtml.push(`<li class="store-item" onclick="onStoreSelect('${store}', this)">
                     <span>${store}</span><span style="color:#64748b;">${count}건</span>
                 </li>`);
@@ -727,11 +781,11 @@
             if (storeName === 'ALL') {
                 document.getElementById('selected-store-title').innerText = `🛒 전체 점포 합산 상세`;
                 baseDetailOrders = filteredDetailOrders;
+                applyColumnFilters();
             } else {
                 document.getElementById('selected-store-title').innerText = `🛒 [${storeName}] 주문 상세`;
-                baseDetailOrders = filteredDetailOrders.filter(r => r.store_name === storeName);
+                fetchStoreDetailOrders(storeName);
             }
-            applyColumnFilters();
         }
 
         function applyColumnFilters() {
@@ -759,7 +813,7 @@
             const tbody = document.getElementById('order-detail-table');
 
             if (!currentDetailOrders || currentDetailOrders.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#94a3b8;">데이터가 없습니다.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#94a3b8;">데이터를 로딩 중이거나 없습니다.</td></tr>`;
                 document.getElementById('list-total-qty').innerText = "0";
                 document.getElementById('list-total-amount').innerText = "0";
                 return;
@@ -848,6 +902,10 @@
                     setTimeout(async () => { 
                         try {
                             await fetch(`${SUPABASE_URL}/rest/v1/rpc/refresh_daily_summary`, {
+                                method: 'POST',
+                                headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                            });
+                            await fetch(`${SUPABASE_URL}/rest/v1/rpc/refresh_store_summary`, {
                                 method: 'POST',
                                 headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
                             });
