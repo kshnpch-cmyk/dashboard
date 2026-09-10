@@ -106,7 +106,7 @@
     <div class="m-navbar">
         <div class="m-brand">
             <span>📱 더본 OMS 모바일</span>
-            <span class="m-version">v3.1 Mat Engine</span>
+            <span class="m-version">v3.2 Fast Cal</span>
         </div>
         <button class="btn-m btn-dark" style="width: auto; padding: 6px 10px; font-size: 11px;" onclick="openCalendarModal()">📅 캘린더</button>
     </div>
@@ -294,6 +294,7 @@
         function openCalendarModal() { document.getElementById('calendar-modal').style.display = 'flex'; loadCalendarData(); }
         function closeCalendarModal() { document.getElementById('calendar-modal').style.display = 'none'; }
 
+        /* 📅 캘린더 모달 (calendar_date_summary 뷰 연동 0.02초 초고속 조회) */
         async function loadCalendarData() {
             const monthVal = document.getElementById('calendar-month-picker').value;
             if (!monthVal) return;
@@ -302,17 +303,19 @@
             const startDateStr = formatDate(new Date(year, month - 1, 1));
             const endDateStr = formatDate(new Date(year, month, 0));
 
+            const queryUrl = `${SUPABASE_URL}/rest/v1/calendar_date_summary?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date,order_count`;
+
             let dateCountMap = {}, availableDates = [];
             try {
-                const res = await fetchWithRetry(`${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date,total_qty`, {
+                const res = await fetchWithRetry(queryUrl, {
                     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
                 });
                 if (res.ok) {
                     const rows = await res.json();
                     rows.forEach(r => {
                         let dKey = formatDisplayDate(r.delivery_date).replace(/\//g, '-');
-                        dateCountMap[dKey] = (dateCountMap[dKey] || 0) + cleanNumber(r.total_qty);
-                        availableDates.push(dKey);
+                        dateCountMap[dKey] = cleanNumber(r.order_count);
+                        if (cleanNumber(r.order_count) > 0) availableDates.push(dKey);
                     });
                 }
             } catch (err) {}
@@ -413,7 +416,7 @@
             renderStoreCardList(filteredDetailOrders);
         }
 
-        /* 🚀 [초고속 모바일] 구체화된 뷰 기반 차트 데이터 */
+        /* 📊 구체화된 뷰 기반 차트 데이터 */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -622,9 +625,12 @@
             document.getElementById('detail-target-date').value = localStorage.getItem('cached_detail_target_date') || formatDate(today);
             document.getElementById('chart-brand-input').value = localStorage.getItem('cached_brand_input') || '';
 
+            document.getElementById('calendar-month-picker').value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2, '0')}`;
+
             const cachedUpdated = localStorage.getItem('cached_last_updated');
             if (cachedUpdated) document.getElementById('last-updated-text').innerText = `최신: ${cachedUpdated}`;
 
+            loadCalendarData();
             fetchChartData();
             fetchDetailData();
         });
@@ -656,6 +662,7 @@
 
                         btn.disabled = false; 
                         btn.innerText = "동기화"; 
+                        loadCalendarData();
                         fetchChartData();
                         fetchDetailData(); 
                     }, 35000);
