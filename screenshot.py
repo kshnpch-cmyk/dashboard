@@ -24,7 +24,7 @@ openpyxl.styles.cell_style.CellStyle.__init__ = _patched_cell_style_init
 
 warnings.filterwarnings('ignore')
 
-# 💡 GitHub Secrets 환경변수 수신 및 정규식 URL 파싱 (괄호/마크다운 자동 제거)
+# 💡 GitHub Secrets 환경변수 수신 및 정규식 URL 파싱
 raw_url = os.environ.get("SUPABASE_URL", "https://zbilhsgfgyfrolveaego.supabase.co").strip()
 url_match = re.search(r'https?://[^\s\)\>\]\"\']+', raw_url)
 SUPABASE_URL = url_match.group(0) if url_match else "https://zbilhsgfgyfrolveaego.supabase.co"
@@ -66,14 +66,46 @@ driver.execute_script("return null;")
 driver.execute("send_command", params)
 
 
+def delete_existing_period_data(start_date_str, end_date_str, headers):
+    """💡 동기화 대상 기간(start_date ~ end_date)의 기존 DB 데이터를 선-삭제하여 중복 및 취소건을 초기화합니다."""
+    # YYYY/MM/DD -> YYYY-MM-DD 포맷 변환
+    s_date = start_date_str.replace('/', '-')
+    e_date = end_date_str.replace('/', '-')
+
+    print(f"🧹 [선-삭제 실행] DB 기존 배송일자 범위 데이터 삭제 진행 ({s_date} ~ {e_date})...", flush=True)
+
+    # Supabase REST API DELETE (delivery_date 범위 삭제)
+    delete_endpoint = f"{SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.{s_date}&delivery_date=lte.{e_date}"
+    
+    try:
+        del_res = requests.delete(delete_endpoint, headers=headers)
+        if del_res.status_code in [200, 204]:
+            print(f"🗑️ 기존 데이터 삭제 성공 ({s_date} ~ {e_date})", flush=True)
+        else:
+            print(f"⚠️ 기존 데이터 삭제 실패/경고 ({del_res.status_code}): {del_res.text}", flush=True)
+    except Exception as e:
+        print(f"❌ 데이터 삭제 중 오류 발생: {e}", flush=True)
+
+
 def sync_to_supabase(combined_df):
-    """수집된 Dataframe을 Supabase oms_orders 테이블로 업로드"""
+    """수집된 Dataframe을 기존 데이터 삭제 후 Supabase oms_orders 테이블로 깔끔하게 재업로드"""
     if combined_df is None or combined_df.empty:
         print("⚠️ Supabase에 업로드할 데이터가 없습니다.", flush=True)
         return
 
     print(f"🚀 Supabase 클라우드 DB 동기화를 시작합니다... (Target: {SUPABASE_URL})", flush=True)
 
+    headers = {
+        "apikey": SUPABASE_SECRET_KEY,
+        "Authorization": f"Bearer {SUPABASE_SECRET_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal"
+    }
+
+    # 💡 1. 해당 조회 기간의 기존 DB 데이터 완전히 삭제 (중복 및 취소/삭제 건 깔끔 정리)
+    delete_existing_period_data(target_start_date, target_end_date, headers)
+
+    # 💡 2. 데이터 가공 및 파싱
     df_clean = combined_df.fillna('').astype(str)
     records = []
 
@@ -89,7 +121,6 @@ def sync_to_supabase(combined_df):
             s = str(val).split('T')[0].replace('/', '-').strip()
             return s if len(s) >= 8 else None
 
-        # 💡 Supabase DB oms_orders 테이블 스키마 매핑
         record = {
             "order_date": parse_date(row.get("주문일자", "")),
             "delivery_date": parse_date(row.get("배송일자", "")),
@@ -104,13 +135,7 @@ def sync_to_supabase(combined_df):
         }
         records.append(record)
 
-    headers = {
-        "apikey": SUPABASE_SECRET_KEY,
-        "Authorization": f"Bearer {SUPABASE_SECRET_KEY}",
-        "Content-Type": "application/json",
-        "Prefer": "return=minimal"
-    }
-
+    # 💡 3. 새로 수집된 최신 데이터 1000건씩 배치 Insert
     batch_size = 1000
     total_records = len(records)
     endpoint = f"{SUPABASE_URL}/rest/v1/oms_orders"
@@ -120,7 +145,7 @@ def sync_to_supabase(combined_df):
         res = requests.post(endpoint, headers=headers, json=batch)
 
         if res.status_code in [200, 201]:
-            print(f"✅ DB 동기화 완료: {min(i + batch_size, total_records)} / {total_records} 건", flush=True)
+            print(f"✅ DB 동기화(새로 재업로드) 완료: {min(i + batch_size, total_records)} / {total_records} 건", flush=True)
         else:
             print(f"❌ DB 동기화 오류 ({res.status_code}): {res.text}", flush=True)
 
@@ -207,7 +232,7 @@ try:
 
     print(f"📥 수신된 원본 데이터: {len(new_df):,}행", flush=True)
 
-    # 10. Supabase DB로 동기화 전송
+    # 10. Supabase DB로 동기화 전송 (선 삭제 후 재업로드)
     sync_to_supabase(new_df)
 
     # 임시 다운로드 파일 정제
