@@ -155,7 +155,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v5.2 Dual Axis</span>
+            <span class="version-tag">v6.0 Summary View Engine</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -353,7 +353,7 @@
             catch (e) { localStorage.clear(); }
         }
 
-        async function fetchWithRetry(url, options, retries = 3, backoff = 600) {
+        async function fetchWithRetry(url, options, retries = 3, backoff = 500) {
             try {
                 const res = await fetch(url, options);
                 if (!res.ok && res.status >= 500 && retries > 0) throw new Error();
@@ -412,7 +412,7 @@
             if (allBrandList.length === 0) {
                 listEl.innerHTML = '<div style="text-align:center; padding:15px; color:#2563eb;">⚡ 브랜드 목록 로드 중...</div>';
                 try {
-                    const res = await fetchWithRetry(`${SUPABASE_URL}/rest/v1/oms_orders?select=brand_name`, {
+                    const res = await fetchWithRetry(`${SUPABASE_URL}/rest/v1/daily_order_summary?select=brand_name`, {
                         headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
                     });
                     if (res.ok) {
@@ -480,7 +480,7 @@
             const listEl = document.getElementById('item-modal-list');
             if (allItemList.length === 0) {
                 try {
-                    const res = await fetchWithRetry(`${SUPABASE_URL}/rest/v1/oms_orders?select=item_code,item_name`, {
+                    const res = await fetchWithRetry(`${SUPABASE_URL}/rest/v1/daily_order_summary?select=item_code,item_name`, {
                         headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
                     });
                     if (res.ok) {
@@ -536,14 +536,14 @@
 
             let dateCountMap = {}, availableDates = [];
             try {
-                const res = await fetchWithRetry(`${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date`, {
+                const res = await fetchWithRetry(`${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date,total_qty`, {
                     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
                 });
                 if (res.ok) {
                     const rows = await res.json();
                     rows.forEach(r => {
                         let dKey = formatDisplayDate(r.delivery_date).replace(/\//g, '-');
-                        dateCountMap[dKey] = (dateCountMap[dKey] || 0) + 1;
+                        dateCountMap[dKey] = (dateCountMap[dKey] || 0) + cleanNumber(r.total_qty);
                         availableDates.push(dKey);
                     });
                 }
@@ -580,7 +580,7 @@
             }
         }
 
-        /* 📊 추이 그래프 (주문수량=왼쪽, 주문금액=오른쪽 축 분리 적용) */
+        /* 🚀 [속도 혁신 1] 사전 집계 뷰 (daily_order_summary) 연동 차트 조회 */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -594,7 +594,8 @@
             safeSetStorage('cached_brand_input', brandInputValue);
             safeSetStorage('cached_item_input', itemKeyword);
 
-            let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,order_date,qty,total_amount,brand_name,item_name`;
+            // ⚡ DB 집계 뷰에서 요약된 데이터만 즉시 수신 (수만 건 ➔ 수십 건)
+            let queryUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,item_name`;
 
             if (brandInputValue) {
                 const brandList = brandInputValue.split(',').map(b => b.trim()).filter(Boolean);
@@ -623,14 +624,14 @@
             const dailyMap = {};
 
             data.forEach(r => {
-                const q = cleanNumber(r.qty);
+                const q = cleanNumber(r.total_qty);
                 const amt = cleanNumber(r.total_amount);
 
                 totalQty += q;
                 totalAmount += amt;
                 if (r.item_name) uniqueItems.add(r.item_name);
 
-                let dateKey = formatDisplayDate(r.delivery_date) || formatDisplayDate(r.order_date);
+                let dateKey = formatDisplayDate(r.delivery_date);
                 if (!dateKey || dateKey === '-') return;
 
                 if (!dailyMap[dateKey]) dailyMap[dateKey] = { qty: 0, amount: 0 };
@@ -657,20 +658,8 @@
                 data: {
                     labels: labels,
                     datasets: [
-                        { 
-                            label: '주문수량', 
-                            data: qtyData, 
-                            backgroundColor: 'rgba(37, 99, 235, 0.6)', 
-                            yAxisID: 'y1' 
-                        },
-                        { 
-                            label: '주문금액', 
-                            data: amtData, 
-                            type: 'line', 
-                            borderColor: '#8b5cf6', 
-                            borderWidth: 2, 
-                            yAxisID: 'y2' 
-                        }
+                        { label: '주문수량', data: qtyData, backgroundColor: 'rgba(37, 99, 235, 0.6)', yAxisID: 'y1' },
+                        { label: '주문금액', data: amtData, type: 'line', borderColor: '#8b5cf6', borderWidth: 2, yAxisID: 'y2' }
                     ]
                 },
                 options: {
