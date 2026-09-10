@@ -76,7 +76,7 @@
 
         .chart-container { position: relative; height: 260px; width: 100%; }
 
-        /* 📅 캘린더 모달 팝업 스타일 */
+        /* 📅 캘린더 팝업 모달 */
         .modal-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(15, 23, 42, 0.6); z-index: 999; justify-content: center; align-items: center;
@@ -137,12 +137,11 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v3.0 Compact</span>
+            <span class="version-tag">v3.3 Proxy Enabled</span>
         </div>
         <div class="control-panel">
-            <!-- 💡 최신 배송일자 문구 및 캘린더 버튼 통합 -->
             <div class="last-updated-tag">
-                <span id="last-updated-text">🕒 최신 배송일자: 조회 중...</span>
+                <span id="last-updated-text">🕒 최신 배송일자: 계산 중...</span>
                 <button class="btn btn-cal" onclick="openCalendarModal()">📅 캘린더</button>
             </div>
             
@@ -171,7 +170,7 @@
 
     <div class="container">
         
-        <!-- 📊 상단 영역: 기간별 추이 차트 분석 (한 줄 통합 헤더) -->
+        <!-- 📊 상단 영역: 기간별 추이 차트 분석 -->
         <div class="section-panel">
             <div class="panel-header" style="margin-bottom: 0; border-bottom: none;">
                 <span class="panel-title-text" style="white-space: nowrap;">📈 기간별 주문 추이 그래프</span>
@@ -215,7 +214,7 @@
             </div>
         </div>
 
-        <!-- 🛒 하단 영역: 하루 단위 상세 내역 (v2.1.0 기존 구조 고정) -->
+        <!-- 🛒 하단 영역: 하루 단위 상세 내역 -->
         <div class="filter-row" style="background: white; margin-bottom: 20px;">
             <div class="filter-group">
                 <label style="font-size: 15px; color: #0f172a;">📅 상세 조회 일자 (하루):</label>
@@ -284,7 +283,6 @@
 
         const githubId = 'kshnpch-cmyk'; 
         const repoName = 'dashboard'; 
-        const token = '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'; 
 
         let rawDetailOrders = [], filteredDetailOrders = [], baseDetailOrders = [], currentDetailOrders = [];
         let trendChart = null;
@@ -317,28 +315,6 @@
             return str || '-';
         }
 
-        // 💡 최신 배송일자 조회
-        async function fetchLatestDeliveryDate() {
-            const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?select=delivery_date&order=delivery_date.desc&limit=1`;
-            try {
-                const res = await fetch(queryUrl, {
-                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data && data.length > 0 && data[0].delivery_date) {
-                        const lastDate = formatDisplayDate(data[0].delivery_date);
-                        document.getElementById('last-updated-text').innerText = `🕒 최신 배송일자: ${lastDate}`;
-                        return;
-                    }
-                }
-                document.getElementById('last-updated-text').innerText = `🕒 최신 배송일자: 데이터 없음`;
-            } catch (err) {
-                document.getElementById('last-updated-text').innerText = `🕒 최신 배송일자: 조회 실패`;
-            }
-        }
-
-        // 📅 캘린더 모달 제어
         function openCalendarModal() {
             document.getElementById('calendar-modal').style.display = 'flex';
             loadCalendarData();
@@ -365,6 +341,8 @@
             const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date`;
 
             let dateCountMap = {};
+            let availableDates = [];
+
             try {
                 const res = await fetch(queryUrl, {
                     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
@@ -374,10 +352,19 @@
                     rows.forEach(r => {
                         let dKey = formatDisplayDate(r.delivery_date).replace(/\//g, '-');
                         dateCountMap[dKey] = (dateCountMap[dKey] || 0) + 1;
+                        availableDates.push(dKey);
                     });
                 }
             } catch (err) {
                 console.error("캘린더 로드 오류:", err);
+            }
+
+            if (availableDates.length > 0) {
+                availableDates.sort();
+                const latestDate = availableDates[availableDates.length - 1].replace(/-/g, '/');
+                document.getElementById('last-updated-text').innerText = `🕒 최신 배송일자: ${latestDate}`;
+            } else {
+                document.getElementById('last-updated-text').innerText = `🕒 최신 배송일자: 데이터 없음`;
             }
 
             renderCalendarGrid(year, month, dateCountMap);
@@ -424,7 +411,6 @@
             fetchDetailData();
         }
 
-        // 📊 추이 차트 조회
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -503,7 +489,6 @@
             });
         }
 
-        // 🛒 하루 단위 상세 내역 조회
         async function fetchDetailData() {
             const targetDate = document.getElementById('detail-target-date').value;
             if (!targetDate) return alert("상세 내역을 조회할 하루 날짜를 선택하세요.");
@@ -675,44 +660,51 @@
             const mStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2, '0')}`;
             document.getElementById('calendar-month-picker').value = mStr;
 
-            fetchLatestDeliveryDate();
+            loadCalendarData();
             fetchChartData();
             fetchDetailData();
         });
 
+        // 🚀 Cloudflare Functions 백엔드 API(/api/trigger-bot) 호출
         async function triggerBot() {
             const btn = document.getElementById('run-btn');
             const targetDateVal = document.getElementById('sync-target-date').value.replace(/-/g, '/');
 
             if (!targetDateVal) return alert("수동 동기화할 일자를 선택하세요.");
 
-            btn.disabled = true; btn.innerText = "🔄 동기화 중...";
+            btn.disabled = true; 
+            btn.innerText = "🔄 동기화 중...";
 
-            fetch(`https://api.github.com/repos/${githubId}/${repoName}/actions/workflows/capture.yml/dispatches`, {
-                method: 'POST',
-                headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ 
-                    ref: 'main', 
-                    inputs: { 
+            try {
+                const res = await fetch('/api/trigger-bot', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        githubId: githubId,
+                        repoName: repoName,
                         start_date: targetDateVal, 
                         end_date: targetDateVal 
-                    } 
-                })
-            }).then(res => {
+                    })
+                });
+
                 if (res.ok) {
                     alert(`✅ [${targetDateVal}] OMS 데이터 동기화 요청 완료! (약 30~40초 후 완료)`);
                     setTimeout(() => { 
                         btn.disabled = false; 
                         btn.innerText = "🚀 OMS 수동 동기화"; 
-                        fetchLatestDeliveryDate();
+                        loadCalendarData();
                         fetchDetailData(); 
                     }, 35000);
                 } else {
-                    alert("❌ 수동 동기화 요청 실패"); 
+                    alert("❌ 수동 동기화 요청 실패 - Cloudflare Secrets(GITHUB_PAT) 설정을 확인하세요."); 
                     btn.disabled = false; 
                     btn.innerText = "🚀 OMS 수동 동기화";
                 }
-            });
+            } catch (err) {
+                alert("❌ 요청 중 네트워크 오류가 발생했습니다.");
+                btn.disabled = false;
+                btn.innerText = "🚀 OMS 수동 동기화";
+            }
         }
     </script>
 </body>
