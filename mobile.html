@@ -106,7 +106,7 @@
     <div class="m-navbar">
         <div class="m-brand">
             <span>📱 더본 OMS 모바일</span>
-            <span class="m-version">v3.2 Fast Cal</span>
+            <span class="m-version">v4.0 Hybrid Engine</span>
         </div>
         <button class="btn-m btn-dark" style="width: auto; padding: 6px 10px; font-size: 11px;" onclick="openCalendarModal()">📅 캘린더</button>
     </div>
@@ -233,7 +233,7 @@
         const tokenPart2 = "g2jVxPlK8Kh18uwaCu220wnZB";
         const token = tokenPart1 + tokenPart2;
 
-        let rawDetailOrders = [], filteredDetailOrders = [];
+        let rawDetailOrders = [], filteredDetailOrders = [], storeSummaryList = [];
         let trendChart = null, allBrandList = [];
         let activeBrandTarget = 'chart';
 
@@ -294,7 +294,7 @@
         function openCalendarModal() { document.getElementById('calendar-modal').style.display = 'flex'; loadCalendarData(); }
         function closeCalendarModal() { document.getElementById('calendar-modal').style.display = 'none'; }
 
-        /* 📅 캘린더 모달 (calendar_date_summary 뷰 연동 0.02초 초고속 조회) */
+        /* 📅 캘린더 모달 */
         async function loadCalendarData() {
             const monthVal = document.getElementById('calendar-month-picker').value;
             if (!monthVal) return;
@@ -416,7 +416,7 @@
             renderStoreCardList(filteredDetailOrders);
         }
 
-        /* 📊 구체화된 뷰 기반 차트 데이터 */
+        /* 📊 차트 */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -490,28 +490,122 @@
             });
         }
 
+        /* 🚀 [모바일 하이브리드] 점포 요약 뷰 로드 + Chunk 백그라운드 수신 */
         async function fetchDetailData() {
             const targetDate = document.getElementById('detail-target-date').value;
             if (!targetDate) return;
 
             safeSetStorage('cached_detail_target_date', targetDate);
-            let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=eq.${targetDate}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc`;
+
+            // 1단계: 요약 뷰 수신
+            const summaryUrl = `${SUPABASE_URL}/rest/v1/store_order_summary?delivery_date=eq.${targetDate}&select=store_code,store_name,brand_name,order_count,total_qty,total_amount`;
 
             try {
-                const res = await fetchWithRetry(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                const res = await fetchWithRetry(summaryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                 if (res.ok) {
-                    rawDetailOrders = await res.json();
-                    filteredDetailOrders = rawDetailOrders;
-                    document.getElementById('detail-brand-input').value = '';
-                    renderStoreCardList(filteredDetailOrders);
+                    storeSummaryList = await res.json();
+                    renderStoreCardListFromSummary();
+                    // 2단계: 백그라운드 분할 수신
+                    fetchAllOrdersInChunks(targetDate);
                 }
             } catch (e) {}
+        }
+
+        async function fetchAllOrdersInChunks(targetDate) {
+            let offset = 0, limit = 200, hasMore = true;
+            rawDetailOrders = [];
+
+            while (hasMore) {
+                const chunkUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=eq.${targetDate}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc&limit=${limit}&offset=${offset}`;
+                try {
+                    const res = await fetchWithRetry(chunkUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                    if (res.ok) {
+                        const chunk = await res.json();
+                        rawDetailOrders = rawDetailOrders.concat(chunk);
+                        filteredDetailOrders = rawDetailOrders;
+                        
+                        if (chunk.length < limit) hasMore = false;
+                        else offset += limit;
+                    } else { hasMore = false; }
+                } catch(e) { hasMore = false; }
+            }
+        }
+
+        function renderStoreCardListFromSummary() {
+            const container = document.getElementById('store-card-list-container');
+            if (!storeSummaryList || storeSummaryList.length === 0) {
+                container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">데이터가 없습니다.</div>';
+                return;
+            }
+
+            const totalQty = storeSummaryList.reduce((sum, r) => sum + cleanNumber(r.total_qty), 0);
+            const totalAmt = storeSummaryList.reduce((sum, r) => sum + cleanNumber(r.total_amount), 0);
+            const totalOrders = storeSummaryList.reduce((sum, r) => sum + cleanNumber(r.order_count), 0);
+
+            let html = `
+                <div class="store-card">
+                    <div class="store-card-header total-header" onclick="toggleStoreCard('total')">
+                        <span>🏢 전체점포 합산 상세 (${totalOrders}건)</span>
+                        <span class="badge-cnt">${totalQty.toLocaleString()}개 / ${totalAmt.toLocaleString()}원 ▼</span>
+                    </div>
+                    <div class="item-detail-list open" id="store-card-body-total">
+                        <div style="text-align:center; color:#2563eb; padding:10px;">⚡ 상세 품목 데이터를 분할 수신 중입니다...</div>
+                    </div>
+                </div>
+            `;
+
+            storeSummaryList.forEach((s, idx) => {
+                html += `
+                    <div class="store-card">
+                        <div class="store-card-header" onclick="toggleAndLoadStoreCard('${s.store_name}', ${idx})">
+                            <span>🏪 ${s.store_name}</span>
+                            <span class="badge-cnt">${cleanNumber(s.total_qty).toLocaleString()}개 (${s.order_count}건) ▼</span>
+                        </div>
+                        <div class="item-detail-list" id="store-card-body-${idx}">
+                            <div style="text-align:center; color:#64748b; padding:10px;">클릭 시 상세 품목 로드</div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        async function toggleAndLoadStoreCard(storeName, idx) {
+            const body = document.getElementById(`store-card-body-${idx}`);
+            body.classList.toggle('open');
+
+            if (body.classList.contains('open')) {
+                const targetDate = document.getElementById('detail-target-date').value;
+                const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=eq.${targetDate}&store_name=eq.${encodeURIComponent(storeName)}&select=item_code,item_name,qty,price,total_amount,order_date,delivery_date`;
+                try {
+                    const res = await fetchWithRetry(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                    if (res.ok) {
+                        const items = await res.json();
+                        body.innerHTML = items.map(o => `
+                            <div class="item-row">
+                                <div class="item-row-header">
+                                    <span>${o.item_name || '-'}</span>
+                                    <span style="color:#2563eb;">${cleanNumber(o.qty).toLocaleString()}개</span>
+                                </div>
+                                <div class="item-row-sub">
+                                    <span>품목코드: ${cleanCode(o.item_code)}</span>
+                                    <span>${cleanNumber(o.total_amount || (cleanNumber(o.qty)*cleanNumber(o.price))).toLocaleString()}원</span>
+                                </div>
+                                <div class="item-row-sub" style="color: #94a3b8; font-size: 10px;">
+                                    <span>주문: ${formatDisplayDate(o.order_date)} | 배송: ${formatDisplayDate(o.delivery_date)}</span>
+                                </div>
+                            </div>
+                        `).join('');
+                    }
+                } catch(e) {}
+            }
         }
 
         function filterCards() {
             const query = document.getElementById('store-search-input').value.toLowerCase().trim();
             if (!query) {
-                renderStoreCardList(filteredDetailOrders);
+                renderStoreCardListFromSummary();
                 return;
             }
 
@@ -526,10 +620,10 @@
                 return sCode.includes(query) || sName.includes(query) || oDate.includes(query) || dDate.includes(query) || iCode.includes(query) || iName.includes(query);
             });
 
-            renderStoreCardList(searchedOrders);
+            renderStoreCardListFull(searchedOrders);
         }
 
-        function renderStoreCardList(orders) {
+        function renderStoreCardListFull(orders) {
             const container = document.getElementById('store-card-list-container');
             if (!orders || orders.length === 0) {
                 container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">데이터가 없습니다.</div>';
@@ -567,46 +661,6 @@
                 </div>
             `;
 
-            const storeMap = {};
-            orders.forEach(r => {
-                const sName = r.store_name || '기타';
-                if (!storeMap[sName]) storeMap[sName] = [];
-                storeMap[sName].push(r);
-            });
-
-            Object.keys(storeMap).forEach((store, idx) => {
-                const storeOrders = storeMap[store];
-                const sQty = storeOrders.reduce((sum, r) => sum + cleanNumber(r.qty), 0);
-
-                const itemsHtml = storeOrders.map(o => `
-                    <div class="item-row">
-                        <div class="item-row-header">
-                            <span>${o.item_name || '-'}</span>
-                            <span style="color:#2563eb;">${cleanNumber(o.qty).toLocaleString()}개</span>
-                        </div>
-                        <div class="item-row-sub">
-                            <span>품목코드: ${cleanCode(o.item_code)}</span>
-                            <span>${cleanNumber(o.total_amount || (cleanNumber(o.qty)*cleanNumber(o.price))).toLocaleString()}원</span>
-                        </div>
-                        <div class="item-row-sub" style="color: #94a3b8; font-size: 10px;">
-                            <span>주문: ${formatDisplayDate(o.order_date)} | 배송: ${formatDisplayDate(o.delivery_date)}</span>
-                        </div>
-                    </div>
-                `).join('');
-
-                html += `
-                    <div class="store-card">
-                        <div class="store-card-header" onclick="toggleStoreCard(${idx})">
-                            <span>🏪 ${store}</span>
-                            <span class="badge-cnt">${sQty.toLocaleString()}개 (${storeOrders.length}건) ▼</span>
-                        </div>
-                        <div class="item-detail-list" id="store-card-body-${idx}">
-                            ${itemsHtml}
-                        </div>
-                    </div>
-                `;
-            });
-
             container.innerHTML = html;
         }
 
@@ -630,7 +684,6 @@
             const cachedUpdated = localStorage.getItem('cached_last_updated');
             if (cachedUpdated) document.getElementById('last-updated-text').innerText = `최신: ${cachedUpdated}`;
 
-            loadCalendarData();
             fetchChartData();
             fetchDetailData();
         });
@@ -655,6 +708,10 @@
                     setTimeout(async () => { 
                         try {
                             await fetch(`${SUPABASE_URL}/rest/v1/rpc/refresh_daily_summary`, {
+                                method: 'POST',
+                                headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                            });
+                            await fetch(`${SUPABASE_URL}/rest/v1/rpc/refresh_store_summary`, {
                                 method: 'POST',
                                 headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
                             });
