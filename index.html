@@ -155,7 +155,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v5.1 Chart Fixed</span>
+            <span class="version-tag">v5.2 Dual Axis</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -580,7 +580,7 @@
             }
         }
 
-        /* 📊 추이 그래프 데이터 안전 조회 및 즉시 예외 렌더링 */
+        /* 📊 추이 그래프 (주문수량=왼쪽, 주문금액=오른쪽 축 분리 적용) */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -630,7 +630,6 @@
                 totalAmount += amt;
                 if (r.item_name) uniqueItems.add(r.item_name);
 
-                // 💡 배송일자 없으면 주문일자로 대체 매핑
                 let dateKey = formatDisplayDate(r.delivery_date) || formatDisplayDate(r.order_date);
                 if (!dateKey || dateKey === '-') return;
 
@@ -658,8 +657,20 @@
                 data: {
                     labels: labels,
                     datasets: [
-                        { label: '주문수량', data: qtyData, backgroundColor: 'rgba(37, 99, 235, 0.6)', yAxisID: 'y1' },
-                        { label: '주문금액', data: amtData, type: 'line', borderColor: '#8b5cf6', borderWidth: 2, yAxisID: 'y2' }
+                        { 
+                            label: '주문수량', 
+                            data: qtyData, 
+                            backgroundColor: 'rgba(37, 99, 235, 0.6)', 
+                            yAxisID: 'y1' 
+                        },
+                        { 
+                            label: '주문금액', 
+                            data: amtData, 
+                            type: 'line', 
+                            borderColor: '#8b5cf6', 
+                            borderWidth: 2, 
+                            yAxisID: 'y2' 
+                        }
                     ]
                 },
                 options: {
