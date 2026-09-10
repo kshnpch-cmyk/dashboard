@@ -77,16 +77,30 @@
         .item-row-header { display: flex; justify-content: space-between; font-weight: 700; color: #0f172a; }
         .item-row-sub { display: flex; justify-content: space-between; color: #64748b; font-size: 11px; }
 
+        /* 바텀시트 모달 스타일 */
         .bottom-sheet-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(15, 23, 42, 0.6); z-index: 999; justify-content: flex-end; flex-direction: column;
         }
         .bottom-sheet-content {
             background: white; border-top-left-radius: 16px; border-top-right-radius: 16px;
-            padding: 20px; max-height: 80vh; display: flex; flex-direction: column; animation: slideUp 0.2s ease-out;
+            padding: 20px; max-height: 85vh; display: flex; flex-direction: column; animation: slideUp 0.2s ease-out;
         }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         .sheet-scroll { flex: 1; overflow-y: auto; margin-top: 10px; }
+
+        /* 📅 캘린더 그리드 스타일 */
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 10px; }
+        .calendar-header-day { text-align: center; font-weight: bold; font-size: 11px; color: #64748b; padding: 4px 0; background: #f8fafc; }
+        .calendar-day-cell {
+            background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; height: 46px; padding: 3px;
+            display: flex; flex-direction: column; justify-content: space-between; cursor: pointer;
+        }
+        .calendar-day-cell:active { background-color: #eff6ff; }
+        .day-number { font-size: 10px; font-weight: bold; }
+        .data-status-badge { font-size: 8.5px; font-weight: bold; padding: 1px 2px; border-radius: 3px; text-align: center; }
+        .badge-has-data { background-color: #d1fae5; color: #047857; }
+        .badge-no-data { background-color: #f1f5f9; color: #94a3b8; }
     </style>
 </head>
 <body>
@@ -94,7 +108,7 @@
     <div class="m-navbar">
         <div class="m-brand">
             <span>📱 더본 OMS 모바일</span>
-            <span class="m-version">v2.2</span>
+            <span class="m-version">v2.3</span>
         </div>
         <button class="btn-m btn-dark" style="width: auto; padding: 6px 10px; font-size: 11px;" onclick="openCalendarModal()">📅 캘린더</button>
     </div>
@@ -174,6 +188,23 @@
 
         <div id="store-card-list-container"></div>
 
+    </div>
+
+    <!-- 📅 캘린더 바텀시트 모달 (추가) -->
+    <div class="bottom-sheet-overlay" id="calendar-modal">
+        <div class="bottom-sheet-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 16px;">
+                <span>📅 배송일자 데이터 존재 현황</span>
+                <span style="cursor: pointer; padding: 4px;" onclick="closeCalendarModal()">✕</span>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 10px; align-items: center;">
+                <label style="font-size: 12px; font-weight: bold;">월 선택:</label>
+                <input type="month" id="calendar-month-picker" class="m-input" style="flex:1;" onchange="loadCalendarData()">
+            </div>
+            <div class="sheet-scroll">
+                <div class="calendar-grid" id="calendar-grid"></div>
+            </div>
+        </div>
     </div>
 
     <!-- 🔍 브랜드 다중 선택 모달 -->
@@ -262,6 +293,75 @@
             return str || '-';
         }
 
+        /* 📅 캘린더 모달 함수 */
+        function openCalendarModal() {
+            document.getElementById('calendar-modal').style.display = 'flex';
+            loadCalendarData();
+        }
+
+        function closeCalendarModal() {
+            document.getElementById('calendar-modal').style.display = 'none';
+        }
+
+        async function loadCalendarData() {
+            const monthVal = document.getElementById('calendar-month-picker').value;
+            if (!monthVal) return;
+
+            const [year, month] = monthVal.split('-').map(Number);
+            const startDateStr = formatDate(new Date(year, month - 1, 1));
+            const endDateStr = formatDate(new Date(year, month, 0));
+
+            let dateCountMap = {}, availableDates = [];
+            try {
+                const res = await fetchWithRetry(`${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date`, {
+                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                });
+                if (res.ok) {
+                    const rows = await res.json();
+                    rows.forEach(r => {
+                        let dKey = formatDisplayDate(r.delivery_date).replace(/\//g, '-');
+                        dateCountMap[dKey] = (dateCountMap[dKey] || 0) + 1;
+                        availableDates.push(dKey);
+                    });
+                }
+            } catch (err) {}
+
+            if (availableDates.length > 0) {
+                availableDates.sort();
+                const latestDate = availableDates[availableDates.length - 1].replace(/-/g, '/');
+                document.getElementById('last-updated-text').innerText = `최신: ${latestDate}`;
+                safeSetStorage('cached_last_updated', latestDate);
+            }
+            renderCalendarGrid(year, month, dateCountMap);
+        }
+
+        function renderCalendarGrid(year, month, dateCountMap) {
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = "";
+            ['일', '월', '화', '수', '목', '금', '토'].forEach(d => grid.innerHTML += `<div class="calendar-header-day">${d}</div>`);
+
+            const firstDayIndex = new Date(year, month - 1, 1).getDay();
+            const totalDays = new Date(year, month, 0).getDate();
+
+            for (let i = 0; i < firstDayIndex; i++) grid.innerHTML += `<div class="calendar-day-cell" style="background:#f8fafc; opacity:0.3;"></div>`;
+
+            for (let day = 1; day <= totalDays; day++) {
+                const dString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const count = dateCountMap[dString] || 0;
+                const badgeHtml = count > 0 ? `<span class="data-status-badge badge-has-data">🟢있음</span>` : `<span class="data-status-badge badge-no-data">⚪없음</span>`;
+                const cell = document.createElement('div');
+                cell.className = 'calendar-day-cell';
+                cell.onclick = () => {
+                    document.getElementById('detail-target-date').value = dString;
+                    closeCalendarModal();
+                    fetchDetailData();
+                };
+                cell.innerHTML = `<span class="day-number">${day}</span>${badgeHtml}`;
+                grid.appendChild(cell);
+            }
+        }
+
+        /* 🏢 브랜드 선택 바텀시트 */
         async function openBrandModal(target = 'chart') {
             activeBrandTarget = target;
             document.getElementById('brand-modal').style.display = 'flex';
@@ -323,6 +423,7 @@
             renderStoreCardList(filteredDetailOrders);
         }
 
+        /* 📊 차트 */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -396,6 +497,7 @@
             });
         }
 
+        /* 🛒 하루 상세 내역 불러오기 */
         async function fetchDetailData() {
             const targetDate = document.getElementById('detail-target-date').value;
             if (!targetDate) return;
@@ -530,6 +632,8 @@
             document.getElementById('sync-target-date').value = formatDate(today);
             document.getElementById('detail-target-date').value = localStorage.getItem('cached_detail_target_date') || formatDate(today);
             document.getElementById('chart-brand-input').value = localStorage.getItem('cached_brand_input') || '';
+
+            document.getElementById('calendar-month-picker').value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2, '0')}`;
 
             const cachedUpdated = localStorage.getItem('cached_last_updated');
             if (cachedUpdated) document.getElementById('last-updated-text').innerText = `최신: ${cachedUpdated}`;
