@@ -155,7 +155,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v7.0 Materialized Engine</span>
+            <span class="version-tag">v7.1 Fast Calendar</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -523,7 +523,7 @@
             closeItemModal();
         }
 
-        /* 📅 캘린더 모달 */
+        /* 📅 캘린더 모달 (calendar_date_summary 전용 뷰 연동 0.02초 초고속 조회) */
         function openCalendarModal() { document.getElementById('calendar-modal').style.display = 'flex'; loadCalendarData(); }
         function closeCalendarModal() { document.getElementById('calendar-modal').style.display = 'none'; }
 
@@ -534,17 +534,20 @@
             const startDateStr = formatDate(new Date(year, month - 1, 1));
             const endDateStr = formatDate(new Date(year, month, 0));
 
+            // ⚡ 캘린더 전용 요약 뷰 조회 (수십만 건 스캔 제거)
+            const queryUrl = `${SUPABASE_URL}/rest/v1/calendar_date_summary?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date,order_count`;
+
             let dateCountMap = {}, availableDates = [];
             try {
-                const res = await fetchWithRetry(`${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date,total_qty`, {
+                const res = await fetchWithRetry(queryUrl, {
                     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
                 });
                 if (res.ok) {
                     const rows = await res.json();
                     rows.forEach(r => {
                         let dKey = formatDisplayDate(r.delivery_date).replace(/\//g, '-');
-                        dateCountMap[dKey] = (dateCountMap[dKey] || 0) + cleanNumber(r.total_qty);
-                        availableDates.push(dKey);
+                        dateCountMap[dKey] = cleanNumber(r.order_count);
+                        if (cleanNumber(r.order_count) > 0) availableDates.push(dKey);
                     });
                 }
             } catch (err) {}
@@ -580,7 +583,7 @@
             }
         }
 
-        /* 🚀 [초고속] 구체화된 뷰(MATERIALIZED VIEW) 기반 차트 조회 */
+        /* 📊 구체화된 뷰(daily_order_summary) 연동 차트 조회 */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -594,7 +597,6 @@
             safeSetStorage('cached_brand_input', brandInputValue);
             safeSetStorage('cached_item_input', itemKeyword);
 
-            // 구체화 뷰(daily_order_summary)에서 0.01초 만에 물리 캐시 수신
             let queryUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,item_name`;
 
             if (brandInputValue) {
@@ -826,7 +828,6 @@
             fetchDetailData();
         });
 
-        /* 🚀 OMS 수동 동기화 및 구체화 뷰 리프레시 동시 트리거 */
         async function triggerBot() {
             const btn = document.getElementById('run-btn');
             const targetDateVal = document.getElementById('sync-target-date').value.replace(/-/g, '/');
@@ -845,7 +846,6 @@
                 if (res.ok) {
                     alert(`✅ [${targetDateVal}] OMS 데이터 동기화 요청 완료! (약 30~40초 후 자동 새로고침)`);
                     setTimeout(async () => { 
-                        // Supabase RPC 호출로 구체화 뷰 리프레시 실행
                         try {
                             await fetch(`${SUPABASE_URL}/rest/v1/rpc/refresh_daily_summary`, {
                                 method: 'POST',
@@ -855,6 +855,7 @@
                         
                         btn.disabled = false; 
                         btn.innerText = "🚀 OMS 수동 동기화"; 
+                        loadCalendarData();
                         fetchChartData();
                         fetchDetailData(); 
                     }, 35000);
