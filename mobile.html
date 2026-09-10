@@ -2,333 +2,198 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>더본 OMS 주문 실시간 대시보드</title>
-    <!-- 📱 모바일 접속 시 mobile.html 자동 리다이렉트 -->
-    <script>
-        if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-            location.replace('/mobile.html');
-        }
-    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>더본 OMS 모바일 대시보드</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body {
             margin: 0; padding: 0;
-            font-family: 'Pretendard', 'Malgun Gothic', sans-serif;
-            background-color: #f1f5f9;
-            color: #1e293b;
+            font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', 'Malgun Gothic', sans-serif;
+            background-color: #f8fafc; color: #0f172a; padding-bottom: 30px;
         }
-        .navbar {
-            background-color: #0f172a; color: white; padding: 15px 30px;
-            display: flex; justify-content: space-between; align-items: center;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex-wrap: wrap; gap: 15px;
-        }
-        .brand-title { display: flex; align-items: center; gap: 10px; }
-        .brand-title h1 { margin: 0; font-size: 20px; font-weight: 700; }
-        .version-tag {
-            background-color: #10b981; color: white; font-size: 11px; font-weight: 800;
-            padding: 3px 8px; border-radius: 12px; letter-spacing: 0.5px;
-        }
-        .control-panel { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-        .sync-date-group {
-            display: flex; align-items: center; background-color: #1e293b;
-            padding: 6px 12px; border-radius: 8px; gap: 8px; border: 1px solid #334155;
-        }
-        .sync-date-group label { font-size: 13px; color: #94a3b8; font-weight: 600; }
-        .date-input {
-            background-color: #0f172a; color: #ffffff; border: 1px solid #475569;
-            padding: 6px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; color-scheme: dark;
-        }
-        .last-updated-tag {
-            font-size: 12px; color: #38bdf8; background-color: #1e293b;
-            padding: 6px 12px; border-radius: 6px; border: 1px solid #0284c7; font-weight: bold;
-            display: flex; align-items: center; gap: 8px;
-        }
-        .btn {
-            background-color: #2563eb; color: white; border: none; padding: 8px 14px;
-            border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px;
-        }
-        .btn:hover { background-color: #1d4ed8; }
-        .btn-query { background-color: #0284c7; }
-        .btn-cal { background-color: #0f766e; padding: 4px 8px; font-size: 11px; border-radius: 4px; }
-        .btn-excel { background-color: #16a34a; padding: 5px 10px; font-size: 12px; }
-        .btn-search-icon {
-            background-color: #475569; color: white; border: none; padding: 6px 9px;
-            border-radius: 6px; cursor: pointer; font-size: 12px; margin-left: -2px;
-        }
-        .btn-search-icon:hover { background-color: #334155; }
 
-        .container { padding: 20px; max-width: 98%; margin: 0 auto; }
-        .section-panel {
-            background: white; padding: 20px; border-radius: 12px;
-            margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-        }
-        .panel-header {
+        .m-navbar {
+            background-color: #0f172a; color: white; padding: 12px 16px;
             display: flex; justify-content: space-between; align-items: center;
-            border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;
+            position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
-        .panel-title-text { font-size: 18px; font-weight: 700; color: #0f172a; }
+        .m-brand { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 6px; }
+        .m-version { background-color: #10b981; color: white; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 8px; }
+
+        .container { padding: 12px; }
+
+        .m-card {
+            background: white; border-radius: 12px; padding: 14px; margin-bottom: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;
+        }
+        .m-card-title { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+
+        .input-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+        .input-group label { font-size: 12px; font-weight: 700; color: #64748b; }
+        .m-input {
+            width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px;
+            font-size: 14px; outline: none; background-color: #fff; appearance: none;
+        }
+
+        .btn-m {
+            width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 14px;
+            font-weight: 700; color: white; cursor: pointer; text-align: center;
+        }
+        .btn-blue { background-color: #2563eb; }
+        .btn-dark { background-color: #334155; }
+
+        .kpi-scroll-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+        .kpi-mini-card {
+            background: #fff; padding: 12px 16px; border-radius: 10px; border-left: 4px solid #2563eb;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .kpi-mini-card.green { border-left-color: #10b981; }
+        .kpi-mini-card.purple { border-left-color: #8b5cf6; }
+        .kpi-mini-title { font-size: 12px; font-weight: 600; color: #64748b; }
+        .kpi-mini-val { font-size: 17px; font-weight: 800; color: #0f172a; }
+
+        .chart-wrapper { position: relative; height: 210px; width: 100%; }
+
+        /* 🛒 카드리스트 스타일 */
+        .store-card {
+            background: white; border-radius: 10px; border: 1px solid #e2e8f0;
+            margin-bottom: 8px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        }
+        .store-card-header {
+            padding: 12px 14px; background: #fff; display: flex; justify-content: space-between;
+            align-items: center; font-size: 14px; font-weight: 700; cursor: pointer;
+        }
+        .store-card-header.total-header { background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+        .badge-cnt { background-color: #eff6ff; color: #2563eb; font-size: 11px; padding: 3px 8px; border-radius: 12px; font-weight: 800; }
         
-        .filter-row {
-            display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-            background-color: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 15px;
+        .item-detail-list { display: none; background: #f8fafc; padding: 10px; }
+        .item-detail-list.open { display: block; }
+        .item-row {
+            background: white; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0;
+            margin-bottom: 6px; font-size: 12px; display: flex; flex-direction: column; gap: 4px;
         }
-        .filter-group { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #475569; }
-        .input-box { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none; }
+        .item-row-header { display: flex; justify-content: space-between; font-weight: 700; color: #0f172a; }
+        .item-row-sub { display: flex; justify-content: space-between; color: #64748b; font-size: 11px; }
 
-        .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 15px; }
-        .kpi-card { background: #f8fafc; padding: 15px 20px; border-radius: 8px; border-left: 5px solid #2563eb; }
-        .kpi-card.green { border-left-color: #10b981; }
-        .kpi-card.purple { border-left-color: #8b5cf6; }
-        .kpi-title { font-size: 13px; color: #64748b; font-weight: 600; }
-        .kpi-value { font-size: 22px; font-weight: 800; margin-top: 4px; color: #0f172a; }
-
-        .chart-container { position: relative; height: 260px; width: 100%; }
-
-        .modal-overlay {
+        .bottom-sheet-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(15, 23, 42, 0.6); z-index: 999; justify-content: center; align-items: center;
+            background: rgba(15, 23, 42, 0.6); z-index: 999; justify-content: flex-end; flex-direction: column;
         }
-        .modal-content {
-            background: white; padding: 20px; border-radius: 12px; width: 520px; max-width: 90%;
-            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
-            max-height: 85vh; display: flex; flex-direction: column;
+        .bottom-sheet-content {
+            background: white; border-top-left-radius: 16px; border-top-right-radius: 16px;
+            padding: 20px; max-height: 80vh; display: flex; flex-direction: column; animation: slideUp 0.2s ease-out;
         }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .modal-title { font-size: 16px; font-weight: 700; }
-        .close-btn { cursor: pointer; font-size: 18px; font-weight: bold; color: #64748b; }
-
-        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 10px; }
-        .calendar-header-day { text-align: center; font-weight: bold; font-size: 11px; color: #64748b; padding: 4px 0; background: #f8fafc; }
-        .calendar-day-cell {
-            background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; height: 48px; padding: 4px;
-            display: flex; flex-direction: column; justify-content: space-between; cursor: pointer;
-        }
-        .calendar-day-cell:hover { border-color: #2563eb; background-color: #eff6ff; }
-        .calendar-day-cell.other-month { background-color: #f8fafc; opacity: 0.3; cursor: default; }
-        .day-number { font-size: 11px; font-weight: bold; }
-        .data-status-badge { font-size: 9.5px; font-weight: bold; padding: 1px 3px; border-radius: 3px; text-align: center; }
-        .badge-has-data { background-color: #d1fae5; color: #047857; }
-        .badge-no-data { background-color: #f1f5f9; color: #94a3b8; }
-
-        .modal-body-scroll { flex: 1; overflow-y: auto; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; }
-        .search-list-item {
-            display: flex; align-items: center; justify-content: space-between; padding: 8px 10px;
-            border-bottom: 1px solid #f1f5f9; font-size: 13px; cursor: pointer;
-        }
-        .search-list-item:hover { background-color: #eff6ff; }
-        .search-list-item label { cursor: pointer; width: 100%; display: flex; align-items: center; gap: 8px; }
-
-        .dashboard-layout { display: grid; grid-template-columns: 300px 1fr; gap: 20px; }
-        .panel { background: white; padding: 20px; border-radius: 12px; }
-        .panel-title {
-            font-size: 18px; font-weight: 700; margin-bottom: 15px; border-bottom: 2px solid #f1f5f9;
-            padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
-        }
-
-        .summary-badge-group { display: flex; align-items: center; gap: 10px; font-size: 13px; }
-        .summary-badge { background-color: #f1f5f9; padding: 4px 10px; border-radius: 6px; border: 1px solid #cbd5e1; color: #475569; }
-        .summary-badge b { color: #2563eb; }
-
-        .select-box, .search-input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 14px; margin-bottom: 12px; }
-        .store-list { list-style: none; padding: 0; margin: 0; max-height: 500px; overflow-y: auto; }
-        .store-item {
-            padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 6px;
-            cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 13.5px;
-        }
-        .store-item:hover, .store-item.active { background-color: #eff6ff; border-color: #2563eb; font-weight: bold; }
-        .store-item.total-item { background-color: #f8fafc; font-weight: 700; }
-
-        .table-container { width: 100%; overflow-x: auto; max-height: 550px; overflow-y: auto; }
-        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #e2e8f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-        th { background-color: #f8fafc; color: #475569; cursor: pointer; position: sticky; top: 0; z-index: 2; }
-        .table-filter-input { width: 100%; padding: 4px 6px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 4px; }
-        .text-right { text-align: right; }
-        .code-tag { font-size: 11px; color: #64748b; font-family: monospace; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .sheet-scroll { flex: 1; overflow-y: auto; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-    <div class="navbar">
-        <div class="brand-title">
-            <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v5.1 Chart Fixed</span>
+    <div class="m-navbar">
+        <div class="m-brand">
+            <span>📱 더본 OMS 모바일</span>
+            <span class="m-version">v2.1</span>
         </div>
-        <div class="control-panel">
-            <div class="last-updated-tag">
-                <span id="last-updated-text">🕒 최신 배송일자: 계산 중...</span>
-                <button class="btn btn-cal" onclick="openCalendarModal()">📅 캘린더</button>
-            </div>
-            
-            <div class="sync-date-group">
-                <label>동기화 일자:</label>
-                <input type="date" id="sync-target-date" class="date-input">
-            </div>
-            <button id="run-btn" class="btn" onclick="triggerBot()">🚀 OMS 수동 동기화</button>
-        </div>
-    </div>
-
-    <!-- 📅 캘린더 모달 -->
-    <div class="modal-overlay" id="calendar-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span class="modal-title">📅 배송일자 데이터 존재 현황</span>
-                <span class="close-btn" onclick="closeCalendarModal()">✕</span>
-            </div>
-            <div style="display: flex; gap: 8px; margin-bottom: 10px; align-items: center;">
-                <label style="font-size: 12px; font-weight: bold;">월 선택:</label>
-                <input type="month" id="calendar-month-picker" class="input-box" onchange="loadCalendarData()">
-            </div>
-            <div class="calendar-grid" id="calendar-grid"></div>
-        </div>
-    </div>
-
-    <!-- 🔍 브랜드 선택 다중 체크 모달 -->
-    <div class="modal-overlay" id="brand-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span class="modal-title">🏢 브랜드 다중 선택</span>
-                <span class="close-btn" onclick="closeBrandModal()">✕</span>
-            </div>
-            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-                <input type="text" id="modal-brand-search" class="input-box" style="flex:1;" placeholder="브랜드명 검색..." onkeyup="filterBrandModalList()">
-                <button class="btn btn-cal" style="background:#475569;" onclick="toggleAllBrandCheck(true)">전체선택</button>
-                <button class="btn btn-cal" style="background:#64748b;" onclick="toggleAllBrandCheck(false)">해제</button>
-            </div>
-            <div class="modal-body-scroll" id="brand-modal-list"></div>
-            <div style="margin-top: 15px; text-align: right;">
-                <button class="btn" onclick="applyBrandSelection()">확인 적용</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 🔍 품목 검색 모달 -->
-    <div class="modal-overlay" id="item-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span class="modal-title">📦 품목 검색 및 선택</span>
-                <span class="close-btn" onclick="closeItemModal()">✕</span>
-            </div>
-            <div style="margin-bottom: 8px;">
-                <input type="text" id="modal-item-search" class="input-box" style="width:100%;" placeholder="품목코드 또는 품목명 검색..." onkeyup="filterItemModalList()">
-            </div>
-            <div class="modal-body-scroll" id="item-modal-list"></div>
-        </div>
+        <button class="btn-m btn-dark" style="width: auto; padding: 6px 10px; font-size: 11px;" onclick="openCalendarModal()">📅 캘린더</button>
     </div>
 
     <div class="container">
         
-        <!-- 📊 상단 영역: 기간별 추이 차트 -->
-        <div class="section-panel">
-            <div class="panel-header" style="margin-bottom: 0; border-bottom: none;">
-                <span class="panel-title-text" style="white-space: nowrap;">📈 기간별 주문 추이 그래프</span>
-                
-                <div class="filter-row" style="margin-bottom: 0; padding: 0; background: transparent; border: none;">
-                    <div class="filter-group">
-                        <label>조회 기간:</label>
-                        <input type="date" id="chart-start-date" class="input-box">
-                        <span>~</span>
-                        <input type="date" id="chart-end-date" class="input-box">
-                    </div>
-                    <div class="filter-group">
-                        <label>브랜드:</label>
-                        <input type="text" id="chart-brand-input" class="input-box" placeholder="브랜드 선택/검색" style="width: 140px;" readonly onclick="openBrandModal('chart')">
-                        <button class="btn-search-icon" onclick="openBrandModal('chart')" title="브랜드 다중 선택">🔍</button>
-                    </div>
-                    <div class="filter-group">
-                        <label>품목코드/명:</label>
-                        <input type="text" id="chart-item-input" class="input-box" placeholder="품목코드 또는 품목명" style="width: 150px;">
-                        <button class="btn-search-icon" onclick="openItemModal()" title="품목 검색 선택">🔍</button>
-                    </div>
-                    <button class="btn btn-query" onclick="fetchChartData()">🔍 추이 조회</button>
+        <!-- 🚀 OMS 동기화 -->
+        <div class="m-card">
+            <div class="m-card-title">
+                <span>🚀 OMS 수동 동기화</span>
+                <span id="last-updated-text" style="font-size: 11px; color: #0284c7; font-weight: 600;">최신: 계산 중...</span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <input type="date" id="sync-target-date" class="m-input" style="flex:1;">
+                <button id="run-btn" class="btn-m btn-blue" style="width: 110px;" onclick="triggerBot()">동기화</button>
+            </div>
+        </div>
+
+        <!-- 📊 추이 차트 -->
+        <div class="m-card">
+            <div class="m-card-title">📈 기간별 주문 추이</div>
+            
+            <div class="input-group">
+                <label>조회 기간</label>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                    <input type="date" id="chart-start-date" class="m-input">
+                    <span>~</span>
+                    <input type="date" id="chart-end-date" class="m-input">
                 </div>
             </div>
 
-            <div class="kpi-grid" style="margin-top: 15px;">
-                <div class="kpi-card">
-                    <div class="kpi-title">기간 내 총 주문수량</div>
-                    <div class="kpi-value" id="kpi-total-qty">0 건</div>
+            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                <input type="text" id="chart-brand-input" class="m-input" placeholder="브랜드 선택 (다중)" readonly onclick="openBrandModal('chart')">
+                <button class="btn-m btn-dark" style="width: 70px;" onclick="openBrandModal('chart')">🔍</button>
+            </div>
+
+            <button class="btn-m btn-blue" style="margin-bottom: 14px;" onclick="fetchChartData()">🔍 추이 조회</button>
+
+            <div class="kpi-scroll-container">
+                <div class="kpi-mini-card">
+                    <span class="kpi-mini-title">총 주문수량</span>
+                    <span class="kpi-mini-val" id="kpi-total-qty">0 건</span>
                 </div>
-                <div class="kpi-card green">
-                    <div class="kpi-title">기간 내 취급 품목수</div>
-                    <div class="kpi-value" id="kpi-total-items">0 종</div>
+                <div class="kpi-mini-card green">
+                    <span class="kpi-mini-title">취급 품목수</span>
+                    <span class="kpi-mini-val" id="kpi-total-items">0 종</span>
                 </div>
-                <div class="kpi-card purple">
-                    <div class="kpi-title">기간 내 총 주문금액</div>
-                    <div class="kpi-value" id="kpi-total-amount">0 원</div>
+                <div class="kpi-mini-card purple">
+                    <span class="kpi-mini-title">총 주문금액</span>
+                    <span class="kpi-mini-val" id="kpi-total-amount">0 원</span>
                 </div>
             </div>
 
-            <div class="chart-container">
+            <div class="chart-wrapper">
                 <canvas id="dailyTrendChart"></canvas>
             </div>
         </div>
 
-        <!-- 🛒 하단 영역: 하루 단위 상세 내역 -->
-        <div class="filter-row" style="background: white; margin-bottom: 20px;">
-            <div class="filter-group">
-                <label style="font-size: 15px; color: #0f172a;">📅 상세 조회 일자 (하루):</label>
-                <input type="date" id="detail-target-date" class="input-box" style="font-weight: bold;">
+        <!-- 🛒 하루 상세 내역 -->
+        <div class="m-card">
+            <div class="m-card-title">🛒 하루 상세 내역</div>
+            <div class="input-group">
+                <label>조회 일자 (하루)</label>
+                <div style="display: flex; gap: 6px;">
+                    <input type="date" id="detail-target-date" class="m-input" style="flex:1;">
+                    <button class="btn-m btn-blue" style="width: 80px;" onclick="fetchDetailData()">불러오기</button>
+                </div>
             </div>
-            <button class="btn btn-query" onclick="fetchDetailData()">⚡ 상세 데이터 불러오기</button>
+
+            <div style="display: flex; gap: 8px; margin-top: 10px;">
+                <input type="text" id="detail-brand-input" class="m-input" placeholder="브랜드 필터 선택..." readonly onclick="openBrandModal('detail')">
+                <button class="btn-m btn-dark" style="width: 70px;" onclick="openBrandModal('detail')">🔍</button>
+            </div>
+            
+            <!-- 통합 다중 검색 입력창 -->
+            <input type="text" id="store-search-input" class="m-input" style="margin-top: 8px;" placeholder="🔍 점포코드, 점포명, 품목코드, 품목명, 날짜 검색..." onkeyup="debouncedFilterCards()">
         </div>
 
-        <div class="dashboard-layout">
-            <div class="panel">
-                <div class="panel-title"><span>🏢 브랜드 필터</span></div>
-                <div style="display: flex; gap: 4px; margin-bottom: 12px;">
-                    <input type="text" id="detail-brand-input" class="input-box" style="flex:1;" placeholder="브랜드 선택..." readonly onclick="openBrandModal('detail')">
-                    <button class="btn-search-icon" onclick="openBrandModal('detail')">🔍</button>
-                </div>
-                <input type="text" id="store-search-input" class="search-input" placeholder="🔍 점포명 검색..." onkeyup="debouncedFilterStoreList()">
-                <div id="brand-summary" style="margin-bottom: 10px; font-size: 12px; color: #64748b;">
-                    점포수: <b id="brand-store-count">0</b>개 | 품목수: <b id="brand-item-count">0</b>종
-                </div>
-                <ul class="store-list" id="store-list"></ul>
-            </div>
+        <!-- 카드리스트 컨테이너 (전체합산 상세가 기본 표시) -->
+        <div id="store-card-list-container"></div>
 
-            <div class="panel">
-                <div class="panel-title">
-                    <span id="selected-store-title">🛒 점포별 주문 상세</span>
-                    <div class="summary-badge-group">
-                        <button class="btn btn-excel" onclick="exportToExcel()">📥 엑셀 저장</button>
-                        <span class="summary-badge">수량합계: <b id="list-total-qty">0</b>개</span>
-                        <span class="summary-badge">금액합계: <b id="list-total-amount">0</b>원</span>
-                    </div>
-                </div>
-                
-                <div class="table-container">
-                    <table id="detail-table">
-                        <colgroup>
-                            <col style="width: 90px;"><col style="width: 160px;"><col style="width: 100px;">
-                            <col style="width: 100px;"><col style="width: 100px;"><col style="width: 200px;">
-                            <col style="width: 70px;"><col style="width: 90px;"><col style="width: 110px;">
-                        </colgroup>
-                        <thead>
-                            <tr>
-                                <th>점포코드</th><th>점포명</th><th>주문일자</th><th>배송일자</th>
-                                <th>품목코드</th><th>품목명</th><th class="text-right">수량</th>
-                                <th class="text-right">단가</th><th class="text-right">금액</th>
-                            </tr>
-                            <tr class="filter-row-table">
-                                <th><input type="text" id="filter-storeCode" class="table-filter-input" placeholder="검색" onkeyup="debouncedApplyColumnFilters()"></th>
-                                <th><input type="text" id="filter-storeName" class="table-filter-input" placeholder="검색" onkeyup="debouncedApplyColumnFilters()"></th>
-                                <th><input type="text" id="filter-orderDate" class="table-filter-input" placeholder="검색" onkeyup="debouncedApplyColumnFilters()"></th>
-                                <th><input type="text" id="filter-deliveryDate" class="table-filter-input" placeholder="검색" onkeyup="debouncedApplyColumnFilters()"></th>
-                                <th><input type="text" id="filter-itemCode" class="table-filter-input" placeholder="검색" onkeyup="debouncedApplyColumnFilters()"></th>
-                                <th><input type="text" id="filter-itemName" class="table-filter-input" placeholder="검색" onkeyup="debouncedApplyColumnFilters()"></th>
-                                <th></th><th></th><th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="order-detail-table"></tbody>
-                    </table>
-                </div>
+    </div>
+
+    <!-- 🔍 브랜드 다중 선택 모달 -->
+    <div class="bottom-sheet-overlay" id="brand-modal">
+        <div class="bottom-sheet-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 16px;">
+                <span>🏢 브랜드 다중 선택</span>
+                <span style="cursor: pointer; padding: 4px;" onclick="closeBrandModal()">✕</span>
             </div>
+            <div style="display: flex; gap: 8px; margin-top: 10px;">
+                <input type="text" id="modal-brand-search" class="m-input" placeholder="브랜드명 검색..." onkeyup="renderBrandModalList()">
+                <button class="btn-m btn-dark" style="width: 70px;" onclick="toggleAllBrandCheck(true)">전체</button>
+                <button class="btn-m btn-dark" style="width: 70px;" onclick="toggleAllBrandCheck(false)">해제</button>
+            </div>
+            <div class="sheet-scroll" id="brand-modal-list"></div>
+            <button class="btn-m btn-blue" style="margin-top: 10px;" onclick="applyBrandSelection()">선택 완료</button>
         </div>
-
     </div>
 
     <script>
@@ -342,10 +207,8 @@
         const tokenPart2 = "g2jVxPlK8Kh18uwaCu220wnZB";
         const token = tokenPart1 + tokenPart2;
 
-        let rawDetailOrders = [], filteredDetailOrders = [], baseDetailOrders = [], currentDetailOrders = [];
-        let trendChart = null;
-
-        let allBrandList = [], allItemList = [];
+        let rawDetailOrders = [], filteredDetailOrders = [];
+        let trendChart = null, allBrandList = [];
         let activeBrandTarget = 'chart';
 
         function safeSetStorage(key, value) {
@@ -353,15 +216,15 @@
             catch (e) { localStorage.clear(); }
         }
 
-        async function fetchWithRetry(url, options, retries = 3, backoff = 600) {
+        async function fetchWithRetry(url, options, retries = 2) {
             try {
                 const res = await fetch(url, options);
                 if (!res.ok && res.status >= 500 && retries > 0) throw new Error();
                 return res;
             } catch (err) {
                 if (retries > 0) {
-                    await new Promise(r => setTimeout(r, backoff));
-                    return fetchWithRetry(url, options, retries - 1, backoff * 1.5);
+                    await new Promise(r => setTimeout(r, 500));
+                    return fetchWithRetry(url, options, retries - 1);
                 }
                 throw err;
             }
@@ -375,8 +238,7 @@
             };
         }
 
-        const debouncedApplyColumnFilters = debounce(applyColumnFilters, 150);
-        const debouncedFilterStoreList = debounce(filterStoreList, 150);
+        const debouncedFilterCards = debounce(filterCards, 150);
 
         function formatDate(d) {
             const y = d.getFullYear();
@@ -386,7 +248,7 @@
         }
 
         function formatDisplayDate(dateStr) {
-            if (!dateStr || dateStr === '-') return '-';
+            if (!dateStr) return '-';
             let s = String(dateStr).split('T')[0];
             return s.replace(/-/g, '/');
         }
@@ -403,14 +265,11 @@
             return str || '-';
         }
 
-        /* 🏢 브랜드 선택 다중 모달 */
+        /* 🏢 모바일 브랜드 선택 바텀시트 */
         async function openBrandModal(target = 'chart') {
             activeBrandTarget = target;
             document.getElementById('brand-modal').style.display = 'flex';
-            const listEl = document.getElementById('brand-modal-list');
-            
             if (allBrandList.length === 0) {
-                listEl.innerHTML = '<div style="text-align:center; padding:15px; color:#2563eb;">⚡ 브랜드 목록 로드 중...</div>';
                 try {
                     const res = await fetchWithRetry(`${SUPABASE_URL}/rest/v1/oms_orders?select=brand_name`, {
                         headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
@@ -419,7 +278,7 @@
                         const data = await res.json();
                         allBrandList = [...new Set(data.map(r => r.brand_name))].filter(Boolean).sort();
                     }
-                } catch (err) {}
+                } catch (e) {}
             }
             renderBrandModalList();
         }
@@ -428,39 +287,33 @@
 
         function renderBrandModalList() {
             const inputId = activeBrandTarget === 'chart' ? 'chart-brand-input' : 'detail-brand-input';
-            const currentSelected = document.getElementById(inputId).value.split(',').map(s => s.trim());
-            const searchKeyword = document.getElementById('modal-brand-search').value.toLowerCase().trim();
-            const listEl = document.getElementById('brand-modal-list');
+            const selected = document.getElementById(inputId).value.split(',').map(s => s.trim());
+            const keyword = document.getElementById('modal-brand-search').value.toLowerCase().trim();
+            const filtered = allBrandList.filter(b => b.toLowerCase().includes(keyword));
 
-            const filtered = allBrandList.filter(b => b.toLowerCase().includes(searchKeyword));
-            if (filtered.length === 0) {
-                listEl.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:15px;">검색 결과가 없습니다.</div>';
-                return;
-            }
-
-            listEl.innerHTML = filtered.map(brand => `
-                <div class="search-list-item">
-                    <label>
-                        <input type="checkbox" class="brand-modal-chk" value="${brand}" ${currentSelected.includes(brand) ? 'checked' : ''}>
-                        <span>${brand}</span>
-                    </label>
+            const html = filtered.map(b => `
+                <div style="padding: 10px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" class="m-brand-chk" value="${b}" ${selected.includes(b) ? 'checked' : ''} style="transform: scale(1.2);">
+                    <span style="font-size: 14px;">${b}</span>
                 </div>
             `).join('');
+            document.getElementById('brand-modal-list').innerHTML = html;
         }
 
-        function filterBrandModalList() { renderBrandModalList(); }
-        function toggleAllBrandCheck(status) { document.querySelectorAll('.brand-modal-chk').forEach(chk => chk.checked = status); }
+        function toggleAllBrandCheck(status) {
+            document.querySelectorAll('.m-brand-chk').forEach(c => c.checked = status);
+        }
 
         function applyBrandSelection() {
-            const checkedVals = Array.from(document.querySelectorAll('.brand-modal-chk:checked')).map(c => c.value);
-            const brandStr = checkedVals.join(', ');
-            
+            const checked = Array.from(document.querySelectorAll('.m-brand-chk:checked')).map(c => c.value);
+            const brandStr = checked.join(', ');
+
             if (activeBrandTarget === 'chart') {
                 document.getElementById('chart-brand-input').value = brandStr;
                 safeSetStorage('cached_brand_input', brandStr);
             } else {
                 document.getElementById('detail-brand-input').value = brandStr;
-                onDetailBrandChange(checkedVals);
+                onDetailBrandChange(checked);
             }
             closeBrandModal();
         }
@@ -471,138 +324,27 @@
             } else {
                 filteredDetailOrders = rawDetailOrders.filter(r => selectedBrands.includes(r.brand_name));
             }
-            updateStoreListAndSummary();
+            renderStoreCardList(filteredDetailOrders);
         }
 
-        /* 📦 품목 모달 */
-        async function openItemModal() {
-            document.getElementById('item-modal').style.display = 'flex';
-            const listEl = document.getElementById('item-modal-list');
-            if (allItemList.length === 0) {
-                try {
-                    const res = await fetchWithRetry(`${SUPABASE_URL}/rest/v1/oms_orders?select=item_code,item_name`, {
-                        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
-                    });
-                    if (res.ok) {
-                        const data = await res.json();
-                        const map = new Map();
-                        data.forEach(r => {
-                            if (r.item_code || r.item_name) map.set(`${cleanCode(r.item_code)}__${r.item_name}`, { code: cleanCode(r.item_code), name: r.item_name || '' });
-                        });
-                        allItemList = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-                    }
-                } catch (err) {}
-            }
-            renderItemModalList();
-        }
-
-        function closeItemModal() { document.getElementById('item-modal').style.display = 'none'; }
-
-        function renderItemModalList() {
-            const searchKeyword = document.getElementById('modal-item-search').value.toLowerCase().trim();
-            const listEl = document.getElementById('item-modal-list');
-            const filtered = allItemList.filter(item => item.code.toLowerCase().includes(searchKeyword) || item.name.toLowerCase().includes(searchKeyword));
-
-            if (filtered.length === 0) {
-                listEl.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:15px;">검색 결과가 없습니다.</div>';
-                return;
-            }
-
-            listEl.innerHTML = filtered.slice(0, 100).map(item => `
-                <div class="search-list-item" onclick="selectItemFromModal('${item.name}')">
-                    <div><span class="code-tag">[${item.code}]</span><b style="margin-left: 5px;">${item.name}</b></div>
-                    <button class="btn btn-cal" style="background:#2563eb;">선택</button>
-                </div>
-            `).join('');
-        }
-
-        function filterItemModalList() { renderItemModalList(); }
-        function selectItemFromModal(itemName) {
-            document.getElementById('chart-item-input').value = itemName;
-            safeSetStorage('cached_item_input', itemName);
-            closeItemModal();
-        }
-
-        /* 📅 캘린더 모달 */
-        function openCalendarModal() { document.getElementById('calendar-modal').style.display = 'flex'; loadCalendarData(); }
-        function closeCalendarModal() { document.getElementById('calendar-modal').style.display = 'none'; }
-
-        async function loadCalendarData() {
-            const monthVal = document.getElementById('calendar-month-picker').value;
-            if (!monthVal) return;
-            const [year, month] = monthVal.split('-').map(Number);
-            const startDateStr = formatDate(new Date(year, month - 1, 1));
-            const endDateStr = formatDate(new Date(year, month, 0));
-
-            let dateCountMap = {}, availableDates = [];
-            try {
-                const res = await fetchWithRetry(`${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date`, {
-                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
-                });
-                if (res.ok) {
-                    const rows = await res.json();
-                    rows.forEach(r => {
-                        let dKey = formatDisplayDate(r.delivery_date).replace(/\//g, '-');
-                        dateCountMap[dKey] = (dateCountMap[dKey] || 0) + 1;
-                        availableDates.push(dKey);
-                    });
-                }
-            } catch (err) {}
-
-            if (availableDates.length > 0) {
-                availableDates.sort();
-                const latestDate = availableDates[availableDates.length - 1].replace(/-/g, '/');
-                document.getElementById('last-updated-text').innerText = `🕒 최신 배송일자: ${latestDate}`;
-                safeSetStorage('cached_last_updated', latestDate);
-            }
-            renderCalendarGrid(year, month, dateCountMap);
-        }
-
-        function renderCalendarGrid(year, month, dateCountMap) {
-            const grid = document.getElementById('calendar-grid');
-            grid.innerHTML = "";
-            ['일', '월', '화', '수', '목', '금', '토'].forEach(d => grid.innerHTML += `<div class="calendar-header-day">${d}</div>`);
-
-            const firstDayIndex = new Date(year, month - 1, 1).getDay();
-            const totalDays = new Date(year, month, 0).getDate();
-
-            for (let i = 0; i < firstDayIndex; i++) grid.innerHTML += `<div class="calendar-day-cell other-month"></div>`;
-
-            for (let day = 1; day <= totalDays; day++) {
-                const dString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                const count = dateCountMap[dString] || 0;
-                const badgeHtml = count > 0 ? `<span class="data-status-badge badge-has-data">🟢 있음</span>` : `<span class="data-status-badge badge-no-data">⚪ 없음</span>`;
-                const cell = document.createElement('div');
-                cell.className = 'calendar-day-cell';
-                cell.onclick = () => { document.getElementById('detail-target-date').value = dString; closeCalendarModal(); fetchDetailData(); };
-                cell.innerHTML = `<span class="day-number">${day}</span>${badgeHtml}`;
-                grid.appendChild(cell);
-            }
-        }
-
-        /* 📊 추이 그래프 데이터 안전 조회 및 즉시 예외 렌더링 */
+        /* 📊 차트 */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
-            const brandInputValue = document.getElementById('chart-brand-input').value.trim();
-            const itemKeyword = document.getElementById('chart-item-input').value.trim();
+            const brandVal = document.getElementById('chart-brand-input').value.trim();
 
-            if (!startDate || !endDate) return alert("시작일과 종료일을 선택하세요.");
+            if (!startDate || !endDate) return alert("조회 기간을 선택하세요.");
 
             safeSetStorage('cached_chart_start_date', startDate);
             safeSetStorage('cached_chart_end_date', endDate);
-            safeSetStorage('cached_brand_input', brandInputValue);
-            safeSetStorage('cached_item_input', itemKeyword);
 
             let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,order_date,qty,total_amount,brand_name,item_name`;
 
-            if (brandInputValue) {
-                const brandList = brandInputValue.split(',').map(b => b.trim()).filter(Boolean);
-                if (brandList.length === 1) queryUrl += `&brand_name=ilike.*${encodeURIComponent(brandList[0])}*`;
-                else if (brandList.length > 1) queryUrl += `&or=(${brandList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`;
+            if (brandVal) {
+                const brands = brandVal.split(',').map(b => b.trim()).filter(Boolean);
+                if (brands.length === 1) queryUrl += `&brand_name=ilike.*${encodeURIComponent(brands[0])}*`;
+                else if (brands.length > 1) queryUrl += `&or=(${brands.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`;
             }
-
-            if (itemKeyword) queryUrl += `&or=(item_code.ilike.*${encodeURIComponent(itemKeyword)}*,item_name.ilike.*${encodeURIComponent(itemKeyword)}*)`;
 
             try {
                 const res = await fetchWithRetry(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
@@ -610,43 +352,30 @@
                     const data = await res.json();
                     renderChartAndKPI(data);
                 }
-            } catch (err) {
-                console.warn("⚠️ DB 조회 지연:", err.message);
-            }
+            } catch (e) {}
         }
 
         function renderChartAndKPI(data) {
             if (!data || !Array.isArray(data) || data.length === 0) return;
-
-            let totalQty = 0, totalAmount = 0;
-            const uniqueItems = new Set();
-            const dailyMap = {};
+            let qty = 0, amt = 0, items = new Set(), dailyMap = {};
 
             data.forEach(r => {
-                const q = cleanNumber(r.qty);
-                const amt = cleanNumber(r.total_amount);
+                const q = cleanNumber(r.qty), a = cleanNumber(r.total_amount);
+                qty += q; amt += a;
+                if (r.item_name) items.add(r.item_name);
 
-                totalQty += q;
-                totalAmount += amt;
-                if (r.item_name) uniqueItems.add(r.item_name);
+                let d = formatDisplayDate(r.delivery_date) || formatDisplayDate(r.order_date);
+                if (!d || d === '-') return;
 
-                // 💡 배송일자 없으면 주문일자로 대체 매핑
-                let dateKey = formatDisplayDate(r.delivery_date) || formatDisplayDate(r.order_date);
-                if (!dateKey || dateKey === '-') return;
-
-                if (!dailyMap[dateKey]) dailyMap[dateKey] = { qty: 0, amount: 0 };
-                dailyMap[dateKey].qty += q;
-                dailyMap[dateKey].amount += amt;
+                if (!dailyMap[d]) dailyMap[d] = { qty: 0, amt: 0 };
+                dailyMap[d].qty += q; dailyMap[d].amt += a;
             });
 
-            document.getElementById('kpi-total-qty').innerText = `${totalQty.toLocaleString()} 건`;
-            document.getElementById('kpi-total-items').innerText = `${uniqueItems.size.toLocaleString()} 종`;
-            document.getElementById('kpi-total-amount').innerText = `${totalAmount.toLocaleString()} 원`;
+            document.getElementById('kpi-total-qty').innerText = `${qty.toLocaleString()} 건`;
+            document.getElementById('kpi-total-items').innerText = `${items.size.toLocaleString()} 종`;
+            document.getElementById('kpi-total-amount').innerText = `${amt.toLocaleString()} 원`;
 
             const labels = Object.keys(dailyMap).sort();
-            const qtyData = labels.map(k => dailyMap[k].qty);
-            const amtData = labels.map(k => dailyMap[k].amount);
-
             const canvas = document.getElementById('dailyTrendChart');
             if (!canvas) return;
 
@@ -658,21 +387,18 @@
                 data: {
                     labels: labels,
                     datasets: [
-                        { label: '주문수량', data: qtyData, backgroundColor: 'rgba(37, 99, 235, 0.6)', yAxisID: 'y1' },
-                        { label: '주문금액', data: amtData, type: 'line', borderColor: '#8b5cf6', borderWidth: 2, yAxisID: 'y2' }
+                        { label: '수량', data: labels.map(k => dailyMap[k].qty), backgroundColor: 'rgba(37, 99, 235, 0.6)', yAxisID: 'y1' },
+                        { label: '금액', data: labels.map(k => dailyMap[k].amt), type: 'line', borderColor: '#8b5cf6', borderWidth: 2, yAxisID: 'y2' }
                     ]
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
-                    scales: {
-                        y1: { type: 'linear', position: 'left', beginAtZero: true },
-                        y2: { type: 'linear', position: 'right', beginAtZero: true, grid: { drawOnChartArea: false } }
-                    }
+                    scales: { y1: { beginAtZero: true }, y2: { beginAtZero: true, grid: { drawOnChartArea: false } } }
                 }
             });
         }
 
-        /* 🛒 하루치 상세 내역 */
+        /* 🛒 하루 상세 내역 불러오기 */
         async function fetchDetailData() {
             const targetDate = document.getElementById('detail-target-date').value;
             if (!targetDate) return;
@@ -686,122 +412,120 @@
                     rawDetailOrders = await res.json();
                     filteredDetailOrders = rawDetailOrders;
                     document.getElementById('detail-brand-input').value = '';
-                    updateStoreListAndSummary();
+                    renderStoreCardList(filteredDetailOrders);
                 }
-            } catch (err) {}
+            } catch (e) {}
         }
 
-        function updateStoreListAndSummary() {
-            const stores = [...new Set(filteredDetailOrders.map(r => r.store_name))].filter(Boolean);
-            document.getElementById('brand-store-count').innerText = stores.length;
-            document.getElementById('brand-item-count').innerText = new Set(filteredDetailOrders.map(r => r.item_name)).size;
-
-            const storeListEl = document.getElementById('store-list');
-            let listItemsHtml = [`<li class="store-item total-item active" onclick="onStoreSelect('ALL', this)">
-                <span>🏢 전체 점포 합산</span><span style="color:#2563eb;">${filteredDetailOrders.length}건</span>
-            </li>`];
-
-            stores.forEach(store => {
-                const count = filteredDetailOrders.filter(r => r.store_name === store).length;
-                listItemsHtml.push(`<li class="store-item" onclick="onStoreSelect('${store}', this)">
-                    <span>${store}</span><span style="color:#64748b;">${count}건</span>
-                </li>`);
-            });
-            storeListEl.innerHTML = listItemsHtml.join('');
-            onStoreSelect('ALL', storeListEl.firstElementChild);
-        }
-
-        function filterStoreList() {
-            const query = document.getElementById('store-search-input').value.toLowerCase();
-            document.querySelectorAll('#store-list .store-item').forEach(item => {
-                item.style.display = item.innerText.toLowerCase().includes(query) ? 'flex' : 'none';
-            });
-        }
-
-        function onStoreSelect(storeName, element) {
-            document.querySelectorAll('.store-item').forEach(el => el.classList.remove('active'));
-            if (element) element.classList.add('active');
-
-            if (storeName === 'ALL') {
-                document.getElementById('selected-store-title').innerText = `🛒 전체 점포 합산 상세`;
-                baseDetailOrders = filteredDetailOrders;
-            } else {
-                document.getElementById('selected-store-title').innerText = `🛒 [${storeName}] 주문 상세`;
-                baseDetailOrders = filteredDetailOrders.filter(r => r.store_name === storeName);
-            }
-            applyColumnFilters();
-        }
-
-        function applyColumnFilters() {
-            const qSC = document.getElementById('filter-storeCode').value.toLowerCase().trim();
-            const qSN = document.getElementById('filter-storeName').value.toLowerCase().trim();
-            const qOD = document.getElementById('filter-orderDate').value.toLowerCase().trim();
-            const qDD = document.getElementById('filter-deliveryDate').value.toLowerCase().trim();
-            const qIC = document.getElementById('filter-itemCode').value.toLowerCase().trim();
-            const qIN = document.getElementById('filter-itemName').value.toLowerCase().trim();
-
-            currentDetailOrders = baseDetailOrders.filter(row => {
-                if (qSC && !cleanCode(row.store_code).toLowerCase().includes(qSC)) return false;
-                if (qSN && !String(row.store_name||'').toLowerCase().includes(qSN)) return false;
-                if (qOD && !formatDisplayDate(row.order_date).toLowerCase().includes(qOD)) return false;
-                if (qDD && !formatDisplayDate(row.delivery_date).toLowerCase().includes(qDD)) return false;
-                if (qIC && !cleanCode(row.item_code).toLowerCase().includes(qIC)) return false;
-                if (qIN && !String(row.item_name||'').toLowerCase().includes(qIN)) return false;
-                return true;
-            });
-
-            renderDetailTable();
-        }
-
-        function renderDetailTable() {
-            const tbody = document.getElementById('order-detail-table');
-
-            if (!currentDetailOrders || currentDetailOrders.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#94a3b8;">데이터가 없습니다.</td></tr>`;
-                document.getElementById('list-total-qty').innerText = "0";
-                document.getElementById('list-total-amount').innerText = "0";
+        /* 모바일 통합 필터링 (점포코드, 점포명, 주문일자, 배송일자, 품목코드, 품목명) */
+        function filterCards() {
+            const query = document.getElementById('store-search-input').value.toLowerCase().trim();
+            if (!query) {
+                renderStoreCardList(filteredDetailOrders);
                 return;
             }
 
-            let sumQty = 0, sumAmount = 0;
-            const rowsHtml = currentDetailOrders.map(row => {
-                const q = cleanNumber(row.qty), p = cleanNumber(row.price);
-                let t = cleanNumber(row.total_amount) || (q * p);
-                sumQty += q; sumAmount += t;
+            const searchedOrders = filteredDetailOrders.filter(row => {
+                const sCode = cleanCode(row.store_code).toLowerCase();
+                const sName = String(row.store_name||'').toLowerCase();
+                const oDate = formatDisplayDate(row.order_date).toLowerCase();
+                const dDate = formatDisplayDate(row.delivery_date).toLowerCase();
+                const iCode = cleanCode(row.item_code).toLowerCase();
+                const iName = String(row.item_name||'').toLowerCase();
 
-                return `
-                    <tr>
-                        <td><span class="code-tag">${cleanCode(row.store_code)}</span></td>
-                        <td><b>${row.store_name||'-'}</b></td>
-                        <td>${formatDisplayDate(row.order_date)}</td>
-                        <td><span style="color:#2563eb; font-weight:bold;">${formatDisplayDate(row.delivery_date)}</span></td>
-                        <td><span class="code-tag">${cleanCode(row.item_code)}</span></td>
-                        <td>${row.item_name||'-'}</td>
-                        <td class="text-right">${q.toLocaleString()}</td>
-                        <td class="text-right">${p > 0 ? p.toLocaleString() + '원' : '-'}</td>
-                        <td class="text-right"><b>${t > 0 ? t.toLocaleString() + '원' : '-'}</b></td>
-                    </tr>
+                return sCode.includes(query) || sName.includes(query) || oDate.includes(query) || dDate.includes(query) || iCode.includes(query) || iName.includes(query);
+            });
+
+            renderStoreCardList(searchedOrders);
+        }
+
+        /* 🛒 모바일 카드 리스트 렌더링 (전체점포 합산 상세 기본 포함) */
+        function renderStoreCardList(orders) {
+            const container = document.getElementById('store-card-list-container');
+            if (!orders || orders.length === 0) {
+                container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">데이터가 없습니다.</div>';
+                return;
+            }
+
+            // 1. 전체 점포 합산 카드 생성
+            const totalQty = orders.reduce((sum, r) => sum + cleanNumber(r.qty), 0);
+            const totalAmt = orders.reduce((sum, r) => sum + (cleanNumber(r.total_amount) || (cleanNumber(r.qty)*cleanNumber(r.price))), 0);
+
+            const totalItemsHtml = orders.map(o => `
+                <div class="item-row">
+                    <div class="item-row-header">
+                        <span>[${o.store_name||'-'}] ${o.item_name || '-'}</span>
+                        <span style="color:#2563eb;">${cleanNumber(o.qty).toLocaleString()}개</span>
+                    </div>
+                    <div class="item-row-sub">
+                        <span>점포코드: ${cleanCode(o.store_code)} | 품목코드: ${cleanCode(o.item_code)}</span>
+                        <span><b>${cleanNumber(o.total_amount || (cleanNumber(o.qty)*cleanNumber(o.price))).toLocaleString()}원</b></span>
+                    </div>
+                    <div class="item-row-sub" style="color: #94a3b8; font-size: 10px;">
+                        <span>주문: ${formatDisplayDate(o.order_date)} | 배송: ${formatDisplayDate(o.delivery_date)}</span>
+                    </div>
+                </div>
+            `).join('');
+
+            let html = `
+                <div class="store-card">
+                    <div class="store-card-header total-header" onclick="toggleStoreCard('total')">
+                        <span>🏢 전체점포 합산 상세 (${orders.length}건)</span>
+                        <span class="badge-cnt">${totalQty.toLocaleString()}개 / ${totalAmt.toLocaleString()}원 ▼</span>
+                    </div>
+                    <div class="item-detail-list open" id="store-card-body-total">
+                        ${totalItemsHtml}
+                    </div>
+                </div>
+            `;
+
+            // 2. 개별 점포별 그룹핑 카드
+            const storeMap = {};
+            orders.forEach(r => {
+                const sName = r.store_name || '기타';
+                if (!storeMap[sName]) storeMap[sName] = [];
+                storeMap[sName].push(r);
+            });
+
+            Object.keys(storeMap).forEach((store, idx) => {
+                const storeOrders = storeMap[store];
+                const sQty = storeOrders.reduce((sum, r) => sum + cleanNumber(r.qty), 0);
+
+                const itemsHtml = storeOrders.map(o => `
+                    <div class="item-row">
+                        <div class="item-row-header">
+                            <span>${o.item_name || '-'}</span>
+                            <span style="color:#2563eb;">${cleanNumber(o.qty).toLocaleString()}개</span>
+                        </div>
+                        <div class="item-row-sub">
+                            <span>품목코드: ${cleanCode(o.item_code)}</span>
+                            <span>${cleanNumber(o.total_amount || (cleanNumber(o.qty)*cleanNumber(o.price))).toLocaleString()}원</span>
+                        </div>
+                        <div class="item-row-sub" style="color: #94a3b8; font-size: 10px;">
+                            <span>주문: ${formatDisplayDate(o.order_date)} | 배송: ${formatDisplayDate(o.delivery_date)}</span>
+                        </div>
+                    </div>
+                `).join('');
+
+                html += `
+                    <div class="store-card">
+                        <div class="store-card-header" onclick="toggleStoreCard(${idx})">
+                            <span>🏪 ${store}</span>
+                            <span class="badge-cnt">${sQty.toLocaleString()}개 (${storeOrders.length}건) ▼</span>
+                        </div>
+                        <div class="item-detail-list" id="store-card-body-${idx}">
+                            ${itemsHtml}
+                        </div>
+                    </div>
                 `;
             });
 
-            tbody.innerHTML = rowsHtml.join('');
-            document.getElementById('list-total-qty').innerText = sumQty.toLocaleString();
-            document.getElementById('list-total-amount').innerText = sumAmount.toLocaleString();
+            container.innerHTML = html;
         }
 
-        function exportToExcel() {
-            if (!currentDetailOrders || currentDetailOrders.length === 0) return alert("저장할 데이터가 없습니다.");
-            const exportData = currentDetailOrders.map(row => ({
-                '점포코드': cleanCode(row.store_code), '점포명': row.store_name || '-',
-                '주문일자': formatDisplayDate(row.order_date), '배송일자': formatDisplayDate(row.delivery_date),
-                '품목코드': cleanCode(row.item_code), '품목명': row.item_name || '-',
-                '수량': cleanNumber(row.qty), '단가': cleanNumber(row.price),
-                '금액': cleanNumber(row.total_amount) || (cleanNumber(row.qty) * cleanNumber(row.price))
-            }));
-            const ws = XLSX.utils.json_to_sheet(exportData);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "주문상세");
-            XLSX.writeFile(wb, `OMS주문상세_${document.getElementById('detail-target-date').value}.xlsx`);
+        function toggleStoreCard(idx) {
+            const body = document.getElementById(`store-card-body-${idx}`);
+            body.classList.toggle('open');
         }
 
         /* ⚡ 초기 실행 */
@@ -814,41 +538,37 @@
             document.getElementById('sync-target-date').value = formatDate(today);
             document.getElementById('detail-target-date').value = localStorage.getItem('cached_detail_target_date') || formatDate(today);
             document.getElementById('chart-brand-input').value = localStorage.getItem('cached_brand_input') || '';
-            document.getElementById('chart-item-input').value = localStorage.getItem('cached_item_input') || '';
 
-            document.getElementById('calendar-month-picker').value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2, '0')}`;
+            const cachedUpdated = localStorage.getItem('cached_last_updated');
+            if (cachedUpdated) document.getElementById('last-updated-text').innerText = `최신: ${cachedUpdated}`;
 
-            const cachedLastUpdated = localStorage.getItem('cached_last_updated');
-            if (cachedLastUpdated) document.getElementById('last-updated-text').innerText = `🕒 최신 배송일자: ${cachedLastUpdated}`;
-
-            loadCalendarData();
             fetchChartData();
             fetchDetailData();
         });
 
         async function triggerBot() {
             const btn = document.getElementById('run-btn');
-            const targetDateVal = document.getElementById('sync-target-date').value.replace(/-/g, '/');
+            const targetVal = document.getElementById('sync-target-date').value.replace(/-/g, '/');
 
-            if (!targetDateVal) return alert("수동 동기화할 일자를 선택하세요.");
+            if (!targetVal) return alert("일자를 선택하세요.");
 
-            btn.disabled = true; btn.innerText = "🔄 동기화 중...";
+            btn.disabled = true; btn.innerText = "동기화 중...";
 
             try {
                 const res = await fetch(`https://api.github.com/repos/${githubId}/${repoName}/actions/workflows/capture.yml/dispatches`, {
                     method: 'POST',
                     headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({ ref: 'main', inputs: { start_date: targetDateVal, end_date: targetDateVal } })
+                    body: JSON.stringify({ ref: 'main', inputs: { start_date: targetVal, end_date: targetVal } })
                 });
 
                 if (res.ok) {
-                    alert(`✅ [${targetDateVal}] OMS 데이터 동기화 요청 완료! (약 30~40초 후 완료)`);
-                    setTimeout(() => { btn.disabled = false; btn.innerText = "🚀 OMS 수동 동기화"; fetchDetailData(); }, 35000);
+                    alert(`✅ [${targetVal}] 동기화 요청 완료!`);
+                    setTimeout(() => { btn.disabled = false; btn.innerText = "동기화"; fetchDetailData(); }, 35000);
                 } else {
-                    alert("❌ 동기화 요청 실패"); btn.disabled = false; btn.innerText = "🚀 OMS 수동 동기화";
+                    alert("❌ 동기화 요청 실패"); btn.disabled = false; btn.innerText = "동기화";
                 }
             } catch (err) {
-                alert("❌ 네트워크 오류"); btn.disabled = false; btn.innerText = "🚀 OMS 수동 동기화";
+                alert("❌ 네트워크 오류"); btn.disabled = false; btn.innerText = "동기화";
             }
         }
     </script>
