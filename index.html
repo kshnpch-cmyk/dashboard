@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>더본 OMS 주문 실시간 대시보드</title>
-    <!-- 📱 모바일 접속 시 mobile.html 자동 리다이렉트 -->
     <script>
         if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
             location.replace('/mobile.html');
@@ -155,7 +154,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v4.5 Desktop Mode</span>
+            <span class="version-tag">v5.0 Unified Filter</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -171,7 +170,7 @@
         </div>
     </div>
 
-    <!-- 📅 캘린더 팝업 모달 -->
+    <!-- 📅 캘린더 모달 -->
     <div class="modal-overlay" id="calendar-modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -205,7 +204,7 @@
         </div>
     </div>
 
-    <!-- 🔍 품목 검색 및 선택 모달 -->
+    <!-- 🔍 품목 검색 모달 -->
     <div class="modal-overlay" id="item-modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -221,7 +220,7 @@
 
     <div class="container">
         
-        <!-- 📊 상단 영역: 기간별 추이 차트 분석 -->
+        <!-- 📊 상단 영역: 기간별 추이 차트 -->
         <div class="section-panel">
             <div class="panel-header" style="margin-bottom: 0; border-bottom: none;">
                 <span class="panel-title-text" style="white-space: nowrap;">📈 기간별 주문 추이 그래프</span>
@@ -235,8 +234,8 @@
                     </div>
                     <div class="filter-group">
                         <label>브랜드:</label>
-                        <input type="text" id="chart-brand-input" class="input-box" placeholder="브랜드 선택/검색" style="width: 140px;">
-                        <button class="btn-search-icon" onclick="openBrandModal()" title="브랜드 다중 선택">🔍</button>
+                        <input type="text" id="chart-brand-input" class="input-box" placeholder="브랜드 선택/검색" style="width: 140px;" readonly onclick="openBrandModal('chart')">
+                        <button class="btn-search-icon" onclick="openBrandModal('chart')" title="브랜드 다중 선택">🔍</button>
                     </div>
                     <div class="filter-group">
                         <label>품목코드/명:</label>
@@ -278,10 +277,11 @@
 
         <div class="dashboard-layout">
             <div class="panel">
-                <div class="panel-title"><span>🏢 브랜드별 점포 목록</span></div>
-                <select id="brand-select" class="select-box" onchange="onBrandChange()">
-                    <option value="ALL">🌐 전체 브랜드</option>
-                </select>
+                <div class="panel-title"><span>🏢 브랜드 필터</span></div>
+                <div style="display: flex; gap: 4px; margin-bottom: 12px;">
+                    <input type="text" id="detail-brand-input" class="input-box" style="flex:1;" placeholder="브랜드 선택..." readonly onclick="openBrandModal('detail')">
+                    <button class="btn-search-icon" onclick="openBrandModal('detail')">🔍</button>
+                </div>
                 <input type="text" id="store-search-input" class="search-input" placeholder="🔍 점포명 검색..." onkeyup="debouncedFilterStoreList()">
                 <div id="brand-summary" style="margin-bottom: 10px; font-size: 12px; color: #64748b;">
                     점포수: <b id="brand-store-count">0</b>개 | 품목수: <b id="brand-item-count">0</b>종
@@ -344,24 +344,18 @@
         let rawDetailOrders = [], filteredDetailOrders = [], baseDetailOrders = [], currentDetailOrders = [];
         let trendChart = null;
 
-        let allBrandList = [];
-        let allItemList = [];
+        let allBrandList = [], allItemList = [];
+        let activeBrandTarget = 'chart';
 
         function safeSetStorage(key, value) {
-            try {
-                localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
-            } catch (e) {
-                console.warn("⚠️ Storage 용량 한도 초과. 캐시 정리 수행");
-                localStorage.clear();
-            }
+            try { localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); }
+            catch (e) { localStorage.clear(); }
         }
 
         async function fetchWithRetry(url, options, retries = 3, backoff = 600) {
             try {
                 const res = await fetch(url, options);
-                if (!res.ok && res.status >= 500 && retries > 0) {
-                    throw new Error(`Server Error ${res.status}`);
-                }
+                if (!res.ok && res.status >= 500 && retries > 0) throw new Error();
                 return res;
             } catch (err) {
                 if (retries > 0) {
@@ -392,8 +386,7 @@
 
         function formatDisplayDate(dateStr) {
             if (!dateStr || dateStr === '-') return '-';
-            let s = String(dateStr);
-            if (s.includes('T')) s = s.split('T')[0];
+            let s = String(dateStr).split('T')[0];
             return s.replace(/-/g, '/');
         }
 
@@ -405,16 +398,13 @@
         function cleanCode(val) {
             if (!val && val !== 0) return '-';
             let str = String(val).trim();
-            if (str.endsWith('.0')) {
-                str = str.substring(0, str.length - 2);
-            }
+            if (str.endsWith('.0')) str = str.substring(0, str.length - 2);
             return str || '-';
         }
 
-        /* -------------------------------------------------------------
-           🏢 브랜드 선택 다중 체크 모달
-        ------------------------------------------------------------- */
-        async function openBrandModal() {
+        /* 🏢 브랜드 선택 다중 모달 */
+        async function openBrandModal(target = 'chart') {
+            activeBrandTarget = target;
             document.getElementById('brand-modal').style.display = 'flex';
             const listEl = document.getElementById('brand-modal-list');
             
@@ -428,19 +418,16 @@
                         const data = await res.json();
                         allBrandList = [...new Set(data.map(r => r.brand_name))].filter(Boolean).sort();
                     }
-                } catch (err) {
-                    console.error("브랜드 로드 오류:", err);
-                }
+                } catch (err) {}
             }
             renderBrandModalList();
         }
 
-        function closeBrandModal() {
-            document.getElementById('brand-modal').style.display = 'none';
-        }
+        function closeBrandModal() { document.getElementById('brand-modal').style.display = 'none'; }
 
         function renderBrandModalList() {
-            const currentSelected = document.getElementById('chart-brand-input').value.split(',').map(s => s.trim());
+            const inputId = activeBrandTarget === 'chart' ? 'chart-brand-input' : 'detail-brand-input';
+            const currentSelected = document.getElementById(inputId).value.split(',').map(s => s.trim());
             const searchKeyword = document.getElementById('modal-brand-search').value.toLowerCase().trim();
             const listEl = document.getElementById('brand-modal-list');
 
@@ -450,46 +437,47 @@
                 return;
             }
 
-            const html = filtered.map(brand => {
-                const isChecked = currentSelected.includes(brand) ? 'checked' : '';
-                return `
-                    <div class="search-list-item">
-                        <label>
-                            <input type="checkbox" class="brand-modal-chk" value="${brand}" ${isChecked}>
-                            <span>${brand}</span>
-                        </label>
-                    </div>
-                `;
-            }).join('');
-
-            listEl.innerHTML = html;
+            listEl.innerHTML = filtered.map(brand => `
+                <div class="search-list-item">
+                    <label>
+                        <input type="checkbox" class="brand-modal-chk" value="${brand}" ${currentSelected.includes(brand) ? 'checked' : ''}>
+                        <span>${brand}</span>
+                    </label>
+                </div>
+            `).join('');
         }
 
-        function filterBrandModalList() {
-            renderBrandModalList();
-        }
-
-        function toggleAllBrandCheck(status) {
-            document.querySelectorAll('.brand-modal-chk').forEach(chk => chk.checked = status);
-        }
+        function filterBrandModalList() { renderBrandModalList(); }
+        function toggleAllBrandCheck(status) { document.querySelectorAll('.brand-modal-chk').forEach(chk => chk.checked = status); }
 
         function applyBrandSelection() {
             const checkedVals = Array.from(document.querySelectorAll('.brand-modal-chk:checked')).map(c => c.value);
             const brandStr = checkedVals.join(', ');
-            document.getElementById('chart-brand-input').value = brandStr;
-            safeSetStorage('cached_brand_input', brandStr);
+            
+            if (activeBrandTarget === 'chart') {
+                document.getElementById('chart-brand-input').value = brandStr;
+                safeSetStorage('cached_brand_input', brandStr);
+            } else {
+                document.getElementById('detail-brand-input').value = brandStr;
+                onDetailBrandChange(checkedVals);
+            }
             closeBrandModal();
         }
 
-        /* -------------------------------------------------------------
-           📦 품목 검색 선택 모달
-        ------------------------------------------------------------- */
+        function onDetailBrandChange(selectedBrands) {
+            if (!selectedBrands || selectedBrands.length === 0) {
+                filteredDetailOrders = rawDetailOrders;
+            } else {
+                filteredDetailOrders = rawDetailOrders.filter(r => selectedBrands.includes(r.brand_name));
+            }
+            updateStoreListAndSummary();
+        }
+
+        /* 📦 품목 모달 */
         async function openItemModal() {
             document.getElementById('item-modal').style.display = 'flex';
             const listEl = document.getElementById('item-modal-list');
-            
             if (allItemList.length === 0) {
-                listEl.innerHTML = '<div style="text-align:center; padding:15px; color:#2563eb;">⚡ 품목 목록 로드 중...</div>';
                 try {
                     const res = await fetchWithRetry(`${SUPABASE_URL}/rest/v1/oms_orders?select=item_code,item_name`, {
                         headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
@@ -498,93 +486,56 @@
                         const data = await res.json();
                         const map = new Map();
                         data.forEach(r => {
-                            if (r.item_code || r.item_name) {
-                                map.set(`${cleanCode(r.item_code)}__${r.item_name}`, {
-                                    code: cleanCode(r.item_code),
-                                    name: r.item_name || ''
-                                });
-                            }
+                            if (r.item_code || r.item_name) map.set(`${cleanCode(r.item_code)}__${r.item_name}`, { code: cleanCode(r.item_code), name: r.item_name || '' });
                         });
                         allItemList = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
                     }
-                } catch (err) {
-                    console.error("품목 로드 오류:", err);
-                }
+                } catch (err) {}
             }
             renderItemModalList();
         }
 
-        function closeItemModal() {
-            document.getElementById('item-modal').style.display = 'none';
-        }
+        function closeItemModal() { document.getElementById('item-modal').style.display = 'none'; }
 
         function renderItemModalList() {
             const searchKeyword = document.getElementById('modal-item-search').value.toLowerCase().trim();
             const listEl = document.getElementById('item-modal-list');
-
-            const filtered = allItemList.filter(item => 
-                item.code.toLowerCase().includes(searchKeyword) || 
-                item.name.toLowerCase().includes(searchKeyword)
-            );
+            const filtered = allItemList.filter(item => item.code.toLowerCase().includes(searchKeyword) || item.name.toLowerCase().includes(searchKeyword));
 
             if (filtered.length === 0) {
                 listEl.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:15px;">검색 결과가 없습니다.</div>';
                 return;
             }
 
-            const html = filtered.slice(0, 100).map(item => `
+            listEl.innerHTML = filtered.slice(0, 100).map(item => `
                 <div class="search-list-item" onclick="selectItemFromModal('${item.name}')">
-                    <div>
-                        <span class="code-tag">[${item.code}]</span>
-                        <b style="margin-left: 5px;">${item.name}</b>
-                    </div>
+                    <div><span class="code-tag">[${item.code}]</span><b style="margin-left: 5px;">${item.name}</b></div>
                     <button class="btn btn-cal" style="background:#2563eb;">선택</button>
                 </div>
             `).join('');
-
-            listEl.innerHTML = html;
         }
 
-        function filterItemModalList() {
-            renderItemModalList();
-        }
-
+        function filterItemModalList() { renderItemModalList(); }
         function selectItemFromModal(itemName) {
             document.getElementById('chart-item-input').value = itemName;
             safeSetStorage('cached_item_input', itemName);
             closeItemModal();
         }
 
-        /* -------------------------------------------------------------
-           📅 캘린더 모달
-        ------------------------------------------------------------- */
-        function openCalendarModal() {
-            document.getElementById('calendar-modal').style.display = 'flex';
-            loadCalendarData();
-        }
-
-        function closeCalendarModal() {
-            document.getElementById('calendar-modal').style.display = 'none';
-        }
+        /* 📅 캘린더 모달 */
+        function openCalendarModal() { document.getElementById('calendar-modal').style.display = 'flex'; loadCalendarData(); }
+        function closeCalendarModal() { document.getElementById('calendar-modal').style.display = 'none'; }
 
         async function loadCalendarData() {
             const monthVal = document.getElementById('calendar-month-picker').value;
             if (!monthVal) return;
-
             const [year, month] = monthVal.split('-').map(Number);
-            const firstDay = new Date(year, month - 1, 1);
-            const lastDay = new Date(year, month, 0);
+            const startDateStr = formatDate(new Date(year, month - 1, 1));
+            const endDateStr = formatDate(new Date(year, month, 0));
 
-            const startDateStr = formatDate(firstDay);
-            const endDateStr = formatDate(lastDay);
-
-            const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date`;
-
-            let dateCountMap = {};
-            let availableDates = [];
-
+            let dateCountMap = {}, availableDates = [];
             try {
-                const res = await fetchWithRetry(queryUrl, {
+                const res = await fetchWithRetry(`${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date`, {
                     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
                 });
                 if (res.ok) {
@@ -595,67 +546,40 @@
                         availableDates.push(dKey);
                     });
                 }
-            } catch (err) {
-                console.error("캘린더 로드 오류:", err);
-            }
+            } catch (err) {}
 
             if (availableDates.length > 0) {
                 availableDates.sort();
                 const latestDate = availableDates[availableDates.length - 1].replace(/-/g, '/');
                 document.getElementById('last-updated-text').innerText = `🕒 최신 배송일자: ${latestDate}`;
                 safeSetStorage('cached_last_updated', latestDate);
-            } else {
-                document.getElementById('last-updated-text').innerText = `🕒 최신 배송일자: 데이터 없음`;
             }
-
             renderCalendarGrid(year, month, dateCountMap);
         }
 
         function renderCalendarGrid(year, month, dateCountMap) {
             const grid = document.getElementById('calendar-grid');
             grid.innerHTML = "";
-
-            const daysOfWeek = ['일', '월', '화', '수', '목', '금', '토'];
-            daysOfWeek.forEach(d => {
-                grid.innerHTML += `<div class="calendar-header-day">${d}</div>`;
-            });
+            ['일', '월', '화', '수', '목', '금', '토'].forEach(d => grid.innerHTML += `<div class="calendar-header-day">${d}</div>`);
 
             const firstDayIndex = new Date(year, month - 1, 1).getDay();
             const totalDays = new Date(year, month, 0).getDate();
 
-            for (let i = 0; i < firstDayIndex; i++) {
-                grid.innerHTML += `<div class="calendar-day-cell other-month"></div>`;
-            }
+            for (let i = 0; i < firstDayIndex; i++) grid.innerHTML += `<div class="calendar-day-cell other-month"></div>`;
 
             for (let day = 1; day <= totalDays; day++) {
                 const dString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 const count = dateCountMap[dString] || 0;
-
-                let badgeHtml = count > 0 
-                    ? `<span class="data-status-badge badge-has-data">🟢 있음</span>`
-                    : `<span class="data-status-badge badge-no-data">⚪ 없음</span>`;
-
+                const badgeHtml = count > 0 ? `<span class="data-status-badge badge-has-data">🟢 있음</span>` : `<span class="data-status-badge badge-no-data">⚪ 없음</span>`;
                 const cell = document.createElement('div');
                 cell.className = 'calendar-day-cell';
-                cell.onclick = () => selectDateFromCalendar(dString);
-                cell.innerHTML = `
-                    <span class="day-number">${day}</span>
-                    ${badgeHtml}
-                `;
+                cell.onclick = () => { document.getElementById('detail-target-date').value = dString; closeCalendarModal(); fetchDetailData(); };
+                cell.innerHTML = `<span class="day-number">${day}</span>${badgeHtml}`;
                 grid.appendChild(cell);
             }
         }
 
-        function selectDateFromCalendar(dateStr) {
-            document.getElementById('detail-target-date').value = dateStr;
-            safeSetStorage('cached_detail_target_date', dateStr);
-            closeCalendarModal();
-            fetchDetailData();
-        }
-
-        /* -------------------------------------------------------------
-           📊 추이 그래프 데이터 안전 조회 (경량화 로직)
-        ------------------------------------------------------------- */
+        /* 📊 추이 그래프 */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -666,61 +590,38 @@
 
             safeSetStorage('cached_chart_start_date', startDate);
             safeSetStorage('cached_chart_end_date', endDate);
-            safeSetStorage('cached_brand_input', brandInputValue);
-            safeSetStorage('cached_item_input', itemKeyword);
 
             let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,qty,total_amount,item_name`;
 
             if (brandInputValue) {
                 const brandList = brandInputValue.split(',').map(b => b.trim()).filter(Boolean);
-                if (brandList.length === 1) {
-                    queryUrl += `&brand_name=ilike.*${encodeURIComponent(brandList[0])}*`;
-                } else if (brandList.length > 1) {
-                    const brandQueryStr = brandList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',');
-                    queryUrl += `&or=(${brandQueryStr})`;
-                }
+                if (brandList.length === 1) queryUrl += `&brand_name=ilike.*${encodeURIComponent(brandList[0])}*`;
+                else if (brandList.length > 1) queryUrl += `&or=(${brandList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`;
             }
 
-            if (itemKeyword) {
-                queryUrl += `&or=(item_code.ilike.*${encodeURIComponent(itemKeyword)}*,item_name.ilike.*${encodeURIComponent(itemKeyword)}*)`;
-            }
+            if (itemKeyword) queryUrl += `&or=(item_code.ilike.*${encodeURIComponent(itemKeyword)}*,item_name.ilike.*${encodeURIComponent(itemKeyword)}*)`;
 
             try {
-                const res = await fetchWithRetry(queryUrl, {
-                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
-                });
-                if (!res.ok) throw new Error(`API 응답 실패 (${res.status})`);
-                const data = await res.json();
-
-                if (Array.isArray(data) && data.length > 0) {
+                const res = await fetchWithRetry(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                if (res.ok) {
+                    const data = await res.json();
                     renderChartAndKPI(data);
                 }
-            } catch (err) {
-                console.warn("⚠️ DB 조회 지연:", err.message);
-            }
+            } catch (err) {}
         }
 
         function renderChartAndKPI(data) {
-            if (!data || !Array.isArray(data) || data.length === 0) return;
-
-            let totalQty = 0, totalAmount = 0;
-            const uniqueItems = new Set();
-            const dailyMap = {};
+            if (!data || !Array.isArray(data)) return;
+            let totalQty = 0, totalAmount = 0, uniqueItems = new Set(), dailyMap = {};
 
             data.forEach(r => {
-                const q = cleanNumber(r.qty);
-                const amt = cleanNumber(r.total_amount);
-
-                totalQty += q;
-                totalAmount += amt;
+                const q = cleanNumber(r.qty), amt = cleanNumber(r.total_amount);
+                totalQty += q; totalAmount += amt;
                 if (r.item_name) uniqueItems.add(r.item_name);
 
                 let dateKey = formatDisplayDate(r.delivery_date);
-                if (!dateKey || dateKey === '-') return;
-
                 if (!dailyMap[dateKey]) dailyMap[dateKey] = { qty: 0, amount: 0 };
-                dailyMap[dateKey].qty += q;
-                dailyMap[dateKey].amount += amt;
+                dailyMap[dateKey].qty += q; dailyMap[dateKey].amount += amt;
             });
 
             document.getElementById('kpi-total-qty').innerText = `${totalQty.toLocaleString()} 건`;
@@ -728,9 +629,6 @@
             document.getElementById('kpi-total-amount').innerText = `${totalAmount.toLocaleString()} 원`;
 
             const labels = Object.keys(dailyMap).sort();
-            const qtyData = labels.map(k => dailyMap[k].qty);
-            const amtData = labels.map(k => dailyMap[k].amount);
-
             const ctx = document.getElementById('dailyTrendChart').getContext('2d');
             if (trendChart) trendChart.destroy();
 
@@ -739,80 +637,51 @@
                 data: {
                     labels: labels,
                     datasets: [
-                        { label: '주문수량', data: qtyData, backgroundColor: 'rgba(37, 99, 235, 0.6)', yAxisID: 'y1' },
-                        { label: '주문금액', data: amtData, type: 'line', borderColor: '#8b5cf6', yAxisID: 'y2' }
+                        { label: '주문수량', data: labels.map(k => dailyMap[k].qty), backgroundColor: 'rgba(37, 99, 235, 0.6)', yAxisID: 'y1' },
+                        { label: '주문금액', data: labels.map(k => dailyMap[k].amount), type: 'line', borderColor: '#8b5cf6', yAxisID: 'y2' }
                     ]
                 },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    scales: {
-                        y1: { type: 'linear', position: 'left', beginAtZero: true },
-                        y2: { type: 'linear', position: 'right', beginAtZero: true, grid: { drawOnChartArea: false } }
-                    }
-                }
+                options: { responsive: true, maintainAspectRatio: false, scales: { y1: { beginAtZero: true }, y2: { beginAtZero: true, grid: { drawOnChartArea: false } } } }
             });
         }
 
-        /* -------------------------------------------------------------
-           🛒 하루치 상세 내역 안전 조회
-        ------------------------------------------------------------- */
+        /* 🛒 상세 하루 내역 */
         async function fetchDetailData() {
             const targetDate = document.getElementById('detail-target-date').value;
             if (!targetDate) return;
 
             safeSetStorage('cached_detail_target_date', targetDate);
-
             let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=eq.${targetDate}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc`;
 
             try {
-                const res = await fetchWithRetry(queryUrl, {
-                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
-                });
-                if (!res.ok) throw new Error("API 응답 실패");
-                
-                const data = await res.json();
-                if (Array.isArray(data) && data.length > 0) {
-                    rawDetailOrders = data;
-                    processDetailData();
+                const res = await fetchWithRetry(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                if (res.ok) {
+                    rawDetailOrders = await res.json();
+                    filteredDetailOrders = rawDetailOrders;
+                    document.getElementById('detail-brand-input').value = '';
+                    updateStoreListAndSummary();
                 }
-            } catch (err) {
-                console.error("상세 데이터 로드 실패:", err);
-            }
+            } catch (err) {}
         }
 
-        function processDetailData() {
-            filteredDetailOrders = rawDetailOrders;
-
-            const brandSelect = document.getElementById('brand-select');
-            const brands = [...new Set(filteredDetailOrders.map(r => r.brand_name))].filter(Boolean);
-            brandSelect.innerHTML = '<option value="ALL">🌐 전체 브랜드</option>';
-            brands.forEach(b => brandSelect.innerHTML += `<option value="${b}">${b}</option>`);
-
-            onBrandChange();
-        }
-
-        function onBrandChange() {
-            const selectedBrand = document.getElementById('brand-select').value;
-            let brandOrders = (selectedBrand === 'ALL' || !selectedBrand) ? filteredDetailOrders : filteredDetailOrders.filter(r => r.brand_name === selectedBrand);
-
-            const stores = [...new Set(brandOrders.map(r => r.store_name))].filter(Boolean);
+        function updateStoreListAndSummary() {
+            const stores = [...new Set(filteredDetailOrders.map(r => r.store_name))].filter(Boolean);
             document.getElementById('brand-store-count').innerText = stores.length;
-            document.getElementById('brand-item-count').innerText = new Set(brandOrders.map(r => r.item_name)).size;
+            document.getElementById('brand-item-count').innerText = new Set(filteredDetailOrders.map(r => r.item_name)).size;
 
             const storeListEl = document.getElementById('store-list');
-            let listItemsHtml = [`<li class="store-item total-item active" onclick="onStoreSelect('ALL', '${selectedBrand}', this)">
-                <span>🏢 전체 점포 합산</span><span style="color:#2563eb;">${brandOrders.length}건</span>
+            let listItemsHtml = [`<li class="store-item total-item active" onclick="onStoreSelect('ALL', this)">
+                <span>🏢 전체 점포 합산</span><span style="color:#2563eb;">${filteredDetailOrders.length}건</span>
             </li>`];
 
-            for (let i = 0; i < stores.length; i++) {
-                const store = stores[i];
-                const count = brandOrders.filter(r => r.store_name === store).length;
-                listItemsHtml.push(`<li class="store-item" onclick="onStoreSelect('${store}', '${selectedBrand}', this)">
+            stores.forEach(store => {
+                const count = filteredDetailOrders.filter(r => r.store_name === store).length;
+                listItemsHtml.push(`<li class="store-item" onclick="onStoreSelect('${store}', this)">
                     <span>${store}</span><span style="color:#64748b;">${count}건</span>
                 </li>`);
-            }
+            });
             storeListEl.innerHTML = listItemsHtml.join('');
-            onStoreSelect('ALL', selectedBrand, storeListEl.firstElementChild);
+            onStoreSelect('ALL', storeListEl.firstElementChild);
         }
 
         function filterStoreList() {
@@ -822,13 +691,13 @@
             });
         }
 
-        function onStoreSelect(storeName, brandName, element) {
+        function onStoreSelect(storeName, element) {
             document.querySelectorAll('.store-item').forEach(el => el.classList.remove('active'));
             if (element) element.classList.add('active');
 
             if (storeName === 'ALL') {
                 document.getElementById('selected-store-title').innerText = `🛒 전체 점포 합산 상세`;
-                baseDetailOrders = (brandName === 'ALL' || !brandName) ? filteredDetailOrders : filteredDetailOrders.filter(r => r.brand_name === brandName);
+                baseDetailOrders = filteredDetailOrders;
             } else {
                 document.getElementById('selected-store-title').innerText = `🛒 [${storeName}] 주문 상세`;
                 baseDetailOrders = filteredDetailOrders.filter(r => r.store_name === storeName);
@@ -868,16 +737,12 @@
             }
 
             let sumQty = 0, sumAmount = 0;
-            const rowsHtml = [];
-
-            for (let i = 0; i < currentDetailOrders.length; i++) {
-                const row = currentDetailOrders[i];
-                const q = cleanNumber(row.qty);
-                const p = cleanNumber(row.price);
+            const rowsHtml = currentDetailOrders.map(row => {
+                const q = cleanNumber(row.qty), p = cleanNumber(row.price);
                 let t = cleanNumber(row.total_amount) || (q * p);
                 sumQty += q; sumAmount += t;
 
-                rowsHtml.push(`
+                return `
                     <tr>
                         <td><span class="code-tag">${cleanCode(row.store_code)}</span></td>
                         <td><b>${row.store_name||'-'}</b></td>
@@ -889,8 +754,8 @@
                         <td class="text-right">${p > 0 ? p.toLocaleString() + '원' : '-'}</td>
                         <td class="text-right"><b>${t > 0 ? t.toLocaleString() + '원' : '-'}</b></td>
                     </tr>
-                `);
-            }
+                `;
+            });
 
             tbody.innerHTML = rowsHtml.join('');
             document.getElementById('list-total-qty').innerText = sumQty.toLocaleString();
@@ -900,14 +765,10 @@
         function exportToExcel() {
             if (!currentDetailOrders || currentDetailOrders.length === 0) return alert("저장할 데이터가 없습니다.");
             const exportData = currentDetailOrders.map(row => ({
-                '점포코드': cleanCode(row.store_code), 
-                '점포명': row.store_name || '-',
-                '주문일자': formatDisplayDate(row.order_date), 
-                '배송일자': formatDisplayDate(row.delivery_date),
-                '품목코드': cleanCode(row.item_code), 
-                '품목명': row.item_name || '-',
-                '수량': cleanNumber(row.qty), 
-                '단가': cleanNumber(row.price),
+                '점포코드': cleanCode(row.store_code), '점포명': row.store_name || '-',
+                '주문일자': formatDisplayDate(row.order_date), '배송일자': formatDisplayDate(row.delivery_date),
+                '품목코드': cleanCode(row.item_code), '품목명': row.item_name || '-',
+                '수량': cleanNumber(row.qty), '단가': cleanNumber(row.price),
                 '금액': cleanNumber(row.total_amount) || (cleanNumber(row.qty) * cleanNumber(row.price))
             }));
             const ws = XLSX.utils.json_to_sheet(exportData);
@@ -916,9 +777,7 @@
             XLSX.writeFile(wb, `OMS주문상세_${document.getElementById('detail-target-date').value}.xlsx`);
         }
 
-        /* -------------------------------------------------------------
-           ⚡ 초기 로드
-        ------------------------------------------------------------- */
+        /* ⚡ 초기 실행 */
         document.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
             const past7 = new Date(); past7.setDate(today.getDate() - 7);
@@ -927,19 +786,14 @@
             document.getElementById('chart-end-date').value = localStorage.getItem('cached_chart_end_date') || formatDate(today);
             document.getElementById('sync-target-date').value = formatDate(today);
             document.getElementById('detail-target-date').value = localStorage.getItem('cached_detail_target_date') || formatDate(today);
-            
             document.getElementById('chart-brand-input').value = localStorage.getItem('cached_brand_input') || '';
             document.getElementById('chart-item-input').value = localStorage.getItem('cached_item_input') || '';
 
-            const mStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2, '0')}`;
-            document.getElementById('calendar-month-picker').value = mStr;
+            document.getElementById('calendar-month-picker').value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2, '0')}`;
 
             const cachedLastUpdated = localStorage.getItem('cached_last_updated');
-            if (cachedLastUpdated) {
-                document.getElementById('last-updated-text').innerText = `🕒 최신 배송일자: ${cachedLastUpdated}`;
-            }
+            if (cachedLastUpdated) document.getElementById('last-updated-text').innerText = `🕒 최신 배송일자: ${cachedLastUpdated}`;
 
-            // 백그라운드 데이터 수신
             loadCalendarData();
             fetchChartData();
             fetchDetailData();
@@ -951,42 +805,23 @@
 
             if (!targetDateVal) return alert("수동 동기화할 일자를 선택하세요.");
 
-            btn.disabled = true; 
-            btn.innerText = "🔄 동기화 중...";
+            btn.disabled = true; btn.innerText = "🔄 동기화 중...";
 
             try {
                 const res = await fetch(`https://api.github.com/repos/${githubId}/${repoName}/actions/workflows/capture.yml/dispatches`, {
                     method: 'POST',
-                    headers: { 
-                        'Accept': 'application/vnd.github.v3+json', 
-                        'Authorization': `Bearer ${token}` 
-                    },
-                    body: JSON.stringify({ 
-                        ref: 'main', 
-                        inputs: { 
-                            start_date: targetDateVal, 
-                            end_date: targetDateVal 
-                        } 
-                    })
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ ref: 'main', inputs: { start_date: targetDateVal, end_date: targetDateVal } })
                 });
 
                 if (res.ok) {
                     alert(`✅ [${targetDateVal}] OMS 데이터 동기화 요청 완료! (약 30~40초 후 완료)`);
-                    setTimeout(() => { 
-                        btn.disabled = false; 
-                        btn.innerText = "🚀 OMS 수동 동기화"; 
-                        loadCalendarData();
-                        fetchDetailData(); 
-                    }, 35000);
+                    setTimeout(() => { btn.disabled = false; btn.innerText = "🚀 OMS 수동 동기화"; fetchDetailData(); }, 35000);
                 } else {
-                    alert("❌ 수동 동기화 요청 실패 - GitHub 토큰을 확인해 주세요."); 
-                    btn.disabled = false; 
-                    btn.innerText = "🚀 OMS 수동 동기화";
+                    alert("❌ 동기화 요청 실패"); btn.disabled = false; btn.innerText = "🚀 OMS 수동 동기화";
                 }
             } catch (err) {
-                alert("❌ 요청 중 네트워크 오류가 발생했습니다.");
-                btn.disabled = false;
-                btn.innerText = "🚀 OMS 수동 동기화";
+                alert("❌ 네트워크 오류"); btn.disabled = false; btn.innerText = "🚀 OMS 수동 동기화";
             }
         }
     </script>
