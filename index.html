@@ -15,89 +15,62 @@
             color: #1e293b;
         }
         .navbar {
-            background-color: #0f172a;
-            color: white;
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            flex-wrap: wrap;
-            gap: 15px;
+            background-color: #0f172a; color: white; padding: 15px 30px;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex-wrap: wrap; gap: 15px;
         }
         .brand-title { display: flex; align-items: center; gap: 10px; }
         .brand-title h1 { margin: 0; font-size: 20px; font-weight: 700; }
         .version-tag {
-            background-color: #10b981;
-            color: white;
-            font-size: 11px;
-            font-weight: 800;
-            padding: 3px 8px;
-            border-radius: 12px;
-            letter-spacing: 0.5px;
-        }
-        .control-panel { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-        .date-picker-group {
-            display: flex; align-items: center; background-color: #1e293b;
-            padding: 6px 12px; border-radius: 8px; gap: 8px; border: 1px solid #334155;
-        }
-        .date-picker-group label { font-size: 13px; color: #94a3b8; font-weight: 600; }
-        .date-input {
-            background-color: #0f172a; color: #ffffff; border: 1px solid #475569;
-            padding: 6px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; color-scheme: dark;
+            background-color: #10b981; color: white; font-size: 11px; font-weight: 800;
+            padding: 3px 8px; border-radius: 12px; letter-spacing: 0.5px;
         }
         .last-updated-tag {
             font-size: 12px; color: #38bdf8; background-color: #1e293b;
             padding: 6px 12px; border-radius: 6px; border: 1px solid #0284c7; font-weight: bold;
         }
         .btn {
-            background-color: #2563eb; color: white; border: none; padding: 9px 16px;
-            border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px;
+            background-color: #2563eb; color: white; border: none; padding: 8px 14px;
+            border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px;
         }
         .btn:hover { background-color: #1d4ed8; }
         .btn-query { background-color: #0284c7; }
-        .btn-reset { background-color: #475569; }
         .btn-excel { background-color: #16a34a; padding: 5px 10px; font-size: 12px; }
 
         .container { padding: 20px; max-width: 98%; margin: 0 auto; }
-        .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 20px; }
-        .kpi-card {
-            background: white; padding: 20px 25px; border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04); border-left: 5px solid #2563eb;
+        
+        .section-panel {
+            background: white; padding: 20px; border-radius: 12px;
+            margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
+        .panel-header {
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;
+        }
+        .panel-title { font-size: 17px; font-weight: 700; color: #0f172a; }
+        
+        .filter-row {
+            display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+            background-color: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 15px;
+        }
+        .filter-group { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #475569; }
+        .input-box {
+            padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none;
+        }
+
+        .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 15px; }
+        .kpi-card { background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #2563eb; }
         .kpi-card.green { border-left-color: #10b981; }
         .kpi-card.purple { border-left-color: #8b5cf6; }
-        .kpi-title { font-size: 14px; color: #64748b; font-weight: 600; }
-        .kpi-value { font-size: 26px; font-weight: 800; margin-top: 6px; color: #0f172a; }
+        .kpi-title { font-size: 12px; color: #64748b; font-weight: 600; }
+        .kpi-value { font-size: 20px; font-weight: 800; margin-top: 4px; color: #0f172a; }
 
-        .chart-panel { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
         .chart-container { position: relative; height: 260px; width: 100%; }
 
-        .dashboard-layout { display: grid; grid-template-columns: 300px 1fr; gap: 20px; }
-        .panel { background: white; padding: 20px; border-radius: 12px; }
-        .panel-title {
-            font-size: 18px; font-weight: 700; margin-bottom: 15px; border-bottom: 2px solid #f1f5f9;
-            padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
-        }
-
-        .summary-badge-group { display: flex; align-items: center; gap: 10px; font-size: 13px; }
-        .summary-badge { background-color: #f1f5f9; padding: 4px 10px; border-radius: 6px; border: 1px solid #cbd5e1; color: #475569; }
-        .summary-badge b { color: #2563eb; }
-
-        .select-box, .search-input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 14px; margin-bottom: 12px; }
-        .store-list { list-style: none; padding: 0; margin: 0; max-height: 500px; overflow-y: auto; }
-        .store-item {
-            padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 6px;
-            cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 13.5px;
-        }
-        .store-item:hover, .store-item.active { background-color: #eff6ff; border-color: #2563eb; font-weight: bold; }
-        .store-item.total-item { background-color: #f8fafc; font-weight: 700; }
-
-        .table-container { width: 100%; overflow-x: auto; max-height: 550px; overflow-y: auto; }
+        .table-container { width: 100%; overflow-x: auto; max-height: 500px; overflow-y: auto; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #e2e8f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-        th { background-color: #f8fafc; color: #475569; cursor: pointer; position: sticky; top: 0; z-index: 2; }
-        .table-filter-input { width: 100%; padding: 4px 6px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 4px; }
+        th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        th { background-color: #f8fafc; color: #475569; position: sticky; top: 0; z-index: 2; }
         .text-right { text-align: right; }
         .code-tag { font-size: 11px; color: #64748b; font-family: monospace; }
     </style>
@@ -107,119 +80,124 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag" id="app-version-tag">v2.1.0 Secure DB</span>
+            <span class="version-tag">v2.5 Fast View</span>
         </div>
         <div class="control-panel">
-            <div class="last-updated-tag" id="last-updated-text">🕒 동기화: DB 대기 중</div>
-            <div class="date-picker-group">
-                <label>조회 기간:</label>
-                <input type="date" id="start-date" class="date-input" onchange="fetchSheetData()">
-                <span>~</span>
-                <input type="date" id="end-date" class="date-input" onchange="fetchSheetData()">
-            </div>
-            <button class="btn btn-query" onclick="fetchSheetData()">🔍 데이터 새로고침</button>
-            <button class="btn btn-reset" onclick="resetToTomorrow()">🔄 일주일 초기화</button>
+            <span class="last-updated-tag" id="last-updated-text">🕒 동기화: 대기 중</span>
             <button id="run-btn" class="btn" onclick="triggerBot()">🚀 OMS 수동 동기화</button>
         </div>
     </div>
 
     <div class="container">
-        <div class="kpi-grid">
-            <div class="kpi-card">
-                <div class="kpi-title">전체 총 주문수량</div>
-                <div class="kpi-value" id="total-qty">0 건</div>
+        
+        <!-- 📊 영역 1: 기간별 추이 그래프 및 브랜드/품목 조건 분석 -->
+        <div class="section-panel">
+            <div class="panel-header">
+                <span class="panel-title">📈 기간별 주문 추이 분석</span>
             </div>
-            <div class="kpi-card green">
-                <div class="kpi-title">전체 취급 품목수</div>
-                <div class="kpi-value" id="total-items">0 종</div>
+            
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label>조회 기간:</label>
+                    <input type="date" id="chart-start-date" class="input-box">
+                    <span>~</span>
+                    <input type="date" id="chart-end-date" class="input-box">
+                </div>
+                <div class="filter-group">
+                    <label>브랜드:</label>
+                    <input type="text" id="chart-brand-input" class="input-box" placeholder="브랜드명 검색" style="width: 130px;">
+                </div>
+                <div class="filter-group">
+                    <label>품목코드/명:</label>
+                    <input type="text" id="chart-item-input" class="input-box" placeholder="품목코드 또는 품목명" style="width: 160px;">
+                </div>
+                <button class="btn btn-query" onclick="fetchChartData()">🔍 추이 조회</button>
             </div>
-            <div class="kpi-card purple">
-                <div class="kpi-title">전체 총 주문금액</div>
-                <div class="kpi-value" id="total-amount">0 원</div>
-            </div>
-        </div>
 
-        <div class="chart-panel">
-            <div class="panel-title">
-                <span id="chart-panel-title">📊 일자별 주문 추이 그래프</span>
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-title">기간 내 총 주문수량</div>
+                    <div class="kpi-value" id="kpi-total-qty">0 건</div>
+                </div>
+                <div class="kpi-card green">
+                    <div class="kpi-title">기간 내 취급 품목수</div>
+                    <div class="kpi-value" id="kpi-total-items">0 종</div>
+                </div>
+                <div class="kpi-card purple">
+                    <div class="kpi-title">기간 내 총 주문금액</div>
+                    <div class="kpi-value" id="kpi-total-amount">0 원</div>
+                </div>
             </div>
+
             <div class="chart-container">
                 <canvas id="dailyTrendChart"></canvas>
             </div>
         </div>
 
-        <div class="dashboard-layout">
-            <div class="panel">
-                <div class="panel-title"><span>🏢 브랜드별 점포 목록</span></div>
-                <select id="brand-select" class="select-box" onchange="onBrandChange()">
-                    <option value="ALL">🌐 전체 브랜드</option>
-                </select>
-                <input type="text" id="store-search-input" class="search-input" placeholder="🔍 점포명 검색..." onkeyup="filterStoreList()">
-                <div id="brand-summary" style="margin-bottom: 10px; font-size: 12px; color: #64748b;">
-                    점포수: <b id="brand-store-count">0</b>개 | 품목수: <b id="brand-item-count">0</b>종
+        <!-- 🛒 영역 2: 일자별(하루) 상세 주문 내역 -->
+        <div class="section-panel">
+            <div class="panel-header">
+                <span class="panel-title">🛒 일자별 상세 주문 내역 (1일 단위 쾌속 조회)</span>
+                <div>
+                    <button class="btn btn-excel" onclick="exportToExcel()">📥 상세 엑셀 저장</button>
                 </div>
-                <ul class="store-list" id="store-list"></ul>
             </div>
 
-            <div class="panel">
-                <div class="panel-title">
-                    <span id="selected-store-title">🛒 점포별 주문 상세</span>
-                    <div class="summary-badge-group">
-                        <button class="btn btn-excel" onclick="exportToExcel()">📥 엑셀 저장</button>
-                        <span class="summary-badge">수량합계: <b id="list-total-qty">0</b>개</span>
-                        <span class="summary-badge">금액합계: <b id="list-total-amount">0</b>원</span>
-                    </div>
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label>조회 일자 (하루):</label>
+                    <input type="date" id="detail-date" class="input-box">
                 </div>
-                
-                <div class="table-container">
-                    <table id="detail-table">
-                        <colgroup>
-                            <col style="width: 90px;"><col style="width: 160px;"><col style="width: 100px;">
-                            <col style="width: 100px;"><col style="width: 100px;"><col style="width: 200px;">
-                            <col style="width: 70px;"><col style="width: 90px;"><col style="width: 110px;">
-                        </colgroup>
-                        <thead>
-                            <tr>
-                                <th>점포코드</th><th>점포명</th><th>주문일자</th><th>배송일자</th>
-                                <th>품목코드</th><th>품목명</th><th class="text-right">수량</th>
-                                <th class="text-right">단가</th><th class="text-right">금액</th>
-                            </tr>
-                            <tr class="filter-row">
-                                <th><input type="text" id="filter-storeCode" class="table-filter-input" placeholder="검색" onkeyup="applyColumnFilters()"></th>
-                                <th><input type="text" id="filter-storeName" class="table-filter-input" placeholder="검색" onkeyup="applyColumnFilters()"></th>
-                                <th><input type="text" id="filter-orderDate" class="table-filter-input" placeholder="검색" onkeyup="applyColumnFilters()"></th>
-                                <th><input type="text" id="filter-deliveryDate" class="table-filter-input" placeholder="검색" onkeyup="applyColumnFilters()"></th>
-                                <th><input type="text" id="filter-itemCode" class="table-filter-input" placeholder="검색" onkeyup="applyColumnFilters()"></th>
-                                <th><input type="text" id="filter-itemName" class="table-filter-input" placeholder="검색" onkeyup="applyColumnFilters()"></th>
-                                <th></th><th></th><th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="order-detail-table"></tbody>
-                    </table>
+                <div class="filter-group">
+                    <label>점포명:</label>
+                    <input type="text" id="detail-store-input" class="input-box" placeholder="점포명 검색" style="width: 140px;">
                 </div>
+                <div class="filter-group">
+                    <label>품목명:</label>
+                    <input type="text" id="detail-item-input" class="input-box" placeholder="품목명 검색" style="width: 140px;">
+                </div>
+                <button class="btn btn-query" onclick="fetchDetailData()">⚡ 상세 데이터 불러오기</button>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <colgroup>
+                        <col style="width: 90px;"><col style="width: 160px;"><col style="width: 100px;">
+                        <col style="width: 100px;"><col style="width: 100px;"><col style="width: 200px;">
+                        <col style="width: 70px;"><col style="width: 90px;"><col style="width: 110px;">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>점포코드</th><th>점포명</th><th>주문일자</th><th>배송일자</th>
+                            <th>품목코드</th><th>품목명</th><th class="text-right">수량</th>
+                            <th class="text-right">단가</th><th class="text-right">금액</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detail-table-body">
+                        <tr><td colspan="9" style="text-align:center; padding:30px; color:#94a3b8;">조회할 날짜를 선택 후 [상세 데이터 불러오기]를 눌러주세요.</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
+
     </div>
 
     <script>
-        // 올바른 Supabase URL 설정
         const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co"; 
-        
-        // ⚠️ 본인의 실제 Supabase Anon Key를 입력해 주세요. (없으면 401 에러 발생)
         const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN"; 
 
         const githubId = 'kshnpch-cmyk'; 
         const repoName = 'dashboard'; 
         const token = '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'; 
 
-        let rawOrders = [], filteredOrders = [], baseDetailOrders = [], currentDetailOrders = [];
+        let currentDetailData = [];
         let trendChart = null;
 
-        function formatDate(dateObj) {
-            const y = dateObj.getFullYear();
-            const m = String(dateObj.getMonth() + 1).padStart(2, '0');
-            const d = String(dateObj.getDate()).padStart(2, '0');
-            return `${y}-${m}-${d}`;
+        function formatDate(d) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
         }
 
         function formatDisplayDate(dateStr) {
@@ -234,94 +212,62 @@
             return parseFloat(String(val).replace(/[^0-9.-]/g, '')) || 0;
         }
 
-        function resetToTomorrow() {
-            const today = new Date();
-            const startObj = new Date(today); startObj.setDate(startObj.getDate() - 7);
-            const endObj = new Date(today); endObj.setDate(endObj.getDate() + 2);
+        // 📊 1. 추이 차트 전용 데이터 조회 (기간 선택)
+        async function fetchChartData() {
+            const startDate = document.getElementById('chart-start-date').value;
+            const endDate = document.getElementById('chart-end-date').value;
+            const brandKeyword = document.getElementById('chart-brand-input').value.trim();
+            const itemKeyword = document.getElementById('chart-item-input').value.trim();
 
-            document.getElementById('start-date').value = formatDate(startObj);
-            document.getElementById('end-date').value = formatDate(endObj);
-            fetchSheetData();
-        }
+            if (!startDate || !endDate) return alert("추이 조회를 위한 시작일과 종료일을 선택하세요.");
 
-        async function fetchSheetData() {
-            document.getElementById('last-updated-text').innerText = "🕒 동기화: DB 쿼리 중...";
+            let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,order_date,qty,price,total_amount,brand_name,item_code,item_name`;
 
-            const startDate = document.getElementById('start-date').value;
-            const endDate = document.getElementById('end-date').value;
-
-            if (!startDate || !endDate) return;
-
-            const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=*&order=delivery_date.desc`;
+            if (brandKeyword) queryUrl += `&brand_name=ilike.*${encodeURIComponent(brandKeyword)}*`;
+            if (itemKeyword) queryUrl += `&or=(item_code.ilike.*${encodeURIComponent(itemKeyword)}*,item_name.ilike.*${encodeURIComponent(itemKeyword)}*)`;
 
             try {
-                const response = await fetch(queryUrl, {
-                    method: 'GET',
-                    headers: {
-                        'apikey': SUPABASE_ANON_KEY,
-                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                        'Content-Type': 'application/json'
-                    }
+                const res = await fetch(queryUrl, {
+                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
                 });
+                if (!res.ok) throw new Error("API 응답 실패");
+                const data = await res.json();
 
-                if (!response.ok) throw new Error("Supabase API 응답 오류");
-
-                rawOrders = await response.json();
-
-                const now = new Date();
-                const updateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-                document.getElementById('last-updated-text').innerText = `🕒 동기화 완료: ${updateStr}`;
-
-                processData();
-
+                renderChartAndKPI(data);
             } catch (err) {
-                console.error("데이터 로드 오류:", err);
-                document.getElementById('last-updated-text').innerText = "🕒 동기화: DB 로드 실패";
+                alert("차트 데이터 조회 실패: " + err.message);
             }
         }
 
-        function processData() {
-            filteredOrders = rawOrders;
+        function renderChartAndKPI(data) {
+            let totalQty = 0, totalAmount = 0;
+            const uniqueItems = new Set();
+            const dailyMap = {};
 
-            document.getElementById('total-qty').innerText = `${filteredOrders.length.toLocaleString()} 건`;
-            const uniqueItems = new Set(filteredOrders.map(r => r.item_name));
-            document.getElementById('total-items').innerText = `${uniqueItems.size.toLocaleString()} 종`;
+            data.forEach(r => {
+                const q = cleanNumber(r.qty);
+                const p = cleanNumber(r.price);
+                const amt = cleanNumber(r.total_amount) || (q * p);
 
-            let totalAmount = 0;
-            filteredOrders.forEach(r => {
-                let amt = cleanNumber(r.total_amount) || (cleanNumber(r.qty) * cleanNumber(r.price));
+                totalQty += q;
                 totalAmount += amt;
-            });
-            document.getElementById('total-amount').innerText = `${totalAmount.toLocaleString()} 원`;
+                if (r.item_name) uniqueItems.add(r.item_name);
 
-            const brandSelect = document.getElementById('brand-select');
-            const brands = [...new Set(filteredOrders.map(r => r.brand_name))].filter(Boolean);
-            brandSelect.innerHTML = '<option value="ALL">🌐 전체 브랜드</option>';
-            brands.forEach(b => brandSelect.innerHTML += `<option value="${b}">${b}</option>`);
-
-            renderChart(filteredOrders);
-            onBrandChange();
-        }
-
-        function renderChart(orders) {
-            const dailyData = {};
-            orders.forEach(row => {
-                let dateKey = formatDisplayDate(row.delivery_date) || formatDisplayDate(row.order_date);
+                let dateKey = formatDisplayDate(r.delivery_date) || formatDisplayDate(r.order_date);
                 if (!dateKey || dateKey === '-') return;
 
-                if (!dailyData[dateKey]) dailyData[dateKey] = { stores: new Set(), qty: 0, amount: 0 };
-                if (row.store_name) dailyData[dateKey].stores.add(row.store_name);
-                
-                const q = cleanNumber(row.qty);
-                const p = cleanNumber(row.price);
-                let t = cleanNumber(row.total_amount) || (q * p);
-                dailyData[dateKey].qty += q; dailyData[dateKey].amount += t;
+                if (!dailyMap[dateKey]) dailyMap[dateKey] = { qty: 0, amount: 0 };
+                dailyMap[dateKey].qty += q;
+                dailyMap[dateKey].amount += amt;
             });
 
-            const labels = Object.keys(dailyData).sort();
-            const storeCounts = labels.map(k => dailyData[k].stores.size);
-            const qtySums = labels.map(k => dailyData[k].qty);
-            const amountSums = labels.map(k => dailyData[k].amount);
+            document.getElementById('kpi-total-qty').innerText = `${totalQty.toLocaleString()} 건`;
+            document.getElementById('kpi-total-items').innerText = `${uniqueItems.size.toLocaleString()} 종`;
+            document.getElementById('kpi-total-amount').innerText = `${totalAmount.toLocaleString()} 원`;
+
+            const labels = Object.keys(dailyMap).sort();
+            const qtyData = labels.map(k => dailyMap[k].qty);
+            const amtData = labels.map(k => dailyMap[k].amount);
 
             const ctx = document.getElementById('dailyTrendChart').getContext('2d');
             if (trendChart) trendChart.destroy();
@@ -331,15 +277,12 @@
                 data: {
                     labels: labels,
                     datasets: [
-                        { label: '점포수', data: storeCounts, backgroundColor: 'rgba(37, 99, 235, 0.6)', yAxisID: 'y1' },
-                        { label: '수량', data: qtySums, type: 'line', borderColor: '#10b981', yAxisID: 'y1' },
-                        { label: '금액', data: amountSums, type: 'line', borderColor: '#8b5cf6', yAxisID: 'y2' }
+                        { label: '주문수량', data: qtyData, backgroundColor: 'rgba(37, 99, 235, 0.6)', yAxisID: 'y1' },
+                        { label: '주문금액', data: amtData, type: 'line', borderColor: '#8b5cf6', yAxisID: 'y2' }
                     ]
                 },
                 options: {
-                    animation: false,
-                    responsive: true,
-                    maintainAspectRatio: false,
+                    responsive: true, maintainAspectRatio: false,
                     scales: {
                         y1: { type: 'linear', position: 'left', beginAtZero: true },
                         y2: { type: 'linear', position: 'right', beginAtZero: true, grid: { drawOnChartArea: false } }
@@ -348,91 +291,50 @@
             });
         }
 
-        function onBrandChange() {
-            const selectedBrand = document.getElementById('brand-select').value;
-            let brandOrders = (selectedBrand === 'ALL' || !selectedBrand) ? filteredOrders : filteredOrders.filter(r => r.brand_name === selectedBrand);
+        // 🛒 2. 하루 단위 상세 주문 내역 조회
+        async function fetchDetailData() {
+            const targetDate = document.getElementById('detail-date').value;
+            const storeKeyword = document.getElementById('detail-store-input').value.trim();
+            const itemKeyword = document.getElementById('detail-item-input').value.trim();
 
-            const stores = [...new Set(brandOrders.map(r => r.store_name))].filter(Boolean);
-            document.getElementById('brand-store-count').innerText = stores.length;
-            document.getElementById('brand-item-count').innerText = new Set(brandOrders.map(r => r.item_name)).size;
+            if (!targetDate) return alert("상세 내역을 조회할 하루 날짜를 선택하세요.");
 
-            const storeListEl = document.getElementById('store-list');
-            let html = `<li class="store-item total-item active" onclick="onStoreSelect('ALL', '${selectedBrand}', this)">
-                <span>🏢 전체 점포 합산</span><span style="color:#2563eb;">${brandOrders.length}건</span>
-            </li>`;
+            let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=eq.${targetDate}&select=*&order=store_name.asc`;
 
-            stores.forEach(store => {
-                const count = brandOrders.filter(r => r.store_name === store).length;
-                html += `<li class="store-item" onclick="onStoreSelect('${store}', '${selectedBrand}', this)">
-                    <span>${store}</span><span style="color:#64748b;">${count}건</span>
-                </li>`;
-            });
-            storeListEl.innerHTML = html;
-            onStoreSelect('ALL', selectedBrand, storeListEl.firstElementChild);
-        }
+            if (storeKeyword) queryUrl += `&store_name=ilike.*${encodeURIComponent(storeKeyword)}*`;
+            if (itemKeyword) queryUrl += `&item_name=ilike.*${encodeURIComponent(itemKeyword)}*`;
 
-        function filterStoreList() {
-            const query = document.getElementById('store-search-input').value.toLowerCase();
-            document.querySelectorAll('#store-list .store-item').forEach(item => {
-                item.style.display = item.innerText.toLowerCase().includes(query) ? 'flex' : 'none';
-            });
-        }
+            const tbody = document.getElementById('detail-table-body');
+            tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#2563eb;">⚡ 선택한 날짜(${targetDate})의 데이터를 불러오는 중...</td></tr>`;
 
-        function onStoreSelect(storeName, brandName, element) {
-            document.querySelectorAll('.store-item').forEach(el => el.classList.remove('active'));
-            if (element) element.classList.add('active');
+            try {
+                const res = await fetch(queryUrl, {
+                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                });
+                if (!res.ok) throw new Error("API 응답 실패");
+                
+                currentDetailData = await res.json();
+                renderDetailTable(currentDetailData);
 
-            if (storeName === 'ALL') {
-                document.getElementById('selected-store-title').innerText = `🛒 전체 점포 합산 상세`;
-                baseDetailOrders = (brandName === 'ALL' || !brandName) ? filteredOrders : filteredOrders.filter(r => r.brand_name === brandName);
-            } else {
-                document.getElementById('selected-store-title').innerText = `🛒 [${storeName}] 주문 상세`;
-                baseDetailOrders = filteredOrders.filter(r => r.store_name === storeName);
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#ef4444;">❌ 로드 실패: ${err.message}</td></tr>`;
             }
-            applyColumnFilters();
         }
 
-        function applyColumnFilters() {
-            const qSC = document.getElementById('filter-storeCode').value.toLowerCase().trim();
-            const qSN = document.getElementById('filter-storeName').value.toLowerCase().trim();
-            const qOD = document.getElementById('filter-orderDate').value.toLowerCase().trim();
-            const qDD = document.getElementById('filter-deliveryDate').value.toLowerCase().trim();
-            const qIC = document.getElementById('filter-itemCode').value.toLowerCase().trim();
-            const qIN = document.getElementById('filter-itemName').value.toLowerCase().trim();
-
-            currentDetailOrders = baseDetailOrders.filter(row => {
-                if (qSC && !String(row.store_code||'').toLowerCase().includes(qSC)) return false;
-                if (qSN && !String(row.store_name||'').toLowerCase().includes(qSN)) return false;
-                if (qOD && !formatDisplayDate(row.order_date).toLowerCase().includes(qOD)) return false;
-                if (qDD && !formatDisplayDate(row.delivery_date).toLowerCase().includes(qDD)) return false;
-                if (qIC && !String(row.item_code||'').toLowerCase().includes(qIC)) return false;
-                if (qIN && !String(row.item_name||'').toLowerCase().includes(qIN)) return false;
-                return true;
-            });
-
-            renderDetailTable();
-        }
-
-        function renderDetailTable() {
-            const tbody = document.getElementById('order-detail-table');
+        function renderDetailTable(data) {
+            const tbody = document.getElementById('detail-table-body');
             tbody.innerHTML = "";
 
-            if (!currentDetailOrders || currentDetailOrders.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#94a3b8;">데이터가 없습니다.</td></tr>`;
-                document.getElementById('list-total-qty').innerText = "0";
-                document.getElementById('list-total-amount').innerText = "0";
+            if (!data || data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#94a3b8;">해당 일자에 조회된 데이터가 없습니다.</td></tr>`;
                 return;
             }
 
-            let sumQty = 0, sumAmount = 0;
             const fragment = document.createDocumentFragment();
-
-            for (let i = 0; i < currentDetailOrders.length; i++) {
-                const row = currentDetailOrders[i];
+            data.forEach(row => {
                 const q = cleanNumber(row.qty);
                 const p = cleanNumber(row.price);
-                let t = cleanNumber(row.total_amount) || (q * p);
-                sumQty += q; sumAmount += t;
+                const t = cleanNumber(row.total_amount) || (q * p);
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
@@ -447,16 +349,15 @@
                     <td class="text-right"><b>${t > 0 ? t.toLocaleString() + '원' : '-'}</b></td>
                 `;
                 fragment.appendChild(tr);
-            }
+            });
 
             tbody.appendChild(fragment);
-            document.getElementById('list-total-qty').innerText = sumQty.toLocaleString();
-            document.getElementById('list-total-amount').innerText = sumAmount.toLocaleString();
+            document.getElementById('last-updated-text').innerText = `🕒 상세 데이터 로드 완료: ${data.length.toLocaleString()}건`;
         }
 
         function exportToExcel() {
-            if (!currentDetailOrders || currentDetailOrders.length === 0) return alert("저장할 데이터가 없습니다.");
-            const exportData = currentDetailOrders.map(row => ({
+            if (!currentDetailData || currentDetailData.length === 0) return alert("저장할 데이터가 없습니다.");
+            const exportData = currentDetailData.map(row => ({
                 '점포코드': row.store_code || '-', '점포명': row.store_name || '-',
                 '주문일자': formatDisplayDate(row.order_date), '배송일자': formatDisplayDate(row.delivery_date),
                 '품목코드': row.item_code || '-', '품목명': row.item_name || '-',
@@ -465,28 +366,34 @@
             }));
             const ws = XLSX.utils.json_to_sheet(exportData);
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "주문상세");
-            XLSX.writeFile(wb, `OMS주문상세_${formatDate(new Date())}.xlsx`);
+            XLSX.utils.book_append_sheet(wb, ws, "상세주문내역");
+            XLSX.writeFile(wb, `OMS_상세주문_${document.getElementById('detail-date').value}.xlsx`);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            resetToTomorrow();
+            const today = new Date();
+            const past7 = new Date(); past7.setDate(today.getDate() - 7);
+
+            document.getElementById('chart-start-date').value = formatDate(past7);
+            document.getElementById('chart-end-date').value = formatDate(today);
+            document.getElementById('detail-date').value = formatDate(today);
+
+            fetchChartData();
+            fetchDetailData();
         });
 
         async function triggerBot() {
             const btn = document.getElementById('run-btn');
-            const startVal = document.getElementById('start-date').value.replace(/-/g, '/');
-            const endVal = document.getElementById('end-date').value.replace(/-/g, '/');
             btn.disabled = true; btn.innerText = "🔄 동기화 중...";
 
             fetch(`https://api.github.com/repos/${githubId}/${repoName}/actions/workflows/capture.yml/dispatches`, {
                 method: 'POST',
                 headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ ref: 'main', inputs: { start_date: startVal, end_date: endVal } })
+                body: JSON.stringify({ ref: 'main' })
             }).then(res => {
                 if (res.ok) {
-                    alert(`✅ [${startVal} ~ ${endVal}] 동기화 요청 완료!`);
-                    setTimeout(() => { btn.disabled = false; btn.innerText = "🚀 OMS 수동 동기화"; fetchSheetData(); }, 35000);
+                    alert(`✅ OMS 동기화 요청 완료!`);
+                    setTimeout(() => { btn.disabled = false; btn.innerText = "🚀 OMS 수동 동기화"; }, 35000);
                 } else {
                     alert("❌ 요청 실패"); btn.disabled = false; btn.innerText = "🚀 OMS 수동 동기화";
                 }
