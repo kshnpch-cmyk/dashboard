@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>더본 OMS 주문 실시간 대시보드</title>
+    <!-- 📱 모바일 접속 시 mobile.html 자동 리다이렉트 -->
+    <script>
+        if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+            location.replace('/mobile.html');
+        }
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
@@ -149,7 +155,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v4.5 Light & Fast</span>
+            <span class="version-tag">v4.5 Desktop Mode</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -341,12 +347,11 @@
         let allBrandList = [];
         let allItemList = [];
 
-        // ⚡ 안전한 로컬 스토리지 저장 (용량 초과 시 자동 정리)
         function safeSetStorage(key, value) {
             try {
                 localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
             } catch (e) {
-                console.warn("⚠️ Storage 용량 한도 초과. 무거운 캐시 데이터를 안전하게 비웁니다.");
+                console.warn("⚠️ Storage 용량 한도 초과. 캐시 정리 수행");
                 localStorage.clear();
             }
         }
@@ -649,7 +654,7 @@
         }
 
         /* -------------------------------------------------------------
-           📊 추이 그래프 데이터 안전 조회 (경량화로 500 에러 방지)
+           📊 추이 그래프 데이터 안전 조회 (경량화 로직)
         ------------------------------------------------------------- */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
@@ -664,7 +669,6 @@
             safeSetStorage('cached_brand_input', brandInputValue);
             safeSetStorage('cached_item_input', itemKeyword);
 
-            // ⚡ 페이로드 극소화 (수량, 금액, 배송일자만 선택 수신)
             let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,qty,total_amount,item_name`;
 
             if (brandInputValue) {
