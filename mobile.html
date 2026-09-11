@@ -106,7 +106,7 @@
     <div class="m-navbar">
         <div class="m-brand">
             <span>📱 더본 OMS 모바일</span>
-            <span class="m-version">v4.0 Hybrid Engine</span>
+            <span class="m-version">v5.0 Ultra Fast</span>
         </div>
         <button class="btn-m btn-dark" style="width: auto; padding: 6px 10px; font-size: 11px;" onclick="openCalendarModal()">📅 캘린더</button>
     </div>
@@ -237,6 +237,65 @@
         let trendChart = null, allBrandList = [];
         let activeBrandTarget = 'chart';
 
+        /* 💾 [IndexedDB 엔진] 모바일 기기 메모리 초고속 로컬 캐시 */
+        const DB_NAME = "OmsLocalCacheDB_Mobile";
+        const STORE_NAME = "query_cache";
+
+        function openIndexedDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, 1);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { keyPath: "url" });
+                    }
+                };
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function getCacheIDB(url) {
+            try {
+                const db = await openIndexedDB();
+                return new Promise((resolve) => {
+                    const tx = db.transaction(STORE_NAME, "readonly");
+                    const store = tx.objectStore(STORE_NAME);
+                    const req = store.get(url);
+                    req.onsuccess = () => {
+                        const res = req.result;
+                        if (res && (Date.now() - res.timestamp < 1000 * 60 * 15)) {
+                            resolve(res.data);
+                        } else resolve(null);
+                    };
+                    req.onerror = () => resolve(null);
+                });
+            } catch (e) { return null; }
+        }
+
+        async function setCacheIDB(url, data) {
+            try {
+                const db = await openIndexedDB();
+                const tx = db.transaction(STORE_NAME, "readwrite");
+                tx.objectStore(STORE_NAME).put({ url, data, timestamp: Date.now() });
+            } catch (e) {}
+        }
+
+        async function fetchWithUltraCache(url, options, retries = 2) {
+            const cachedData = await getCacheIDB(url);
+            if (cachedData) {
+                return new Response(JSON.stringify(cachedData), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            }
+
+            const res = await fetchWithRetry(url, options, retries);
+            if (res.ok) {
+                const clone = res.clone();
+                const jsonData = await clone.json();
+                setCacheIDB(url, jsonData);
+            }
+            return res;
+        }
+
         function safeSetStorage(key, value) {
             try { localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); }
             catch (e) { localStorage.clear(); }
@@ -249,7 +308,7 @@
                 return res;
             } catch (err) {
                 if (retries > 0) {
-                    await new Promise(r => setTimeout(r, 500));
+                    await new Promise(r => setTimeout(r, 400));
                     return fetchWithRetry(url, options, retries - 1);
                 }
                 throw err;
@@ -294,7 +353,6 @@
         function openCalendarModal() { document.getElementById('calendar-modal').style.display = 'flex'; loadCalendarData(); }
         function closeCalendarModal() { document.getElementById('calendar-modal').style.display = 'none'; }
 
-        /* 📅 캘린더 모달 */
         async function loadCalendarData() {
             const monthVal = document.getElementById('calendar-month-picker').value;
             if (!monthVal) return;
@@ -307,7 +365,7 @@
 
             let dateCountMap = {}, availableDates = [];
             try {
-                const res = await fetchWithRetry(queryUrl, {
+                const res = await fetchWithUltraCache(queryUrl, {
                     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
                 });
                 if (res.ok) {
@@ -360,7 +418,7 @@
             document.getElementById('brand-modal').style.display = 'flex';
             if (allBrandList.length === 0) {
                 try {
-                    const res = await fetchWithRetry(`${SUPABASE_URL}/rest/v1/daily_order_summary?select=brand_name`, {
+                    const res = await fetchWithUltraCache(`${SUPABASE_URL}/rest/v1/daily_order_summary?select=brand_name`, {
                         headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
                     });
                     if (res.ok) {
@@ -416,7 +474,6 @@
             renderStoreCardList(filteredDetailOrders);
         }
 
-        /* 📊 차트 */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -436,7 +493,7 @@
             }
 
             try {
-                const res = await fetchWithRetry(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                const res = await fetchWithUltraCache(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                 if (res.ok) {
                     const data = await res.json();
                     renderChartAndKPI(data);
@@ -490,22 +547,19 @@
             });
         }
 
-        /* 🚀 [모바일 하이브리드] 점포 요약 뷰 로드 + Chunk 백그라운드 수신 */
         async function fetchDetailData() {
             const targetDate = document.getElementById('detail-target-date').value;
             if (!targetDate) return;
 
             safeSetStorage('cached_detail_target_date', targetDate);
 
-            // 1단계: 요약 뷰 수신
             const summaryUrl = `${SUPABASE_URL}/rest/v1/store_order_summary?delivery_date=eq.${targetDate}&select=store_code,store_name,brand_name,order_count,total_qty,total_amount`;
 
             try {
-                const res = await fetchWithRetry(summaryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                const res = await fetchWithUltraCache(summaryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                 if (res.ok) {
                     storeSummaryList = await res.json();
                     renderStoreCardListFromSummary();
-                    // 2단계: 백그라운드 분할 수신
                     fetchAllOrdersInChunks(targetDate);
                 }
             } catch (e) {}
@@ -518,7 +572,7 @@
             while (hasMore) {
                 const chunkUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=eq.${targetDate}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc&limit=${limit}&offset=${offset}`;
                 try {
-                    const res = await fetchWithRetry(chunkUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                    const res = await fetchWithUltraCache(chunkUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                     if (res.ok) {
                         const chunk = await res.json();
                         rawDetailOrders = rawDetailOrders.concat(chunk);
@@ -549,7 +603,7 @@
                         <span class="badge-cnt">${totalQty.toLocaleString()}개 / ${totalAmt.toLocaleString()}원 ▼</span>
                     </div>
                     <div class="item-detail-list open" id="store-card-body-total">
-                        <div style="text-align:center; color:#2563eb; padding:10px;">⚡ 상세 품목 데이터를 분할 수신 중입니다...</div>
+                        <div style="text-align:center; color:#2563eb; padding:10px;">⚡ 초고속 데이터 렌더링 준비 완료</div>
                     </div>
                 </div>
             `;
@@ -579,7 +633,7 @@
                 const targetDate = document.getElementById('detail-target-date').value;
                 const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=eq.${targetDate}&store_name=eq.${encodeURIComponent(storeName)}&select=item_code,item_name,qty,price,total_amount,order_date,delivery_date`;
                 try {
-                    const res = await fetchWithRetry(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                    const res = await fetchWithUltraCache(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                     if (res.ok) {
                         const items = await res.json();
                         body.innerHTML = items.map(o => `
@@ -707,6 +761,9 @@
                     alert(`✅ [${targetVal}] 동기화 요청 완료!`);
                     setTimeout(async () => { 
                         try {
+                            const db = await openIndexedDB();
+                            db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME).clear();
+
                             await fetch(`${SUPABASE_URL}/rest/v1/rpc/refresh_daily_summary`, {
                                 method: 'POST',
                                 headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
