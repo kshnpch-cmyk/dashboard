@@ -155,7 +155,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v8.0 Hybrid Chunk Engine</span>
+            <span class="version-tag">v9.0 Ultra Fast Engine</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -186,7 +186,7 @@
         </div>
     </div>
 
-    <!-- 🔍 브랜드 선택 다중 모달 -->
+    <!-- 🔍 브랜드 선택 모달 -->
     <div class="modal-overlay" id="brand-modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -349,12 +349,74 @@
         let allBrandList = [], allItemList = [];
         let activeBrandTarget = 'chart';
 
+        /* 💾 [2번 IndexedDB 엔진] 브라우저 기기 메모리 초고속 캐시 */
+        const DB_NAME = "OmsLocalCacheDB";
+        const STORE_NAME = "query_cache";
+
+        function openIndexedDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, 1);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { keyPath: "url" });
+                    }
+                };
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function getCacheIDB(url) {
+            try {
+                const db = await openIndexedDB();
+                return new Promise((resolve) => {
+                    const tx = db.transaction(STORE_NAME, "readonly");
+                    const store = tx.objectStore(STORE_NAME);
+                    const req = store.get(url);
+                    req.onsuccess = () => {
+                        const res = req.result;
+                        if (res && (Date.now() - res.timestamp < 1000 * 60 * 15)) { // 15분간 로컬 캐시 유지
+                            resolve(res.data);
+                        } else {
+                            resolve(null);
+                        }
+                    };
+                    req.onerror = () => resolve(null);
+                });
+            } catch (e) { return null; }
+        }
+
+        async function setCacheIDB(url, data) {
+            try {
+                const db = await openIndexedDB();
+                const tx = db.transaction(STORE_NAME, "readwrite");
+                const store = tx.objectStore(STORE_NAME);
+                store.put({ url, data, timestamp: Date.now() });
+            } catch (e) {}
+        }
+
+        async function fetchWithUltraCache(url, options, retries = 3) {
+            const cachedData = await getCacheIDB(url);
+            if (cachedData) {
+                return new Response(JSON.stringify(cachedData), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            }
+
+            const res = await fetchWithRetry(url, options, retries);
+            if (res.ok) {
+                const clone = res.clone();
+                const jsonData = await clone.json();
+                setCacheIDB(url, jsonData);
+            }
+            return res;
+        }
+
         function safeSetStorage(key, value) {
             try { localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); }
             catch (e) { localStorage.clear(); }
         }
 
-        async function fetchWithRetry(url, options, retries = 3, backoff = 600) {
+        async function fetchWithRetry(url, options, retries = 3, backoff = 400) {
             try {
                 const res = await fetch(url, options);
                 if (!res.ok && res.status >= 500 && retries > 0) throw new Error();
@@ -413,7 +475,7 @@
             if (allBrandList.length === 0) {
                 listEl.innerHTML = '<div style="text-align:center; padding:15px; color:#2563eb;">⚡ 브랜드 목록 로드 중...</div>';
                 try {
-                    const res = await fetchWithRetry(`${SUPABASE_URL}/rest/v1/daily_order_summary?select=brand_name`, {
+                    const res = await fetchWithUltraCache(`${SUPABASE_URL}/rest/v1/daily_order_summary?select=brand_name`, {
                         headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
                     });
                     if (res.ok) {
@@ -481,7 +543,7 @@
             const listEl = document.getElementById('item-modal-list');
             if (allItemList.length === 0) {
                 try {
-                    const res = await fetchWithRetry(`${SUPABASE_URL}/rest/v1/daily_order_summary?select=item_code,item_name`, {
+                    const res = await fetchWithUltraCache(`${SUPABASE_URL}/rest/v1/daily_order_summary?select=item_code,item_name`, {
                         headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
                     });
                     if (res.ok) {
@@ -539,7 +601,7 @@
 
             let dateCountMap = {}, availableDates = [];
             try {
-                const res = await fetchWithRetry(queryUrl, {
+                const res = await fetchWithUltraCache(queryUrl, {
                     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
                 });
                 if (res.ok) {
@@ -583,7 +645,7 @@
             }
         }
 
-        /* 📊 추이 차트 수신 */
+        /* 📊 추이 차트 수신 (이중 캐시 적용) */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -594,8 +656,6 @@
 
             safeSetStorage('cached_chart_start_date', startDate);
             safeSetStorage('cached_chart_end_date', endDate);
-            safeSetStorage('cached_brand_input', brandInputValue);
-            safeSetStorage('cached_item_input', itemKeyword);
 
             let queryUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,item_name`;
 
@@ -608,14 +668,12 @@
             if (itemKeyword) queryUrl += `&or=(item_code.ilike.*${encodeURIComponent(itemKeyword)}*,item_name.ilike.*${encodeURIComponent(itemKeyword)}*)`;
 
             try {
-                const res = await fetchWithRetry(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                const res = await fetchWithUltraCache(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                 if (res.ok) {
                     const data = await res.json();
                     renderChartAndKPI(data);
                 }
-            } catch (err) {
-                console.warn("⚠️ DB 조회 지연:", err.message);
-            }
+            } catch (err) {}
         }
 
         function renderChartAndKPI(data) {
@@ -674,29 +732,26 @@
             });
         }
 
-        /* 🚀 [전략 1 적용] 점포별 요약 뷰(store_order_summary) 우선 로드 (0.01초 소요) */
+        /* 🛒 하루치 상세 내역 (이중 캐시 적용) */
         async function fetchDetailData() {
             const targetDate = document.getElementById('detail-target-date').value;
             if (!targetDate) return;
 
             safeSetStorage('cached_detail_target_date', targetDate);
 
-            // 1단계: 점포 목록 요약 뷰 수신
-            const summaryUrl = `${SUPABASE_URL}/rest/v1/store_order_summary?delivery_date=eq.${targetDate}&select=store_code,store_name,brand_name,order_count,total_qty,total_amount&order=store_name.asc`;
+            const summaryUrl = `${SUPABASE_URL}/rest/v1/store_order_summary?delivery_date=eq.${targetDate}&select=store_code,store_name,brand_name,order_count,total_qty,total_amount`;
 
             try {
-                const res = await fetchWithRetry(summaryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                const res = await fetchWithUltraCache(summaryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                 if (res.ok) {
                     storeSummaryList = await res.json();
                     rawDetailOrders = [];
                     updateStoreListAndSummary();
-                    // 2단계: 전체 합산 데이터 분할 수신 자동 트리거
                     fetchAllOrdersInChunks(targetDate);
                 }
             } catch (err) {}
         }
 
-        /* 🚀 [전략 2 적용] 200건 단위 Chunk 분할 백그라운드 수신 */
         async function fetchAllOrdersInChunks(targetDate) {
             let offset = 0;
             const limit = 200;
@@ -706,13 +761,12 @@
             while (hasMore) {
                 const chunkUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=eq.${targetDate}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc&limit=${limit}&offset=${offset}`;
                 try {
-                    const res = await fetchWithRetry(chunkUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                    const res = await fetchWithUltraCache(chunkUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                     if (res.ok) {
                         const chunk = await res.json();
                         rawDetailOrders = rawDetailOrders.concat(chunk);
                         filteredDetailOrders = rawDetailOrders;
 
-                        // 현재 전체점포가 선택되어 있다면 실시간 바인딩
                         const activeStore = document.querySelector('#store-list .active');
                         if (activeStore && activeStore.innerText.includes('전체 점포 합산')) {
                             baseDetailOrders = filteredDetailOrders;
@@ -721,22 +775,17 @@
 
                         if (chunk.length < limit) hasMore = false;
                         else offset += limit;
-                    } else {
-                        hasMore = false;
-                    }
-                } catch(e) {
-                    hasMore = false;
-                }
+                    } else { hasMore = false; }
+                } catch(e) { hasMore = false; }
             }
         }
 
-        /* 개별 점포 선택 시 Drill-down 지연 수신 */
         async function fetchStoreDetailOrders(storeName) {
             const targetDate = document.getElementById('detail-target-date').value;
             const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=eq.${targetDate}&store_name=eq.${encodeURIComponent(storeName)}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name`;
 
             try {
-                const res = await fetchWithRetry(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                const res = await fetchWithUltraCache(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                 if (res.ok) {
                     baseDetailOrders = await res.json();
                     applyColumnFilters();
@@ -898,9 +947,14 @@
                 });
 
                 if (res.ok) {
-                    alert(`✅ [${targetDateVal}] OMS 데이터 동기화 요청 완료! (약 30~40초 후 자동 새로고침)`);
+                    alert(`✅ [${targetDateVal}] OMS 데이터 동기화 요청 완료!`);
                     setTimeout(async () => { 
                         try {
+                            // 로컬 캐시 초기화
+                            const db = await openIndexedDB();
+                            const tx = db.transaction(STORE_NAME, "readwrite");
+                            tx.objectStore(STORE_NAME).clear();
+
                             await fetch(`${SUPABASE_URL}/rest/v1/rpc/refresh_daily_summary`, {
                                 method: 'POST',
                                 headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
