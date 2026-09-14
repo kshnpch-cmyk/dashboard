@@ -155,7 +155,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v9.0 Ultra Fast Engine</span>
+            <span class="version-tag">v10.0 Explicit Action Engine</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -194,7 +194,8 @@
                 <span class="close-btn" onclick="closeBrandModal()">✕</span>
             </div>
             <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-                <input type="text" id="modal-brand-search" class="input-box" style="flex:1;" placeholder="브랜드명 검색..." onkeyup="filterBrandModalList()">
+                <input type="text" id="modal-brand-search" class="input-box" style="flex:1;" placeholder="브랜드명 검색 (Enter 키를 누르세요)" onkeydown="if(event.key==='Enter') filterBrandModalList()">
+                <button class="btn btn-cal" style="background:#2563eb;" onclick="filterBrandModalList()">검색</button>
                 <button class="btn btn-cal" style="background:#475569;" onclick="toggleAllBrandCheck(true)">전체선택</button>
                 <button class="btn btn-cal" style="background:#64748b;" onclick="toggleAllBrandCheck(false)">해제</button>
             </div>
@@ -212,8 +213,9 @@
                 <span class="modal-title">📦 품목 검색 및 선택</span>
                 <span class="close-btn" onclick="closeItemModal()">✕</span>
             </div>
-            <div style="margin-bottom: 8px;">
-                <input type="text" id="modal-item-search" class="input-box" style="width:100%;" placeholder="품목코드 또는 품목명 검색..." onkeyup="filterItemModalList()">
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                <input type="text" id="modal-item-search" class="input-box" style="flex:1;" placeholder="품목코드 또는 품목명 검색 (Enter 키를 누르세요)" onkeydown="if(event.key==='Enter') filterItemModalList()">
+                <button class="btn btn-cal" style="background:#2563eb;" onclick="filterItemModalList()">검색</button>
             </div>
             <div class="modal-body-scroll" id="item-modal-list"></div>
         </div>
@@ -283,7 +285,11 @@
                     <input type="text" id="detail-brand-input" class="input-box" style="flex:1;" placeholder="브랜드 선택..." readonly onclick="openBrandModal('detail')">
                     <button class="btn-search-icon" onclick="openBrandModal('detail')">🔍</button>
                 </div>
-                <input type="text" id="store-search-input" class="search-input" placeholder="🔍 점포명 검색..." onkeyup="debouncedFilterStoreList()">
+                <div style="display: flex; gap: 4px; margin-bottom: 12px;">
+                    <!-- ⚡ 실시간 필터 제거: Enter 키 또는 검색 버튼 클릭 시에만 필터 동작 -->
+                    <input type="text" id="store-search-input" class="search-input" style="margin-bottom:0;" placeholder="🔍 점포명 입력 후 Enter" onkeydown="if(event.key==='Enter') filterStoreList()">
+                    <button class="btn btn-query" onclick="filterStoreList()">검색</button>
+                </div>
                 <div id="brand-summary" style="margin-bottom: 10px; font-size: 12px; color: #64748b;">
                     점포수: <b id="brand-store-count">0</b>개 | 품목수: <b id="brand-item-count">0</b>종
                 </div>
@@ -314,12 +320,13 @@
                                 <th class="text-right">단가</th><th class="text-right">금액</th>
                             </tr>
                             <tr class="filter-row-table">
-                                <th><input type="text" id="filter-storeCode" class="table-filter-input" placeholder="검색" onkeyup="debouncedApplyColumnFilters()"></th>
-                                <th><input type="text" id="filter-storeName" class="table-filter-input" placeholder="검색" onkeyup="debouncedApplyColumnFilters()"></th>
-                                <th><input type="text" id="filter-orderDate" class="table-filter-input" placeholder="검색" onkeyup="debouncedApplyColumnFilters()"></th>
-                                <th><input type="text" id="filter-deliveryDate" class="table-filter-input" placeholder="검색" onkeyup="debouncedApplyColumnFilters()"></th>
-                                <th><input type="text" id="filter-itemCode" class="table-filter-input" placeholder="검색" onkeyup="debouncedApplyColumnFilters()"></th>
-                                <th><input type="text" id="filter-itemName" class="table-filter-input" placeholder="검색" onkeyup="debouncedApplyColumnFilters()"></th>
+                                <!-- ⚡ 입력 렉 방지를 위해 Enter 키 조작 시에만 테이블 필터 실행 -->
+                                <th><input type="text" id="filter-storeCode" class="table-filter-input" placeholder="Enter" onkeydown="if(event.key==='Enter') applyColumnFilters()"></th>
+                                <th><input type="text" id="filter-storeName" class="table-filter-input" placeholder="Enter" onkeydown="if(event.key==='Enter') applyColumnFilters()"></th>
+                                <th><input type="text" id="filter-orderDate" class="table-filter-input" placeholder="Enter" onkeydown="if(event.key==='Enter') applyColumnFilters()"></th>
+                                <th><input type="text" id="filter-deliveryDate" class="table-filter-input" placeholder="Enter" onkeydown="if(event.key==='Enter') applyColumnFilters()"></th>
+                                <th><input type="text" id="filter-itemCode" class="table-filter-input" placeholder="Enter" onkeydown="if(event.key==='Enter') applyColumnFilters()"></th>
+                                <th><input type="text" id="filter-itemName" class="table-filter-input" placeholder="Enter" onkeydown="if(event.key==='Enter') applyColumnFilters()"></th>
                                 <th></th><th></th><th></th>
                             </tr>
                         </thead>
@@ -349,7 +356,7 @@
         let allBrandList = [], allItemList = [];
         let activeBrandTarget = 'chart';
 
-        /* 💾 [2번 IndexedDB 엔진] 브라우저 기기 메모리 초고속 캐시 */
+        /* 💾 IndexedDB 브라우저 캐시 처리 */
         const DB_NAME = "OmsLocalCacheDB";
         const STORE_NAME = "query_cache";
 
@@ -376,11 +383,9 @@
                     const req = store.get(url);
                     req.onsuccess = () => {
                         const res = req.result;
-                        if (res && (Date.now() - res.timestamp < 1000 * 60 * 15)) { // 15분간 로컬 캐시 유지
+                        if (res && (Date.now() - res.timestamp < 1000 * 60 * 15)) {
                             resolve(res.data);
-                        } else {
-                            resolve(null);
-                        }
+                        } else resolve(null);
                     };
                     req.onerror = () => resolve(null);
                 });
@@ -391,8 +396,7 @@
             try {
                 const db = await openIndexedDB();
                 const tx = db.transaction(STORE_NAME, "readwrite");
-                const store = tx.objectStore(STORE_NAME);
-                store.put({ url, data, timestamp: Date.now() });
+                tx.objectStore(STORE_NAME).put({ url, data, timestamp: Date.now() });
             } catch (e) {}
         }
 
@@ -429,17 +433,6 @@
                 throw err;
             }
         }
-
-        function debounce(func, delay = 150) {
-            let timeout;
-            return function(...args) {
-                clearTimeout(timeout);
-                timeout = setTimeout(() => func.apply(this, args), delay);
-            };
-        }
-
-        const debouncedApplyColumnFilters = debounce(applyColumnFilters, 150);
-        const debouncedFilterStoreList = debounce(filterStoreList, 150);
 
         function formatDate(d) {
             const y = d.getFullYear();
@@ -645,7 +638,7 @@
             }
         }
 
-        /* 📊 추이 차트 수신 (이중 캐시 적용) */
+        /* 📊 추이 차트 조회 */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -732,7 +725,7 @@
             });
         }
 
-        /* 🛒 하루치 상세 내역 (이중 캐시 적용) */
+        /* 🛒 하루치 상세 내역 불러오기 */
         async function fetchDetailData() {
             const targetDate = document.getElementById('detail-target-date').value;
             if (!targetDate) return;
@@ -816,8 +809,9 @@
             onStoreSelect('ALL', storeListEl.firstElementChild);
         }
 
+        /* ⚡ 점포 검색 액션 함수 */
         function filterStoreList() {
-            const query = document.getElementById('store-search-input').value.toLowerCase();
+            const query = document.getElementById('store-search-input').value.toLowerCase().trim();
             document.querySelectorAll('#store-list .store-item').forEach(item => {
                 item.style.display = item.innerText.toLowerCase().includes(query) ? 'flex' : 'none';
             });
@@ -837,6 +831,7 @@
             }
         }
 
+        /* ⚡ 테이블 필터 적용 함수 */
         function applyColumnFilters() {
             const qSC = document.getElementById('filter-storeCode').value.toLowerCase().trim();
             const qSN = document.getElementById('filter-storeName').value.toLowerCase().trim();
@@ -931,6 +926,7 @@
             fetchDetailData();
         });
 
+        /* 🚀 동기화 후 구체화 뷰 자동 REFRESH RPC 통합 트래킹 */
         async function triggerBot() {
             const btn = document.getElementById('run-btn');
             const targetDateVal = document.getElementById('sync-target-date').value.replace(/-/g, '/');
@@ -947,14 +943,14 @@
                 });
 
                 if (res.ok) {
-                    alert(`✅ [${targetDateVal}] OMS 데이터 동기화 요청 완료!`);
+                    alert(`✅ [${targetDateVal}] OMS 데이터 동기화 요청 완료! (약 35초 후 캐시 갱신 및 자동으로 그려집니다.)`);
                     setTimeout(async () => { 
                         try {
-                            // 로컬 캐시 초기화
+                            // 1. IndexedDB 캐시 삭제
                             const db = await openIndexedDB();
-                            const tx = db.transaction(STORE_NAME, "readwrite");
-                            tx.objectStore(STORE_NAME).clear();
+                            db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME).clear();
 
+                            // 2. Supabase 뷰 캐시 자동 리프레시 명령
                             await fetch(`${SUPABASE_URL}/rest/v1/rpc/refresh_daily_summary`, {
                                 method: 'POST',
                                 headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
