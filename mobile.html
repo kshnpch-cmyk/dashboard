@@ -106,7 +106,7 @@
     <div class="m-navbar">
         <div class="m-brand">
             <span>📱 더본 OMS 모바일</span>
-            <span class="m-version">v5.0 Ultra Fast</span>
+            <span class="m-version">v6.0 Ultra Action</span>
         </div>
         <button class="btn-m btn-dark" style="width: auto; padding: 6px 10px; font-size: 11px;" onclick="openCalendarModal()">📅 캘린더</button>
     </div>
@@ -181,14 +181,18 @@
                 <button class="btn-m btn-dark" style="width: 70px;" onclick="openBrandModal('detail')">🔍</button>
             </div>
             
-            <input type="text" id="store-search-input" class="m-input" style="margin-top: 8px;" placeholder="🔍 점포코드, 점포명, 품목코드, 품목명, 날짜 검색..." onkeyup="debouncedFilterCards()">
+            <div style="display: flex; gap: 6px; margin-top: 8px;">
+                <!-- ⚡ 모바일 입력 렉 제거: Enter 키 조작 또는 검색 버튼 시 검색 수행 -->
+                <input type="text" id="store-search-input" class="m-input" placeholder="🔍 점포명/품목명 입력 후 Enter" onkeydown="if(event.key==='Enter') filterCards()">
+                <button class="btn-m btn-blue" style="width: 70px;" onclick="filterCards()">검색</button>
+            </div>
         </div>
 
         <div id="store-card-list-container"></div>
 
     </div>
 
-    <!-- 📅 캘린더 바텀시트 모달 -->
+    <!-- 📅 캘린더 모달 -->
     <div class="bottom-sheet-overlay" id="calendar-modal">
         <div class="bottom-sheet-content">
             <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 16px;">
@@ -213,9 +217,10 @@
                 <span style="cursor: pointer; padding: 4px;" onclick="closeBrandModal()">✕</span>
             </div>
             <div style="display: flex; gap: 8px; margin-top: 10px;">
-                <input type="text" id="modal-brand-search" class="m-input" placeholder="브랜드명 검색..." onkeyup="renderBrandModalList()">
-                <button class="btn-m btn-dark" style="width: 70px;" onclick="toggleAllBrandCheck(true)">전체</button>
-                <button class="btn-m btn-dark" style="width: 70px;" onclick="toggleAllBrandCheck(false)">해제</button>
+                <input type="text" id="modal-brand-search" class="m-input" placeholder="브랜드명 검색 (Enter 키를 누르세요)" onkeydown="if(event.key==='Enter') renderBrandModalList()">
+                <button class="btn-m btn-blue" style="width: 70px;" onclick="renderBrandModalList()">검색</button>
+                <button class="btn-m btn-dark" style="width: 60px;" onclick="toggleAllBrandCheck(true)">전체</button>
+                <button class="btn-m btn-dark" style="width: 60px;" onclick="toggleAllBrandCheck(false)">해제</button>
             </div>
             <div class="sheet-scroll" id="brand-modal-list"></div>
             <button class="btn-m btn-blue" style="margin-top: 10px;" onclick="applyBrandSelection()">선택 완료</button>
@@ -237,7 +242,7 @@
         let trendChart = null, allBrandList = [];
         let activeBrandTarget = 'chart';
 
-        /* 💾 [IndexedDB 엔진] 모바일 기기 메모리 초고속 로컬 캐시 */
+        /* 💾 모바일 IndexedDB 로컬 캐시 */
         const DB_NAME = "OmsLocalCacheDB_Mobile";
         const STORE_NAME = "query_cache";
 
@@ -314,16 +319,6 @@
                 throw err;
             }
         }
-
-        function debounce(func, delay = 150) {
-            let timeout;
-            return function(...args) {
-                clearTimeout(timeout);
-                timeout = setTimeout(() => func.apply(this, args), delay);
-            };
-        }
-
-        const debouncedFilterCards = debounce(filterCards, 150);
 
         function formatDate(d) {
             const y = d.getFullYear();
@@ -603,7 +598,7 @@
                         <span class="badge-cnt">${totalQty.toLocaleString()}개 / ${totalAmt.toLocaleString()}원 ▼</span>
                     </div>
                     <div class="item-detail-list open" id="store-card-body-total">
-                        <div style="text-align:center; color:#2563eb; padding:10px;">⚡ 초고속 데이터 렌더링 준비 완료</div>
+                        <div style="text-align:center; color:#2563eb; padding:10px;">⚡ 데이터 수신 및 초고속 렌더링 완료</div>
                     </div>
                 </div>
             `;
@@ -656,6 +651,7 @@
             }
         }
 
+        /* ⚡ 모바일 카드 검색 실행 함수 */
         function filterCards() {
             const query = document.getElementById('store-search-input').value.toLowerCase().trim();
             if (!query) {
@@ -758,7 +754,7 @@
                 });
 
                 if (res.ok) {
-                    alert(`✅ [${targetVal}] 동기화 요청 완료!`);
+                    alert(`✅ [${targetVal}] 동기화 요청 완료! (약 35초 후 자동 갱신됩니다.)`);
                     setTimeout(async () => { 
                         try {
                             const db = await openIndexedDB();
