@@ -110,8 +110,6 @@
         .calendar-day-cell:hover { border-color: #2563eb; background-color: #eff6ff; }
         .calendar-day-cell.other-month { background-color: #f8fafc; opacity: 0.3; cursor: default; }
         .day-number { font-size: 11px; font-weight: bold; }
-        
-        /* 💡 캘린더 수량 뱃지 스타일 보정 */
         .data-status-badge { font-size: 9.5px; font-weight: bold; padding: 1px 3px; border-radius: 3px; text-align: center; }
         .badge-has-data { background-color: #d1fae5; color: #047857; }
         .badge-no-data { background-color: #f1f5f9; color: #94a3b8; }
@@ -226,18 +224,23 @@
         </div>
     </div>
 
-    <!-- 🔍 품목 검색 모달 -->
+    <!-- 📦 품목 다중 선택 모달 (개편) -->
     <div class="modal-overlay" id="item-modal">
         <div class="modal-content">
             <div class="modal-header">
-                <span class="modal-title">📦 품목 검색 및 선택</span>
+                <span class="modal-title">📦 품목 다중 선택</span>
                 <span class="close-btn" onclick="closeItemModal()">✕</span>
             </div>
             <div style="display: flex; gap: 8px; margin-bottom: 8px;">
                 <input type="text" id="modal-item-search" class="input-box" style="flex:1;" placeholder="품목코드 또는 품목명 검색 (Enter)" onkeydown="if(event.key==='Enter') filterItemModalList()">
                 <button class="btn btn-cal" style="background:#2563eb;" onclick="filterItemModalList()">검색</button>
+                <button class="btn btn-cal" style="background:#475569;" onclick="toggleAllItemCheck(true)">전체선택</button>
+                <button class="btn btn-cal" style="background:#64748b;" onclick="toggleAllItemCheck(false)">해제</button>
             </div>
             <div class="modal-body-scroll" id="item-modal-list"></div>
+            <div style="margin-top: 15px; text-align: right;">
+                <button class="btn" onclick="applyItemSelection()">확인 적용</button>
+            </div>
         </div>
     </div>
 
@@ -262,8 +265,8 @@
                     </div>
                     <div class="filter-group">
                         <label>품목코드/명:</label>
-                        <input type="text" id="chart-item-input" class="input-box" placeholder="품목코드 또는 품목명" style="width: 150px;">
-                        <button class="btn-search-icon" onclick="openItemModal()" title="품목 검색 선택">🔍</button>
+                        <input type="text" id="chart-item-input" class="input-box" placeholder="품목 선택/검색" style="width: 150px;" readonly onclick="openItemModal()">
+                        <button class="btn-search-icon" onclick="openItemModal()" title="품목 다중 선택">🔍</button>
                     </div>
                     <button class="btn btn-query" onclick="fetchAllDashboardData()">🔍 대시보드 종합 조회</button>
                 </div>
@@ -568,11 +571,12 @@
             updateStoreListAndSummary(selectedBrands);
         }
 
-        /* 📦 품목 모달 */
+        /* 📦 품목 모달 (브랜드와 동일한 체크박스 다중 선택 구조) */
         async function openItemModal() {
             document.getElementById('item-modal').style.display = 'flex';
             const listEl = document.getElementById('item-modal-list');
             if (allItemList.length === 0) {
+                listEl.innerHTML = '<div style="text-align:center; padding:15px; color:#2563eb;">⚡ 품목 목록 로드 중...</div>';
                 try {
                     const res = await fetchWithUltraCache(`${SUPABASE_URL}/rest/v1/daily_order_summary?select=item_code,item_name`, {
                         headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
@@ -593,6 +597,7 @@
         function closeItemModal() { document.getElementById('item-modal').style.display = 'none'; }
 
         function renderItemModalList() {
+            const currentSelected = document.getElementById('chart-item-input').value.split(',').map(s => s.trim());
             const searchKeyword = document.getElementById('modal-item-search').value.toLowerCase().trim();
             const listEl = document.getElementById('item-modal-list');
             const filtered = allItemList.filter(item => item.code.toLowerCase().includes(searchKeyword) || item.name.toLowerCase().includes(searchKeyword));
@@ -602,22 +607,28 @@
                 return;
             }
 
-            listEl.innerHTML = filtered.slice(0, 100).map(item => `
-                <div class="search-list-item" onclick="selectItemFromModal('${item.name}')">
-                    <div><span class="code-tag">[${item.code}]</span><b style="margin-left: 5px;">${item.name}</b></div>
-                    <button class="btn btn-cal" style="background:#2563eb;">선택</button>
+            listEl.innerHTML = filtered.map(item => `
+                <div class="search-list-item">
+                    <label>
+                        <input type="checkbox" class="item-modal-chk" value="${item.name}" ${currentSelected.includes(item.name) ? 'checked' : ''}>
+                        <span><span class="code-tag">[${item.code}]</span> <b style="margin-left: 4px;">${item.name}</b></span>
+                    </label>
                 </div>
             `).join('');
         }
 
         function filterItemModalList() { renderItemModalList(); }
-        function selectItemFromModal(itemName) {
-            document.getElementById('chart-item-input').value = itemName;
-            safeSetStorage('cached_item_input', itemName);
+        function toggleAllItemCheck(status) { document.querySelectorAll('.item-modal-chk').forEach(chk => chk.checked = status); }
+
+        function applyItemSelection() {
+            const checkedVals = Array.from(document.querySelectorAll('.item-modal-chk:checked')).map(c => c.value);
+            const itemStr = checkedVals.join(', ');
+            document.getElementById('chart-item-input').value = itemStr;
+            safeSetStorage('cached_item_input', itemStr);
             closeItemModal();
         }
 
-        /* 📅 캘린더 모달 (수량 숫자로 표출) */
+        /* 📅 캘린더 모달 */
         function openCalendarModal() { document.getElementById('calendar-modal').style.display = 'flex'; loadCalendarData(); }
         function closeCalendarModal() { document.getElementById('calendar-modal').style.display = 'none'; }
 
@@ -628,7 +639,6 @@
             const startDateStr = formatDate(new Date(year, month - 1, 1));
             const endDateStr = formatDate(new Date(year, month, 0));
 
-            // 🚀 수량 합산 정보를 위해 sum_qty 필드가 지원되는 뷰 또는 계산 API 조회
             const queryUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date,total_qty`;
 
             let dateQtyMap = {}, availableDates = [];
@@ -669,8 +679,6 @@
             for (let day = 1; day <= totalDays; day++) {
                 const dString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 const qty = dateQtyMap[dString] || 0;
-                
-                // 💡 수량이 있다면 숫자로 표시, 없다면 0 표출
                 const badgeHtml = qty > 0 ? `<span class="data-status-badge badge-has-data">${qty.toLocaleString()}</span>` : `<span class="data-status-badge badge-no-data">0</span>`;
                 
                 const cell = document.createElement('div');
@@ -726,7 +734,11 @@
                 else if (brandList.length > 1) queryUrl += `&or=(${brandList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`;
             }
 
-            if (itemKeyword) queryUrl += `&or=(item_code.ilike.*${encodeURIComponent(itemKeyword)}*,item_name.ilike.*${encodeURIComponent(itemKeyword)}*)`;
+            if (itemKeyword) {
+                const itemList = itemKeyword.split(',').map(i => i.trim()).filter(Boolean);
+                if (itemList.length === 1) queryUrl += `&or=(item_code.ilike.*${encodeURIComponent(itemList[0])}*,item_name.ilike.*${encodeURIComponent(itemList[0])}*)`;
+                else if (itemList.length > 1) queryUrl += `&or=(${itemList.map(i => `item_code.ilike.*${encodeURIComponent(i)}*,item_name.ilike.*${encodeURIComponent(i)}*`).join(',')})`;
+            }
 
             try {
                 const res = await fetchWithUltraCache(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
