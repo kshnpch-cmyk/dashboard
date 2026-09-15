@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>더본 OMS 주문 실시간 대시보드</title>
-    <!-- 📱 모바일 접속 시 mobile.html 자동 리다이렉트 -->
     <script>
         if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
             location.replace('/mobile.html');
@@ -173,7 +172,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v16.0 Strict Progress Engine</span>
+            <span class="version-tag">v17.0 Stream Engine</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -267,7 +266,6 @@
                 </div>
             </div>
 
-            <!-- 상단 KPI는 원래 수치 규격 유지 -->
             <div class="kpi-grid" style="margin-top: 15px;">
                 <div class="kpi-card">
                     <div class="kpi-title">기간 내 총 주문수량</div>
@@ -310,7 +308,6 @@
                     <span id="selected-store-title">🛒 기간 내 주문 상세</span>
                     <div class="summary-badge-group">
                         <button class="btn btn-excel" onclick="exportToExcel()">📥 엑셀 저장</button>
-                        <!-- 하단 배지에서만 로딩 시 % 퍼센티지 표출 -->
                         <span class="summary-badge">수량합계: <b id="list-total-qty">0개</b></span>
                         <span class="summary-badge">금액합계: <b id="list-total-amount">0원</b></span>
                     </div>
@@ -394,9 +391,12 @@
         let currentPage = 1;
         let rowsPerPage = 10;
         let totalPages = 1;
-        let isLoadingChunks = false; // 로딩 진행 플래그
 
-        /* 💾 IndexedDB 로컬 캐시 엔진 */
+        // 🚀 단조 증가 퍼센티지 트래커 변수
+        let currentMaxPercent = 0;
+        let activeFetchToken = 0;
+
+        /* 💾 IndexedDB 캐시 */
         const DB_NAME = "OmsLocalCacheDB";
         const STORE_NAME = "query_cache";
 
@@ -680,18 +680,24 @@
 
         /* 🚀 대시보드 종합 조회 */
         async function fetchAllDashboardData() {
-            isLoadingChunks = true;
-            updateBadgePercent(0);
+            activeFetchToken++;
+            currentMaxPercent = 0;
+            updateBadgePercent(1);
             await Promise.all([fetchChartData(), fetchDetailDataForRange()]);
         }
 
-        /* ⚡ 하단 뱃지 전용 실시간 % 진행 상태 표출 함수 */
+        /* ⚡ 단조 증가(Monotonic Increase) 보장 퍼센티지 함수 */
         function updateBadgePercent(percent) {
-            if (!isLoadingChunks) return;
-            const pText = `⏳ 로딩중 (${percent}%)`;
+            if (percent < currentMaxPercent) return; // 이전보다 작아지지 않게 방어
+            currentMaxPercent = percent;
+            
+            const pText = `⏳ 로딩중 (${currentMaxPercent}%)`;
             document.getElementById('list-total-qty').innerText = pText;
             document.getElementById('list-total-amount').innerText = pText;
-            document.getElementById('order-detail-table').innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#2563eb;">⚡ 데이터를 로딩 중입니다 (${percent}%)...</td></tr>`;
+            
+            if (rawDetailOrders.length === 0) {
+                document.getElementById('order-detail-table').innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#2563eb;">⚡ 데이터를 로딩 중입니다 (${currentMaxPercent}%)...</td></tr>`;
+            }
         }
 
         async function fetchChartData() {
@@ -785,7 +791,7 @@
             });
         }
 
-        /* 🛒 기간 기반 하단 상세 내역 불러오기 */
+        /* 🛒 스트리밍 청크 데이터 즉시 렌더링 로직 */
         async function fetchDetailDataForRange() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -805,25 +811,18 @@
         }
 
         async function fetchAllOrdersInChunksForRange(startDate, endDate) {
+            const currentToken = activeFetchToken;
             let offset = 0;
             const limit = 200;
             let hasMore = true;
             rawDetailOrders = [];
-            isLoadingChunks = true;
 
-            let totalExpectedRows = 10000;
-            try {
-                const headRes = await fetch(`${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=id`, {
-                    method: 'HEAD',
-                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Prefer': 'count=exact' }
-                });
-                const contentRange = headRes.headers.get('content-range');
-                if (contentRange && contentRange.includes('/')) {
-                    totalExpectedRows = parseInt(contentRange.split('/')[1], 10) || 10000;
-                }
-            } catch(e) {}
+            // 정확한 총 건수를 storeSummaryList 수량 합계 기반으로 도출 (분모 보정)
+            let totalExpectedRows = storeSummaryList.reduce((sum, r) => sum + cleanNumber(r.order_count), 0) || 5000;
 
             while (hasMore) {
+                if (currentToken !== activeFetchToken) return; // 이전 중복 요청 취소
+
                 const chunkUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc&limit=${limit}&offset=${offset}`;
                 try {
                     const res = await fetchWithUltraCache(chunkUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
@@ -832,24 +831,25 @@
                         rawDetailOrders = rawDetailOrders.concat(chunk);
                         filteredDetailOrders = rawDetailOrders;
 
-                        let currentPercent = Math.min(99, Math.round((rawDetailOrders.length / totalExpectedRows) * 100));
-                        updateBadgePercent(currentPercent);
+                        let calculatedPercent = Math.min(99, Math.round((rawDetailOrders.length / totalExpectedRows) * 100));
+                        updateBadgePercent(calculatedPercent);
+
+                        // ⚡ 수신받는 즉시 테이블 데이터를 실시간 업데이트
+                        const activeStore = document.querySelector('#store-list .active');
+                        if (activeStore && activeStore.innerText.includes('전체 점포 합산')) {
+                            baseDetailOrders = filteredDetailOrders;
+                            applyColumnFilters();
+                        }
 
                         if (chunk.length < limit) {
                             hasMore = false;
-                        } else {
-                            offset += limit;
-                        }
+                        } else offset += limit;
                     } else { hasMore = false; }
                 } catch(e) { hasMore = false; }
             }
 
-            // 모든 청크 수신 완료 시에만 로딩 상태 해제 및 최종 100% 수치 렌더링
-            isLoadingChunks = false;
-            const activeStore = document.querySelector('#store-list .active');
-            if (activeStore && activeStore.innerText.includes('전체 점포 합산')) {
-                baseDetailOrders = filteredDetailOrders;
-                applyColumnFilters();
+            if (currentToken === activeFetchToken) {
+                updateBadgePercent(100);
             }
         }
 
@@ -953,13 +953,11 @@
         }
 
         function renderDetailTable() {
-            // 로딩 중일 때는 도중에 최종 결과로 숫자를 덮어씌우지 않음
-            if (isLoadingChunks) return;
-
             const tbody = document.getElementById('order-detail-table');
 
             if (!currentDetailOrders || currentDetailOrders.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#94a3b8;">데이터를 로딩 중이거나 없습니다.</td></tr>`;
+                if (currentMaxPercent < 100) return; // 아직 수신 중이면 퍼센티지 문구 유지
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#94a3b8;">데이터가 없습니다.</td></tr>`;
                 document.getElementById('list-total-qty').innerText = "0개";
                 document.getElementById('list-total-amount').innerText = "0원";
                 updatePaginationUI(0);
@@ -973,9 +971,11 @@
                 sumAmount += (cleanNumber(row.total_amount) || (q * p));
             });
 
-            // 100% 완전히 다 가져온 후 최종 숫자를 표출
-            document.getElementById('list-total-qty').innerText = `${sumQty.toLocaleString()}개`;
-            document.getElementById('list-total-amount').innerText = `${sumAmount.toLocaleString()}원`;
+            // 완료되었거나 수신 중인 수치 실시간 계산해서 표시
+            if (currentMaxPercent >= 100) {
+                document.getElementById('list-total-qty').innerText = `${sumQty.toLocaleString()}개`;
+                document.getElementById('list-total-amount').innerText = `${sumAmount.toLocaleString()}원`;
+            }
 
             const totalItems = currentDetailOrders.length;
             totalPages = Math.ceil(totalItems / rowsPerPage) || 1;
