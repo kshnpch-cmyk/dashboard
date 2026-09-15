@@ -121,7 +121,7 @@
     <div class="m-navbar">
         <div class="m-brand">
             <span>📱 더본 OMS 모바일</span>
-            <span class="m-version">v15.0 1K Chunk & Center Field</span>
+            <span class="m-version">v16.0 Schema Corrected</span>
         </div>
         <button class="btn-m btn-dark" style="width: auto; padding: 6px 10px; font-size: 11px;" onclick="openCalendarModal()">📅 캘린더</button>
     </div>
@@ -609,7 +609,7 @@
             } catch (e) {}
         }
 
-        /* ⚡ 모바일 1,000개 단위 청크 로딩 및 센터명 항목 추가 */
+        /* 🔧 [버그 수정 완료] distribution_center 컬럼명 수신 모바일 적용 */
         async function fetchAllOrdersInChunksForRange(startDate, endDate) {
             const currentToken = activeMobileToken;
             let offset = 0, limit = 1000, hasMore = true;
@@ -620,11 +620,13 @@
             while (hasMore) {
                 if (currentToken !== activeMobileToken) return;
 
-                const chunkUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_code,store_name,center_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc&limit=${limit}&offset=${offset}`;
+                const chunkUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_code,store_name,distribution_center,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc&limit=${limit}&offset=${offset}`;
                 try {
                     const res = await fetchWithUltraCache(chunkUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                     if (res.ok) {
                         const chunk = await res.json();
+                        chunk.forEach(r => { r.center_name = r.distribution_center || r.center_name || '-'; });
+
                         rawDetailOrders = rawDetailOrders.concat(chunk);
                         filteredDetailOrders = rawDetailOrders;
                         
@@ -719,7 +721,7 @@
             if (body.classList.contains('open')) {
                 const startDate = document.getElementById('chart-start-date').value;
                 const endDate = document.getElementById('chart-end-date').value;
-                const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&store_name=eq.${encodeURIComponent(storeName)}&select=item_code,item_name,center_name,qty,price,total_amount,order_date,delivery_date`;
+                const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&store_name=eq.${encodeURIComponent(storeName)}&select=item_code,item_name,distribution_center,qty,price,total_amount,order_date,delivery_date`;
                 try {
                     const res = await fetchWithUltraCache(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                     if (res.ok) {
@@ -731,7 +733,7 @@
                                     <span style="color:#2563eb;">${cleanNumber(o.qty).toLocaleString()}개</span>
                                 </div>
                                 <div class="item-row-sub">
-                                    <span>센터: ${o.center_name || '-'} | 품목코드: ${cleanCode(o.item_code)}</span>
+                                    <span>센터: ${o.distribution_center || o.center_name || '-'} | 품목코드: ${cleanCode(o.item_code)}</span>
                                     <span>${cleanNumber(o.total_amount || (cleanNumber(o.qty)*cleanNumber(o.price))).toLocaleString()}원</span>
                                 </div>
                                 <div class="item-row-sub" style="color: #94a3b8; font-size: 10px;">
@@ -744,7 +746,6 @@
             }
         }
 
-        /* 🔍 모바일 검색 시 센터명(`center_name`) 포함 개편 */
         function filterCards() {
             const query = document.getElementById('store-search-input').value.toLowerCase().trim();
             if (!query) {
@@ -755,7 +756,7 @@
             activeFullOrders = filteredDetailOrders.filter(row => {
                 const sCode = cleanCode(row.store_code).toLowerCase();
                 const sName = String(row.store_name||'').toLowerCase();
-                const cName = String(row.center_name||'').toLowerCase();
+                const cName = String(row.center_name||row.distribution_center||'').toLowerCase();
                 const oDate = formatDisplayDate(row.order_date).toLowerCase();
                 const dDate = formatDisplayDate(row.delivery_date).toLowerCase();
                 const iCode = cleanCode(row.item_code).toLowerCase();
@@ -798,7 +799,7 @@
                         <span style="color:#2563eb;">${cleanNumber(o.qty).toLocaleString()}개</span>
                     </div>
                     <div class="item-row-sub">
-                        <span>센터: ${o.center_name||'-'} | 점포코드: ${cleanCode(o.store_code)}</span>
+                        <span>센터: ${o.center_name||o.distribution_center||'-'} | 점포코드: ${cleanCode(o.store_code)}</span>
                         <span><b>${cleanNumber(o.total_amount || (cleanNumber(o.qty)*cleanNumber(o.price))).toLocaleString()}원</b></span>
                     </div>
                     <div class="item-row-sub" style="color: #94a3b8; font-size: 10px;">
