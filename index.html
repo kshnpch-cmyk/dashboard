@@ -142,7 +142,6 @@
         .store-item:hover, .store-item.active { background-color: #eff6ff; border-color: #2563eb; font-weight: bold; }
         .store-item.total-item { background-color: #f8fafc; font-weight: 700; }
 
-        /* 📐 스크롤바 조절: 고정 높이 제거하고 선택된 건수에 맞춰 높이가 자동으로 늘어남 */
         .table-container { width: 100%; overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #e2e8f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
@@ -151,7 +150,6 @@
         .text-right { text-align: right; }
         .code-tag { font-size: 11px; color: #64748b; font-family: monospace; }
 
-        /* 📄 페이지네이션 스타일 */
         .pagination-container {
             display: flex; justify-content: space-between; align-items: center;
             margin-top: 15px; padding-top: 12px; border-top: 1px solid #e2e8f0; flex-wrap: wrap; gap: 10px;
@@ -175,7 +173,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v12.0 Ultra Auto-Fit</span>
+            <span class="version-tag">v14.0 Real-time % Loader</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -243,10 +241,10 @@
 
     <div class="container">
         
-        <!-- 📊 상단 영역: 기간별 추이 차트 -->
+        <!-- 📊 통합 검색 컨트롤 패널 -->
         <div class="section-panel">
             <div class="panel-header" style="margin-bottom: 0; border-bottom: none;">
-                <span class="panel-title-text" style="white-space: nowrap;">📈 기간별 주문 추이 그래프</span>
+                <span class="panel-title-text" style="white-space: nowrap;">📈 기간별 주문 대시보드</span>
                 
                 <div class="filter-row" style="margin-bottom: 0; padding: 0; background: transparent; border: none;">
                     <div class="filter-group">
@@ -265,37 +263,28 @@
                         <input type="text" id="chart-item-input" class="input-box" placeholder="품목코드 또는 품목명" style="width: 150px;">
                         <button class="btn-search-icon" onclick="openItemModal()" title="품목 검색 선택">🔍</button>
                     </div>
-                    <button class="btn btn-query" onclick="fetchChartData()">🔍 추이 조회</button>
+                    <button class="btn btn-query" onclick="fetchAllDashboardData()">🔍 대시보드 종합 조회</button>
                 </div>
             </div>
 
             <div class="kpi-grid" style="margin-top: 15px;">
                 <div class="kpi-card">
                     <div class="kpi-title">기간 내 총 주문수량</div>
-                    <div class="kpi-value" id="kpi-total-qty">0 건</div>
+                    <div class="kpi-value" id="kpi-total-qty">⏳ 로딩중 (0%)</div>
                 </div>
                 <div class="kpi-card green">
                     <div class="kpi-title">기간 내 취급 품목수</div>
-                    <div class="kpi-value" id="kpi-total-items">0 종</div>
+                    <div class="kpi-value" id="kpi-total-items">⏳ 로딩중 (0%)</div>
                 </div>
                 <div class="kpi-card purple">
                     <div class="kpi-title">기간 내 총 주문금액</div>
-                    <div class="kpi-value" id="kpi-total-amount">0 원</div>
+                    <div class="kpi-value" id="kpi-total-amount">⏳ 로딩중 (0%)</div>
                 </div>
             </div>
 
             <div class="chart-container">
                 <canvas id="dailyTrendChart"></canvas>
             </div>
-        </div>
-
-        <!-- 🛒 하단 영역: 하루 단위 상세 내역 -->
-        <div class="filter-row" style="background: white; margin-bottom: 20px;">
-            <div class="filter-group">
-                <label style="font-size: 15px; color: #0f172a;">📅 상세 조회 일자 (하루):</label>
-                <input type="date" id="detail-target-date" class="input-box" style="font-weight: bold;">
-            </div>
-            <button class="btn btn-query" onclick="fetchDetailData()">⚡ 상세 데이터 불러오기</button>
         </div>
 
         <div class="dashboard-layout">
@@ -310,18 +299,19 @@
                     <button class="btn btn-query" onclick="filterStoreList()">검색</button>
                 </div>
                 <div id="brand-summary" style="margin-bottom: 10px; font-size: 12px; color: #64748b;">
-                    점포수: <b id="brand-store-count">0</b>개 | 품목수: <b id="brand-item-count">0</b>종
+                    점포수: <b id="brand-store-count">⏳ 로딩중 (0%)</b> | 품목수: <b id="brand-item-count">-</b>
                 </div>
                 <ul class="store-list" id="store-list"></ul>
             </div>
 
             <div class="panel">
                 <div class="panel-title">
-                    <span id="selected-store-title">🛒 점포별 주문 상세</span>
+                    <span id="selected-store-title">🛒 기간 내 주문 상세</span>
                     <div class="summary-badge-group">
                         <button class="btn btn-excel" onclick="exportToExcel()">📥 엑셀 저장</button>
-                        <span class="summary-badge">수량합계: <b id="list-total-qty">0</b>개</span>
-                        <span class="summary-badge">금액합계: <b id="list-total-amount">0</b>원</span>
+                        <!-- 실시간 퍼센트 로더 바인딩 -->
+                        <span class="summary-badge">수량합계: <b id="list-total-qty">⏳ 로딩중 (0%)</b></span>
+                        <span class="summary-badge">금액합계: <b id="list-total-amount">⏳ 로딩중 (0%)</b></span>
                     </div>
                 </div>
                 
@@ -352,7 +342,6 @@
                     </table>
                 </div>
 
-                <!-- 📄 [개선된 페이지네이션] 페이지 입력 기능 추가 및 10개선택 시 높이 자동 맞춤 -->
                 <div class="pagination-container">
                     <div class="rows-per-page-selector">
                         <label>페이지당 보기:</label>
@@ -401,12 +390,11 @@
         let allBrandList = [], allItemList = [];
         let activeBrandTarget = 'chart';
 
-        /* 📄 페이지네이션 상태 변수 (기본 10개씩 선택) */
         let currentPage = 1;
         let rowsPerPage = 10;
         let totalPages = 1;
 
-        /* 💾 IndexedDB 캐시 */
+        /* 💾 IndexedDB 로컬 캐시 엔진 */
         const DB_NAME = "OmsLocalCacheDB";
         const STORE_NAME = "query_cache";
 
@@ -571,7 +559,6 @@
             closeBrandModal();
         }
 
-        /* 🔧 [버그 수정 완료] 브랜드 선택 시 점포 수 요약 뷰 필터링 보정 */
         function onDetailBrandChange(selectedBrands) {
             updateStoreListAndSummary(selectedBrands);
         }
@@ -678,20 +665,42 @@
                 const badgeHtml = count > 0 ? `<span class="data-status-badge badge-has-data">🟢 있음</span>` : `<span class="data-status-badge badge-no-data">⚪ 없음</span>`;
                 const cell = document.createElement('div');
                 cell.className = 'calendar-day-cell';
-                cell.onclick = () => { document.getElementById('detail-target-date').value = dString; closeCalendarModal(); fetchDetailData(); };
+                cell.onclick = () => { 
+                    document.getElementById('chart-start-date').value = dString;
+                    document.getElementById('chart-end-date').value = dString;
+                    closeCalendarModal(); 
+                    fetchAllDashboardData(); 
+                };
                 cell.innerHTML = `<span class="day-number">${day}</span>${badgeHtml}`;
                 grid.appendChild(cell);
             }
         }
 
-        /* 📊 추이 차트 조회 */
+        /* 🚀 상단 기간 설정으로 차트 및 하단 상세 내역 통합 조회 */
+        async function fetchAllDashboardData() {
+            updateLoadingPercent(0);
+            await Promise.all([fetchChartData(), fetchDetailDataForRange()]);
+        }
+
+        /* ⚡ 실시간 % 퍼센트 로딩 가시기 */
+        function updateLoadingPercent(percent) {
+            const pText = `⏳ 로딩중 (${percent}%)`;
+            document.getElementById('kpi-total-qty').innerText = pText;
+            document.getElementById('kpi-total-items').innerText = pText;
+            document.getElementById('kpi-total-amount').innerText = pText;
+            document.getElementById('brand-store-count').innerText = pText;
+            document.getElementById('list-total-qty').innerText = pText;
+            document.getElementById('list-total-amount').innerText = pText;
+            document.getElementById('order-detail-table').innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#2563eb;">⚡ 데이터를 로딩 중입니다 (${percent}%)...</td></tr>`;
+        }
+
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
             const brandInputValue = document.getElementById('chart-brand-input').value.trim();
             const itemKeyword = document.getElementById('chart-item-input').value.trim();
 
-            if (!startDate || !endDate) return alert("시작일과 종료일을 선택하세요.");
+            if (!startDate || !endDate) return alert("조회 기간을 선택하세요.");
 
             safeSetStorage('cached_chart_start_date', startDate);
             safeSetStorage('cached_chart_end_date', endDate);
@@ -716,7 +725,12 @@
         }
 
         function renderChartAndKPI(data) {
-            if (!data || !Array.isArray(data) || data.length === 0) return;
+            if (!data || !Array.isArray(data) || data.length === 0) {
+                document.getElementById('kpi-total-qty').innerText = "0 건";
+                document.getElementById('kpi-total-items').innerText = "0 종";
+                document.getElementById('kpi-total-amount').innerText = "0 원";
+                return;
+            }
 
             let totalQty = 0, totalAmount = 0;
             const uniqueItems = new Set();
@@ -771,14 +785,13 @@
             });
         }
 
-        /* 🛒 하루치 상세 내역 불러오기 */
-        async function fetchDetailData() {
-            const targetDate = document.getElementById('detail-target-date').value;
-            if (!targetDate) return;
+        /* 🛒 기간 기반 하단 상세 내역 불러오기 (실시간 % 바인딩) */
+        async function fetchDetailDataForRange() {
+            const startDate = document.getElementById('chart-start-date').value;
+            const endDate = document.getElementById('chart-end-date').value;
+            if (!startDate || !endDate) return;
 
-            safeSetStorage('cached_detail_target_date', targetDate);
-
-            const summaryUrl = `${SUPABASE_URL}/rest/v1/store_order_summary?delivery_date=eq.${targetDate}&select=store_code,store_name,brand_name,order_count,total_qty,total_amount`;
+            const summaryUrl = `${SUPABASE_URL}/rest/v1/store_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_code,store_name,brand_name,order_count,total_qty,total_amount`;
 
             try {
                 const res = await fetchWithUltraCache(summaryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
@@ -786,19 +799,32 @@
                     storeSummaryList = await res.json();
                     rawDetailOrders = [];
                     updateStoreListAndSummary();
-                    fetchAllOrdersInChunks(targetDate);
+                    fetchAllOrdersInChunksForRange(startDate, endDate);
                 }
             } catch (err) {}
         }
 
-        async function fetchAllOrdersInChunks(targetDate) {
+        async function fetchAllOrdersInChunksForRange(startDate, endDate) {
             let offset = 0;
             const limit = 200;
             let hasMore = true;
             rawDetailOrders = [];
 
+            // 총 전체 예상 건수 파악용 헤더 호출
+            let totalExpectedRows = 5000;
+            try {
+                const headRes = await fetch(`${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=id`, {
+                    method: 'HEAD',
+                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Prefer': 'count=exact' }
+                });
+                const contentRange = headRes.headers.get('content-range');
+                if (contentRange && contentRange.includes('/')) {
+                    totalExpectedRows = parseInt(contentRange.split('/')[1], 10) || 5000;
+                }
+            } catch(e) {}
+
             while (hasMore) {
-                const chunkUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=eq.${targetDate}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc&limit=${limit}&offset=${offset}`;
+                const chunkUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc&limit=${limit}&offset=${offset}`;
                 try {
                     const res = await fetchWithUltraCache(chunkUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                     if (res.ok) {
@@ -806,22 +832,29 @@
                         rawDetailOrders = rawDetailOrders.concat(chunk);
                         filteredDetailOrders = rawDetailOrders;
 
+                        // ⚡ % 퍼센티지 실시간 업데이트 계산
+                        let currentPercent = Math.min(99, Math.round((rawDetailOrders.length / totalExpectedRows) * 100));
+                        updateLoadingPercent(currentPercent);
+
                         const activeStore = document.querySelector('#store-list .active');
                         if (activeStore && activeStore.innerText.includes('전체 점포 합산')) {
                             baseDetailOrders = filteredDetailOrders;
                             applyColumnFilters();
                         }
 
-                        if (chunk.length < limit) hasMore = false;
-                        else offset += limit;
+                        if (chunk.length < limit) {
+                            hasMore = false;
+                            updateLoadingPercent(100);
+                        } else offset += limit;
                     } else { hasMore = false; }
                 } catch(e) { hasMore = false; }
             }
         }
 
         async function fetchStoreDetailOrders(storeName) {
-            const targetDate = document.getElementById('detail-target-date').value;
-            const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=eq.${targetDate}&store_name=eq.${encodeURIComponent(storeName)}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name`;
+            const startDate = document.getElementById('chart-start-date').value;
+            const endDate = document.getElementById('chart-end-date').value;
+            const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&store_name=eq.${encodeURIComponent(storeName)}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name`;
 
             try {
                 const res = await fetchWithUltraCache(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
@@ -832,7 +865,6 @@
             } catch(e) {}
         }
 
-        /* 🔧 [브랜드 필터 동작 수정] 점포 리스트 및 요약 보정 */
         function updateStoreListAndSummary(selectedBrandsFilter = null) {
             let activeList = storeSummaryList;
             
@@ -846,22 +878,29 @@
                 }
             }
 
-            const stores = [...new Set(activeList.map(r => r.store_name))].filter(Boolean);
-            document.getElementById('brand-store-count').innerText = stores.length;
+            const storeGroupMap = {};
+            activeList.forEach(r => {
+                const sName = r.store_name;
+                if (!sName) return;
+                if (!storeGroupMap[sName]) storeGroupMap[sName] = 0;
+                storeGroupMap[sName] += cleanNumber(r.order_count);
+            });
+
+            const sortedStores = Object.keys(storeGroupMap).sort();
+            document.getElementById('brand-store-count').innerText = `${sortedStores.length.toLocaleString()}개`;
             document.getElementById('brand-item-count').innerText = '-';
 
             const storeListEl = document.getElementById('store-list');
-            const totalCount = activeList.reduce((sum, r) => sum + cleanNumber(r.order_count), 0);
+            const totalCount = Object.values(storeGroupMap).reduce((a, b) => a + b, 0);
 
             let listItemsHtml = [`<li class="store-item total-item active" onclick="onStoreSelect('ALL', this)">
-                <span>🏢 전체 점포 합산</span><span style="color:#2563eb;">${totalCount}건</span>
+                <span>🏢 전체 점포 합산</span><span style="color:#2563eb;">${totalCount.toLocaleString()}건</span>
             </li>`];
 
-            stores.forEach(store => {
-                const sData = activeList.filter(r => r.store_name === store);
-                const count = sData.reduce((sum, r) => sum + cleanNumber(r.order_count), 0);
+            sortedStores.forEach(store => {
+                const count = storeGroupMap[store];
                 listItemsHtml.push(`<li class="store-item" onclick="onStoreSelect('${store}', this)">
-                    <span>${store}</span><span style="color:#64748b;">${count}건</span>
+                    <span>${store}</span><span style="color:#64748b;">${count.toLocaleString()}건</span>
                 </li>`);
             });
             storeListEl.innerHTML = listItemsHtml.join('');
@@ -880,7 +919,7 @@
             if (element) element.classList.add('active');
 
             if (storeName === 'ALL') {
-                document.getElementById('selected-store-title').innerText = `🛒 전체 점포 합산 상세`;
+                document.getElementById('selected-store-title').innerText = `🛒 기간 내 전체 점포 합산 상세`;
                 baseDetailOrders = filteredDetailOrders;
                 applyColumnFilters();
             } else {
@@ -889,7 +928,6 @@
             }
         }
 
-        /* ⚡ 테이블 필터 적용 함수 */
         function applyColumnFilters() {
             const qSC = document.getElementById('filter-storeCode').value.toLowerCase().trim();
             const qSN = document.getElementById('filter-storeName').value.toLowerCase().trim();
@@ -912,14 +950,13 @@
             renderDetailTable();
         }
 
-        /* 📄 [동적 높이 조절 & 페이지 이동 입력 엔진] */
         function renderDetailTable() {
             const tbody = document.getElementById('order-detail-table');
 
             if (!currentDetailOrders || currentDetailOrders.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#94a3b8;">데이터를 로딩 중이거나 없습니다.</td></tr>`;
-                document.getElementById('list-total-qty').innerText = "0";
-                document.getElementById('list-total-amount').innerText = "0";
+                document.getElementById('list-total-qty').innerText = "0개";
+                document.getElementById('list-total-amount').innerText = "0원";
                 updatePaginationUI(0);
                 return;
             }
@@ -930,8 +967,9 @@
                 sumQty += q;
                 sumAmount += (cleanNumber(row.total_amount) || (q * p));
             });
-            document.getElementById('list-total-qty').innerText = sumQty.toLocaleString();
-            document.getElementById('list-total-amount').innerText = sumAmount.toLocaleString();
+
+            document.getElementById('list-total-qty').innerText = `${sumQty.toLocaleString()}개`;
+            document.getElementById('list-total-amount').innerText = `${sumAmount.toLocaleString()}원`;
 
             const totalItems = currentDetailOrders.length;
             totalPages = Math.ceil(totalItems / rowsPerPage) || 1;
@@ -964,10 +1002,9 @@
             updatePaginationUI(totalItems);
         }
 
-        /* 📄 컨트롤 UI 조율 및 페이지 직접 입력 로직 */
         function updatePaginationUI(totalItems) {
             document.getElementById('page-input-box').value = currentPage;
-            document.getElementById('total-page-text').innerText = totalPages;
+            document.getElementById('total-page-text').innerText = totalPages.toLocaleString();
             document.getElementById('total-rows-text').innerText = `(총 ${totalItems.toLocaleString()}건)`;
 
             document.getElementById('btn-first-page').disabled = (currentPage === 1);
@@ -976,7 +1013,6 @@
             document.getElementById('btn-last-page').disabled = (currentPage === totalPages || totalPages === 0);
         }
 
-        /* 🔢 숫자를 직접 넣고 이동하는 이벤트 핸들러 */
         function handlePageInput(val) {
             let page = parseInt(val, 10);
             if (isNaN(page)) page = 1;
@@ -1011,7 +1047,7 @@
             const ws = XLSX.utils.json_to_sheet(exportData);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "주문상세");
-            XLSX.writeFile(wb, `OMS주문상세_${document.getElementById('detail-target-date').value}.xlsx`);
+            XLSX.writeFile(wb, `OMS주문상세_${document.getElementById('chart-start-date').value}_${document.getElementById('chart-end-date').value}.xlsx`);
         }
 
         /* ⚡ 초기 실행 */
@@ -1022,7 +1058,6 @@
             document.getElementById('chart-start-date').value = localStorage.getItem('cached_chart_start_date') || formatDate(past7);
             document.getElementById('chart-end-date').value = localStorage.getItem('cached_chart_end_date') || formatDate(today);
             document.getElementById('sync-target-date').value = formatDate(today);
-            document.getElementById('detail-target-date').value = localStorage.getItem('cached_detail_target_date') || formatDate(today);
             document.getElementById('chart-brand-input').value = localStorage.getItem('cached_brand_input') || '';
             document.getElementById('chart-item-input').value = localStorage.getItem('cached_item_input') || '';
 
@@ -1032,8 +1067,7 @@
             if (cachedLastUpdated) document.getElementById('last-updated-text').innerText = `🕒 최신 배송일자: ${cachedLastUpdated}`;
 
             loadCalendarData();
-            fetchChartData();
-            fetchDetailData();
+            fetchAllDashboardData();
         });
 
         async function triggerBot() {
@@ -1071,8 +1105,7 @@
                         btn.disabled = false; 
                         btn.innerText = "🚀 OMS 수동 동기화"; 
                         loadCalendarData();
-                        fetchChartData();
-                        fetchDetailData(); 
+                        fetchAllDashboardData(); 
                     }, 35000);
                 } else {
                     alert("❌ 동기화 요청 실패"); btn.disabled = false; btn.innerText = "🚀 OMS 수동 동기화";
