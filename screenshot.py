@@ -58,6 +58,16 @@ def get_chrome_driver():
     chrome_options.add_argument("--window-size=1920,1080")
     chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
+    # 📥 자동 엑셀 다운로드 디렉토리 설정
+    download_dir = os.getcwd()
+    prefs = {
+        "download.default_directory": download_dir,
+        "download.prompt_for_download": False,
+        "download.directory_upgrade": True,
+        "safebrowsing.enabled": True
+    }
+    chrome_options.add_experimental_option("prefs", prefs)
+
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
@@ -113,7 +123,7 @@ def run_capture(target_start_date, target_end_date):
     try:
         logging.info(f"🚀 OMS 크롤링 시작 [조회 기간: {target_start_date} ~ {target_end_date}]")
         driver = get_chrome_driver()
-        wait = WebDriverWait(driver, 20)
+        wait = WebDriverWait(driver, 25)
 
         # 1. 로그인
         driver.get(OMS_LOGIN_URL)
@@ -128,110 +138,101 @@ def run_capture(target_start_date, target_end_date):
         pw_input.send_keys(USER_PW)
         pw_input.send_keys(Keys.RETURN)
 
-        time.sleep(5) # 로그인 후 페이지 안정화 대기
+        time.sleep(5)
         logging.info("✅ OMS 로그인 성공 및 세션 확보")
 
         # 2. 주문 내역 페이지 이동
         driver.get(OMS_ORDER_LIST_URL)
         time.sleep(5)
 
-        # 🚀 iframe 존재 여부 확인 및 전환
         iframes = driver.find_elements(By.TAG_NAME, "iframe")
         if iframes:
             logging.info(f"🔍 iframe {len(iframes)}개 감지 - 첫 번째 프레임으로 전환")
             driver.switch_to.frame(0)
 
-        # 3. 날짜 입력 유연한 탐색 (ID, Name, Class 대응)
-        start_date_elem = None
-        for selector in ["startDate", "sDate", "searchStartDate", "start_date"]:
-            try:
-                start_date_elem = driver.find_element(By.ID, selector)
-                if start_date_elem: break
-            except: pass
+        # 3. 날짜 입력 및 조회 클릭
+        start_date_elem = wait.until(EC.presence_of_element_located((By.ID, "startDate")))
+        end_date_elem = driver.find_element(By.ID, "endDate")
 
-        if not start_date_elem:
-            try:
-                start_date_elem = driver.find_element(By.CSS_SELECTOR, "input[type='text']")
-            except: pass
+        driver.execute_script("arguments[0].value = arguments[1];", start_date_elem, target_start_date)
+        driver.execute_script("arguments[0].value = arguments[1];", end_date_elem, target_end_date)
 
-        if start_date_elem:
-            logging.info("📅 날짜 입력 필드 정상 포착 완료")
-            end_date_elem = None
-            for selector in ["endDate", "eDate", "searchEndDate", "end_date"]:
-                try:
-                    end_date_elem = driver.find_element(By.ID, selector)
-                    if end_date_elem: break
-                except: pass
+        # 검색 버튼 실행 (이벤트 트리거 포함)
+        driver.execute_script("if(typeof fn_search === 'function') { fn_search(); } else if(typeof doSearch === 'function') { doSearch(); }")
+        try:
+            search_btn = driver.find_element(By.CSS_SELECTOR, "button.btn-search, button#btnSearch, input[value='조회'], a.btn-search")
+            search_btn.click()
+        except Exception:
+            pass
 
-            driver.execute_script("arguments[0].value = arguments[1];", start_date_elem, target_start_date)
-            if end_date_elem:
-                driver.execute_script("arguments[0].value = arguments[1];", end_date_elem, target_end_date)
+        logging.info("🔍 조회 실행 완료 - 데이터 로딩 대기 중...")
+        time.sleep(10) # 서버 응답 대기
 
-            # 검색 버튼 유연 탐색
-            search_btn = None
-            for btn_sel in ["button.btn-search", "button#btnSearch", "input[type='button'][value='조회']", "a.btn-search"]:
-                try:
-                    search_btn = driver.find_element(By.CSS_SELECTOR, btn_sel)
-                    if search_btn: break
-                except: pass
-
-            if search_btn:
-                search_btn.click()
-                time.sleep(6)
-
-        # 4. 엑셀 다운로드 및 데이터 파싱
-        excel_btn = None
-        for ex_sel in ["button.btn-excel", "a.btn-excel", "#btnExcel", "input[value='엑셀']"]:
-            try:
-                excel_btn = driver.find_element(By.CSS_SELECTOR, ex_sel)
-                if excel_btn: break
-            except: pass
-
+        # 4. 엑셀 다운로드 시도 (JS 직접 호출 + 버튼 탐색)
         records = []
-        if excel_btn:
-            logging.info("📥 엑셀 다운로드 수행")
-            excel_btn.click()
-            time.sleep(8)
-            
-            download_dir = os.getcwd()
-            files = [os.path.join(download_dir, f) for f in os.listdir(download_dir) if f.endswith('.xlsx') or f.endswith('.xls')]
-            if files:
-                latest_file = max(files, key=os.path.getctime)
-                df = pd.read_excel(latest_file)
-                
-                for _, row in df.iterrows():
-                    center_val = clean_str(row.get("distribution_center") or row.get("물류센터") or row.get("배송센터") or row.get("센터명"))
-                    records.append({
-                        "store_code": clean_str(row.get("점포코드")),
-                        "store_name": clean_str(row.get("점포명")),
-                        "brand_name": clean_str(row.get("브랜드")),
-                        "distribution_center": center_val,
-                        "order_date": clean_str(row.get("주문일자")),
-                        "delivery_date": clean_str(row.get("배송일자")),
-                        "item_code": clean_str(row.get("품목코드")),
-                        "item_name": clean_str(row.get("품목명")),
-                        "qty": clean_int(row.get("수량")),
-                        "price": clean_int(row.get("단가")),
-                        "total_amount": clean_int(row.get("금액") or (clean_int(row.get("수량")) * clean_int(row.get("단가")))),
-                        "created_at": datetime.now().isoformat()
-                    })
-                os.remove(latest_file)
+        logging.info("📥 엑셀 다운로드 실행 시도")
+        try:
+            # 더본 OMS 자바스크립트 엑셀 함수 직접 호출
+            driver.execute_script("if(typeof fn_excel === 'function') { fn_excel(); } else if(typeof fn_excelDown === 'function') { fn_excelDown(); } else if(typeof doExcel === 'function') { doExcel(); }")
+        except Exception:
+            pass
 
+        # 엑셀 다운로드 버튼 클릭
+        for ex_sel in ["button.btn-excel", "a.btn-excel", "#btnExcel", "input[value='엑셀']", ".btn_excel"]:
+            try:
+                ex_btn = driver.find_element(By.CSS_SELECTOR, ex_sel)
+                if ex_btn:
+                    ex_btn.click()
+                    break
+            except: pass
+
+        time.sleep(10) # 파일 다운로드 완료 대기
+
+        # 5. 다운로드된 엑셀 파일 읽기
+        download_dir = os.getcwd()
+        files = [os.path.join(download_dir, f) for f in os.listdir(download_dir) if f.endswith('.xlsx') or f.endswith('.xls')]
+        
+        if files:
+            latest_file = max(files, key=os.path.getctime)
+            logging.info(f"📂 엑셀 파일 감지 및 읽기: {latest_file}")
+            df = pd.read_excel(latest_file)
+            
+            for _, row in df.iterrows():
+                center_val = clean_str(row.get("distribution_center") or row.get("물류센터") or row.get("배송센터") or row.get("센터명"))
+                records.append({
+                    "store_code": clean_str(row.get("점포코드")),
+                    "store_name": clean_str(row.get("점포명")),
+                    "brand_name": clean_str(row.get("브랜드")),
+                    "distribution_center": center_val,
+                    "order_date": clean_str(row.get("주문일자")),
+                    "delivery_date": clean_str(row.get("배송일자")),
+                    "item_code": clean_str(row.get("품목코드")),
+                    "item_name": clean_str(row.get("품목명")),
+                    "qty": clean_int(row.get("수량")),
+                    "price": clean_int(row.get("단가")),
+                    "total_amount": clean_int(row.get("금액") or (clean_int(row.get("수량")) * clean_int(row.get("단가")))),
+                    "created_at": datetime.now().isoformat()
+                })
+            try:
+                os.remove(latest_file)
+            except: pass
+
+        # 6. 엑셀 파일이 없을 경우 화면 DOM 직접 스크래핑
         if not records:
-            logging.info("📄 테이블 스크래핑 시도")
+            logging.info("📄 엑셀 파일 미감지 - 화면 테이블 DOM 직접 추출 시도")
             rows = driver.find_elements(By.CSS_SELECTOR, "table tbody tr")
             for r in rows:
                 cols = r.find_elements(By.TAG_NAME, "td")
-                if len(cols) >= 8:
+                if len(cols) >= 6:
                     records.append({
                         "store_code": clean_str(cols[0].text),
                         "store_name": clean_str(cols[1].text),
-                        "brand_name": clean_str(cols[2].text),
-                        "distribution_center": clean_str(cols[3].text),
-                        "order_date": clean_str(cols[4].text),
-                        "delivery_date": clean_str(cols[5].text),
-                        "item_code": clean_str(cols[6].text),
-                        "item_name": clean_str(cols[7].text),
+                        "brand_name": clean_str(cols[2].text) if len(cols) > 2 else "",
+                        "distribution_center": clean_str(cols[3].text) if len(cols) > 3 else "",
+                        "order_date": clean_str(cols[4].text) if len(cols) > 4 else "",
+                        "delivery_date": clean_str(cols[5].text) if len(cols) > 5 else "",
+                        "item_code": clean_str(cols[6].text) if len(cols) > 6 else "",
+                        "item_name": clean_str(cols[7].text) if len(cols) > 7 else "",
                         "qty": clean_int(cols[8].text) if len(cols) > 8 else 0,
                         "price": clean_int(cols[9].text) if len(cols) > 9 else 0,
                         "total_amount": clean_int(cols[10].text) if len(cols) > 10 else 0,
@@ -246,7 +247,7 @@ def run_capture(target_start_date, target_end_date):
             refresh_materialized_views()
             logging.info("✨ 모든 프로세스가 성공적으로 마무리되었습니다.")
         else:
-            logging.warning("⚠️ 수집된 데이터가 존재하지 않습니다.")
+            logging.warning("⚠️ 수집된 데이터가 존재하지 않습니다. OMS 조회 조건 날짜에 데이터가 있는지 확인해 주세요.")
 
     except Exception as e:
         logging.error(f"❌ 크롤링 오류: {e}", exc_info=True)
