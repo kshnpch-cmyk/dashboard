@@ -2,39 +2,34 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Theborn OMS 모바일 현황</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background-color: #f4f6f9; font-family: 'Pretendard', sans-serif; }
-        .mobile-card { background: #fff; border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-        .center-tag { display: inline-block; background-color: #e8f5e9; color: #2e7d32; font-size: 11px; font-weight: 700; padding: 3px 6px; border-radius: 4px; }
-        .multi-select-list { max-height: 280px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 8px; padding: 6px; }
-        .multi-select-item { padding: 6px 8px; border-bottom: 1px solid #f1f3f5; display: flex; align-items: center; gap: 8px; font-size: 13px; }
+        .mobile-card { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+        .center-tag { display: inline-block; background-color: #e8f5e9; color: #2e7d32; font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 4px; }
     </style>
 </head>
 <body>
     <div class="container py-3">
-        <h5 class="fw-bold mb-3">📱 OMS 주문 현황</h5>
+        <h4 class="fw-bold mb-3">📱 OMS 주문 현황</h4>
 
-        <!-- 필터 섹션 -->
+        <!-- 모바일 기간 및 센터 선택 -->
         <div class="card p-3 mb-3 border-0 shadow-sm">
             <div class="row g-2">
                 <div class="col-6">
-                    <input type="date" id="mStartDate" class="form-control form-control-sm" onchange="validateMobileDates()">
+                    <input type="date" id="mStartDate" class="form-control form-control-sm">
                 </div>
                 <div class="col-6">
-                    <input type="date" id="mEndDate" class="form-control form-control-sm" onchange="validateMobileDates()">
+                    <input type="date" id="mEndDate" class="form-control form-control-sm">
                 </div>
                 <div class="col-12">
                     <select id="mCenterFilter" class="form-select form-select-sm">
                         <option value="">전체 물류센터</option>
                     </select>
                 </div>
-                <div class="col-6">
-                    <button class="btn btn-outline-secondary btn-sm w-100 text-truncate" onclick="openMItemModal()" id="btnMItemSelect">📦 품목 선택</button>
-                </div>
-                <div class="col-6">
+                <div class="col-12 mt-2">
                     <button class="btn btn-primary btn-sm w-100 fw-bold" onclick="loadMobileData()">조회하기</button>
                 </div>
             </div>
@@ -54,73 +49,33 @@
             </div>
         </div>
 
-        <!-- 모바일 카드 목록 -->
+        <!-- 주문 목록 (카드 뷰) -->
         <div id="mobileList">
-            <div class="text-center py-4 text-muted">조회 버튼을 눌러주세요.</div>
+            <div class="text-center py-5 text-muted">조회 버튼을 눌러주세요.</div>
         </div>
     </div>
 
-    <!-- 📦 모바일 품목 다중 선택 모달 -->
-    <div class="modal fade" id="mItemModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header py-2">
-                    <h6 class="modal-title fw-bold">📦 품목 다중 선택</h6>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="input-group input-group-sm mb-2">
-                        <input type="text" id="mItemSearchKeyword" class="form-control" placeholder="품목명/코드 검색" onkeyup="filterMItemList()">
-                        <button class="btn btn-outline-dark" onclick="toggleAllMItems(true)">전체</button>
-                        <button class="btn btn-outline-secondary" onclick="toggleAllMItems(false)">해제</button>
-                    </div>
-                    <div class="multi-select-list" id="mItemContainer"></div>
-                </div>
-                <div class="modal-footer py-2">
-                    <button class="btn btn-primary btn-sm w-100" data-bs-dismiss="modal" onclick="renderMobileView()">적용하기</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co";
         const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN";
 
         let mRawData = [];
-        let mSelectedItems = new Set();
-        let mItemModalObj;
 
         window.onload = function() {
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('mStartDate').value = today;
             document.getElementById('mEndDate').value = today;
-            mItemModalObj = new bootstrap.Modal(document.getElementById('mItemModal'));
             loadMobileData();
         };
 
-        // 🚨 모바일 날짜 유효성 검증 함수
-        function validateMobileDates() {
-            const sDate = document.getElementById('mStartDate').value;
-            const eDate = document.getElementById('mEndDate').value;
-
-            if (sDate && eDate && sDate > eDate) {
-                alert("⚠️ 종료 배송일자는 시작 배송일자보다 이전 일자일 수 없습니다.");
-                document.getElementById('mEndDate').value = sDate;
-                return false;
-            }
-            return true;
-        }
-
         async function loadMobileData() {
-            if (!validateMobileDates()) return;
-
             const sDate = document.getElementById('mStartDate').value;
             const eDate = document.getElementById('mEndDate').value;
+
             if (!sDate || !eDate) return;
 
-            document.getElementById('mobileList').innerHTML = '<div class="text-center py-4">⏳ 데이터 불러오는 중...</div>';
+            const container = document.getElementById('mobileList');
+            container.innerHTML = '<div class="text-center py-4">⏳ 데이터 불러오는 중...</div>';
 
             let allData = [];
             let page = 0;
@@ -128,11 +83,16 @@
             let hasMore = true;
 
             while (hasMore) {
+                // 🚀 select 쿼리에 distribution_center 명시
                 const selectCols = "order_date,delivery_date,store_code,store_name,brand_name,distribution_center,item_code,item_name,qty,price,total_amount";
                 const url = `${SUPABASE_URL}/rest/v1/oms_orders?select=${selectCols}&delivery_date=gte.${sDate}&delivery_date=lte.${eDate}&order=delivery_date.desc`;
 
                 const res = await fetch(url, {
-                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Range': `${page * pageSize}-${(page + 1) * pageSize - 1}` }
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Range': `${page * pageSize}-${(page + 1) * pageSize - 1}`
+                    }
                 });
 
                 if (!res.ok) break;
@@ -144,63 +104,28 @@
             }
 
             mRawData = allData;
-            initMobileFilters();
+            populateMobileCenterFilter(mRawData);
             renderMobileView();
         }
 
-        function initMobileFilters() {
+        function populateMobileCenterFilter(data) {
             const select = document.getElementById('mCenterFilter');
+            const curVal = select.value;
             const centers = new Set();
-            const items = new Map();
 
-            mRawData.forEach(r => {
-                const c = (r.distribution_center || r.center_name || '').trim();
-                if (c) centers.add(c);
-
-                const iCode = (r.item_code || '').trim();
-                const iName = (r.item_name || '').trim();
-                if (iCode || iName) items.set(iCode || iName, `[${iCode}] ${iName}`);
+            data.forEach(row => {
+                const cName = (row.distribution_center || row.center_name || row.center || '').trim();
+                if (cName) centers.add(cName);
             });
 
             select.innerHTML = '<option value="">전체 물류센터</option>';
-            Array.from(centers).sort().forEach(c => { select.innerHTML += `<option value="${c}">${c}</option>`; });
-
-            mSelectedItems = new Set(items.keys());
-            renderMItemCheckboxes(Array.from(items.entries()).sort());
-        }
-
-        function openMItemModal() { mItemModalObj.show(); }
-        function renderMItemCheckboxes(itemList) {
-            const container = document.getElementById('mItemContainer');
-            container.innerHTML = itemList.map(([key, label]) => `
-                <div class="multi-select-item">
-                    <input type="checkbox" class="form-check-input m-item-chk" value="${key}" id="chk_m_${key}" ${mSelectedItems.has(key) ? 'checked' : ''} onchange="onMItemChkChange('${key}', this.checked)">
-                    <label class="form-check-label w-100" for="chk_m_${key}">${label}</label>
-                </div>
-            `).join('');
-        }
-        function onMItemChkChange(key, checked) {
-            if (checked) mSelectedItems.add(key);
-            else mSelectedItems.delete(key);
-            updateMItemBtnText();
-        }
-        function toggleAllMItems(checked) {
-            document.querySelectorAll('.m-item-chk').forEach(chk => {
-                chk.checked = checked;
-                if (checked) mSelectedItems.add(chk.value);
-                else mSelectedItems.delete(chk.value);
+            Array.from(centers).sort().forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = c;
+                if (c === curVal) opt.selected = true;
+                select.appendChild(opt);
             });
-            updateMItemBtnText();
-        }
-        function filterMItemList() {
-            const kw = document.getElementById('mItemSearchKeyword').value.toLowerCase();
-            document.querySelectorAll('#mItemContainer .multi-select-item').forEach(el => {
-                el.style.display = el.textContent.toLowerCase().includes(kw) ? 'flex' : 'none';
-            });
-        }
-        function updateMItemBtnText() {
-            const btn = document.getElementById('btnMItemSelect');
-            btn.textContent = mSelectedItems.size === 0 ? '📦 품목 선택 없음' : `📦 품목 (${mSelectedItems.size}개)`;
         }
 
         document.getElementById('mCenterFilter').addEventListener('change', renderMobileView);
@@ -210,20 +135,19 @@
             const container = document.getElementById('mobileList');
             container.innerHTML = '';
 
-            const filtered = mRawData.filter(row => {
-                const cName = (row.distribution_center || row.center_name || '').trim();
-                const iKey = (row.item_code || row.item_name || '').trim();
+            let filtered = mRawData;
+            if (selectedCenter) {
+                filtered = mRawData.filter(row => {
+                    const cName = (row.distribution_center || row.center_name || row.center || '').trim();
+                    return cName === selectedCenter;
+                });
+            }
 
-                const centerMatch = !selectedCenter || cName === selectedCenter;
-                const itemMatch = mSelectedItems.has(iKey) || mSelectedItems.has(row.item_code) || mSelectedItems.has(row.item_name);
-
-                return centerMatch && itemMatch;
-            });
-
-            let tQty = 0, tAmt = 0;
+            let tQty = 0;
+            let tAmt = 0;
 
             if (filtered.length === 0) {
-                container.innerHTML = '<div class="text-center py-4 text-muted">선택 조건에 맞는 데이터가 없습니다.</div>';
+                container.innerHTML = '<div class="text-center py-4 text-muted">데이터가 없습니다.</div>';
                 document.getElementById('mTotalQty').textContent = '0개';
                 document.getElementById('mTotalAmount').textContent = '0원';
                 return;
@@ -232,9 +156,11 @@
             filtered.forEach(row => {
                 const qty = Number(row.qty || 0);
                 const amt = Number(row.total_amount || 0);
-                tQty += qty; tAmt += amt;
+                tQty += qty;
+                tAmt += amt;
 
-                const centerName = (row.distribution_center || row.center_name || '').trim() || '-';
+                // 💡 DB 컬럼명 바인딩 및 Fallback 처리
+                const centerName = (row.distribution_center || row.center_name || row.center || '').trim() || '-';
 
                 const card = document.createElement('div');
                 card.className = 'mobile-card';
@@ -244,7 +170,7 @@
                         <span class="center-tag">${centerName}</span>
                     </div>
                     <div class="fw-bold fs-6 text-dark mb-1">${row.store_name || '-'} <span class="small text-muted">(${row.brand_name || '-'})</span></div>
-                    <div class="text-secondary small mb-2">[${row.item_code || '-'}] ${row.item_name || '-'}</div>
+                    <div class="text-secondary small mb-2">${row.item_name || '-'}</div>
                     <div class="d-flex justify-content-between align-items-center pt-2 border-top">
                         <span class="small text-muted">수량: <strong class="text-dark">${qty.toLocaleString()}개</strong></span>
                         <span class="fw-bold text-success">${amt.toLocaleString()}원</span>
