@@ -2,56 +2,180 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Theborn OMS 모바일 현황</title>
+    <!-- 🚀 모바일 기기 화면에 맞게 100% 가변 자동 확장 처리 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>더본 OMS 주문 실시간 대시보드</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background-color: #f4f6f9; font-family: 'Pretendard', sans-serif; }
-        .mobile-card { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-        .center-tag { display: inline-block; background-color: #e8f5e9; color: #2e7d32; font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 4px; }
+        :root {
+            --primary-color: #0d6efd;
+            --bg-color: #f4f6f9;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden; /* 모바일 좌우 잘림 및 전체 스크롤 방지 */
+            background-color: var(--bg-color);
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+        }
+
+        /* 메인 컨테이너 모바일 100% 대응 */
+        .app-container {
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 12px;
+            box-sizing: border-box;
+        }
+
+        /* 카드 및 컨테이너 가변 반응형 */
+        .custom-card {
+            background: #ffffff;
+            border-radius: 10px;
+            border: none;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+            margin-bottom: 12px;
+            padding: 14px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* 요약 집계 카드 */
+        .summary-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+
+        /* 테이블 스크롤 최적화 */
+        .table-responsive {
+            width: 100% !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .table th, .table td {
+            white-space: nowrap;
+            vertical-align: middle;
+            font-size: 13px;
+        }
+
+        .badge-center {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        /* 📱 모바일 디스플레이 전용 반응형 레이아웃 (화면 너비 768px 이하) */
+        @media (max-width: 768px) {
+            .app-container {
+                padding: 8px !important;
+            }
+
+            .summary-value {
+                font-size: 1.1rem !important;
+            }
+
+            /* 폼 엘리먼트 세로 1열 강제 확장 */
+            .mobile-col-12 {
+                width: 100% !important;
+                flex: 0 0 100% !important;
+                max-width: 100% !important;
+                margin-bottom: 6px;
+            }
+
+            .btn-mobile {
+                width: 100% !important;
+                margin-top: 4px;
+            }
+
+            .table th, .table td {
+                font-size: 11px !important;
+                padding: 6px 4px !important;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="container py-3">
-        <h4 class="fw-bold mb-3">📱 OMS 주문 현황</h4>
 
-        <!-- 모바일 기간 및 센터 선택 -->
-        <div class="card p-3 mb-3 border-0 shadow-sm">
-            <div class="row g-2">
-                <div class="col-6">
-                    <input type="date" id="mStartDate" class="form-control form-control-sm">
+    <div class="app-container">
+        <!-- 1. 헤더 영역 -->
+        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap">
+            <h5 class="fw-bold m-0 py-1">📊 더본 OMS 주문 실시간 대시보드</h5>
+            <span class="badge bg-success">v22.0 Fully Synchronized</span>
+        </div>
+
+        <!-- 2. 필터 영역 -->
+        <div class="custom-card">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-3 col-6 mobile-col-12">
+                    <label class="form-label small fw-bold text-secondary mb-1">시작 배송일자</label>
+                    <input type="date" id="startDate" class="form-control form-control-sm">
                 </div>
-                <div class="col-6">
-                    <input type="date" id="mEndDate" class="form-control form-control-sm">
+                <div class="col-md-3 col-6 mobile-col-12">
+                    <label class="form-label small fw-bold text-secondary mb-1">종료 배송일자</label>
+                    <input type="date" id="endDate" class="form-control form-control-sm">
                 </div>
-                <div class="col-12">
-                    <select id="mCenterFilter" class="form-select form-select-sm">
+                <div class="col-md-3 col-12 mobile-col-12">
+                    <label class="form-label small fw-bold text-secondary mb-1">물류센터</label>
+                    <select id="centerFilter" class="form-select form-select-sm">
                         <option value="">전체 물류센터</option>
                     </select>
                 </div>
-                <div class="col-12 mt-2">
-                    <button class="btn btn-primary btn-sm w-100 fw-bold" onclick="loadMobileData()">조회하기</button>
+                <div class="col-md-3 col-12 mobile-col-12 d-flex gap-1">
+                    <button class="btn btn-primary btn-sm btn-mobile fw-bold flex-fill" onclick="loadDashboardData()">조회</button>
                 </div>
             </div>
         </div>
 
-        <!-- 카드형 요약 -->
-        <div class="card p-3 mb-3 border-0 bg-dark text-white shadow-sm">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <span class="small text-white-50">총 수량</span>
-                    <h5 id="mTotalQty" class="fw-bold mb-0 text-info">0개</h5>
+        <!-- 3. 핵심 요약 카드 (상단 3종) -->
+        <div class="row g-2 mb-2">
+            <div class="col-md-4 col-4">
+                <div class="custom-card text-center p-2 mb-0">
+                    <div class="text-secondary small">총 주문건수</div>
+                    <div id="totalCount" class="summary-value text-dark">0건</div>
                 </div>
-                <div class="text-end">
-                    <span class="small text-white-50">총 금액</span>
-                    <h5 id="mTotalAmount" class="fw-bold mb-0 text-warning">0원</h5>
+            </div>
+            <div class="col-md-4 col-4">
+                <div class="custom-card text-center p-2 mb-0">
+                    <div class="text-secondary small">총 주문수량</div>
+                    <div id="totalQty" class="summary-value text-primary">0개</div>
+                </div>
+            </div>
+            <div class="col-md-4 col-4">
+                <div class="custom-card text-center p-2 mb-0">
+                    <div class="text-secondary small">총 주문금액</div>
+                    <div id="totalAmount" class="summary-value text-success">0원</div>
                 </div>
             </div>
         </div>
 
-        <!-- 주문 목록 (카드 뷰) -->
-        <div id="mobileList">
-            <div class="text-center py-5 text-muted">조회 버튼을 눌러주세요.</div>
+        <!-- 4. 데이터 테이블 영역 -->
+        <div class="custom-card p-0 overflow-hidden">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>배송일자</th>
+                            <th>브랜드</th>
+                            <th>점포명(코드)</th>
+                            <th class="text-center">센터명</th>
+                            <th>품목명</th>
+                            <th class="text-end">수량</th>
+                            <th class="text-end">단가</th>
+                            <th class="text-end">금액</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orderTableBody">
+                        <tr>
+                            <td colspan="8" class="text-center py-4 text-muted">조회할 날짜를 선택 후 조회를 눌러주세요.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -59,35 +183,31 @@
         const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co";
         const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN";
 
-        let mRawData = [];
+        let currentOrdersData = [];
 
         window.onload = function() {
             const today = new Date().toISOString().split('T')[0];
-            document.getElementById('mStartDate').value = today;
-            document.getElementById('mEndDate').value = today;
-            loadMobileData();
+            document.getElementById('startDate').value = today;
+            document.getElementById('endDate').value = today;
+            loadDashboardData();
         };
 
-        async function loadMobileData() {
-            const sDate = document.getElementById('mStartDate').value;
-            const eDate = document.getElementById('mEndDate').value;
-
-            if (!sDate || !eDate) return;
-
-            const container = document.getElementById('mobileList');
-            container.innerHTML = '<div class="text-center py-4">⏳ 데이터 불러오는 중...</div>';
-
+        // 🚀 Supabase DB 조회 (distribution_center 컬럼 명시)
+        async function fetchAllOrdersInChunksForRange(startDate, endDate) {
             let allData = [];
             let page = 0;
             const pageSize = 1000;
             let hasMore = true;
 
+            const sDate = startDate.replace(/\//g, '-');
+            const eDate = endDate.replace(/\//g, '-');
+
             while (hasMore) {
-                // 🚀 select 쿼리에 distribution_center 명시
                 const selectCols = "order_date,delivery_date,store_code,store_name,brand_name,distribution_center,item_code,item_name,qty,price,total_amount";
                 const url = `${SUPABASE_URL}/rest/v1/oms_orders?select=${selectCols}&delivery_date=gte.${sDate}&delivery_date=lte.${eDate}&order=delivery_date.desc`;
 
-                const res = await fetch(url, {
+                const response = await fetch(url, {
+                    method: 'GET',
                     headers: {
                         'apikey': SUPABASE_ANON_KEY,
                         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
@@ -95,92 +215,114 @@
                     }
                 });
 
-                if (!res.ok) break;
-                const data = await res.json();
+                if (!response.ok) {
+                    console.error("데이터 패치 실패:", response.statusText);
+                    break;
+                }
+
+                const data = await response.json();
                 allData = allData.concat(data);
 
-                if (data.length < pageSize) hasMore = false;
-                else page++;
+                if (data.length < pageSize) {
+                    hasMore = false;
+                } else {
+                    page++;
+                }
             }
-
-            mRawData = allData;
-            populateMobileCenterFilter(mRawData);
-            renderMobileView();
+            return allData;
         }
 
-        function populateMobileCenterFilter(data) {
-            const select = document.getElementById('mCenterFilter');
-            const curVal = select.value;
-            const centers = new Set();
+        async function loadDashboardData() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
 
+            if (!startDate || !endDate) {
+                alert("조회 날짜를 선택하세요.");
+                return;
+            }
+
+            const tbody = document.getElementById('orderTableBody');
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4">⏳ 데이터 불러오는 중...</td></tr>';
+
+            currentOrdersData = await fetchAllOrdersInChunksForRange(startDate, endDate);
+            
+            populateCenterFilter(currentOrdersData);
+            applyFilterAndRender();
+        }
+
+        function populateCenterFilter(data) {
+            const centerSelect = document.getElementById('centerFilter');
+            const selectedVal = centerSelect.value;
+            
+            const centers = new Set();
             data.forEach(row => {
                 const cName = (row.distribution_center || row.center_name || row.center || '').trim();
                 if (cName) centers.add(cName);
             });
 
-            select.innerHTML = '<option value="">전체 물류센터</option>';
-            Array.from(centers).sort().forEach(c => {
+            centerSelect.innerHTML = '<option value="">전체 물류센터</option>';
+            Array.from(centers).sort().forEach(center => {
                 const opt = document.createElement('option');
-                opt.value = c;
-                opt.textContent = c;
-                if (c === curVal) opt.selected = true;
-                select.appendChild(opt);
+                opt.value = center;
+                opt.textContent = center;
+                if (center === selectedVal) opt.selected = true;
+                centerSelect.appendChild(opt);
             });
         }
 
-        document.getElementById('mCenterFilter').addEventListener('change', renderMobileView);
+        function applyFilterAndRender() {
+            const selectedCenter = document.getElementById('centerFilter').value;
+            let filtered = currentOrdersData;
 
-        function renderMobileView() {
-            const selectedCenter = document.getElementById('mCenterFilter').value;
-            const container = document.getElementById('mobileList');
-            container.innerHTML = '';
-
-            let filtered = mRawData;
             if (selectedCenter) {
-                filtered = mRawData.filter(row => {
+                filtered = currentOrdersData.filter(row => {
                     const cName = (row.distribution_center || row.center_name || row.center || '').trim();
                     return cName === selectedCenter;
                 });
             }
 
-            let tQty = 0;
-            let tAmt = 0;
+            renderDashboard(filtered);
+        }
 
-            if (filtered.length === 0) {
-                container.innerHTML = '<div class="text-center py-4 text-muted">데이터가 없습니다.</div>';
-                document.getElementById('mTotalQty').textContent = '0개';
-                document.getElementById('mTotalAmount').textContent = '0원';
-                return;
+        document.getElementById('centerFilter').addEventListener('change', applyFilterAndRender);
+
+        function renderDashboard(dataList) {
+            const tbody = document.getElementById('orderTableBody');
+            tbody.innerHTML = '';
+
+            let totalQty = 0;
+            let totalAmount = 0;
+
+            if (dataList.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">수집된 데이터가 없습니다.</td></tr>';
+            } else {
+                dataList.forEach(row => {
+                    const qty = Number(row.qty || 0);
+                    const amount = Number(row.total_amount || 0);
+                    totalQty += qty;
+                    totalAmount += amount;
+
+                    // 💡 DB 컬럼명 불일치 방지 및 Fallback 처리
+                    const centerName = (row.distribution_center || row.center_name || row.center || '').trim() || '-';
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${row.delivery_date || '-'}</td>
+                        <td>${row.brand_name || '-'}</td>
+                        <td><strong>${row.store_name || '-'}</strong> <span class="text-muted small">(${row.store_code || ''})</span></td>
+                        <td class="text-center"><span class="badge-center">${centerName}</span></td>
+                        <td>${row.item_name || '-'}</td>
+                        <td class="text-end fw-bold">${qty.toLocaleString()}</td>
+                        <td class="text-end">${Number(row.price || 0).toLocaleString()}원</td>
+                        <td class="text-end fw-bold text-success">${amount.toLocaleString()}원</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
             }
 
-            filtered.forEach(row => {
-                const qty = Number(row.qty || 0);
-                const amt = Number(row.total_amount || 0);
-                tQty += qty;
-                tAmt += amt;
-
-                // 💡 DB 컬럼명 바인딩 및 Fallback 처리
-                const centerName = (row.distribution_center || row.center_name || row.center || '').trim() || '-';
-
-                const card = document.createElement('div');
-                card.className = 'mobile-card';
-                card.innerHTML = `
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <span class="badge bg-secondary font-monospace">${row.delivery_date || '-'}</span>
-                        <span class="center-tag">${centerName}</span>
-                    </div>
-                    <div class="fw-bold fs-6 text-dark mb-1">${row.store_name || '-'} <span class="small text-muted">(${row.brand_name || '-'})</span></div>
-                    <div class="text-secondary small mb-2">${row.item_name || '-'}</div>
-                    <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-                        <span class="small text-muted">수량: <strong class="text-dark">${qty.toLocaleString()}개</strong></span>
-                        <span class="fw-bold text-success">${amt.toLocaleString()}원</span>
-                    </div>
-                `;
-                container.appendChild(card);
-            });
-
-            document.getElementById('mTotalQty').textContent = `${tQty.toLocaleString()}개`;
-            document.getElementById('mTotalAmount').textContent = `${tAmt.toLocaleString()}원`;
+            document.getElementById('totalCount').textContent = `${dataList.length.toLocaleString()}건`;
+            document.getElementById('totalQty').textContent = `${totalQty.toLocaleString()}개`;
+            document.getElementById('totalAmount').textContent = `${totalAmount.toLocaleString()}원`;
         }
     </script>
 </body>
