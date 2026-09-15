@@ -173,7 +173,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v15.0 Targeted Progress</span>
+            <span class="version-tag">v16.0 Strict Progress Engine</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -267,7 +267,7 @@
                 </div>
             </div>
 
-            <!-- 1번 반영: 상단 KPI는 기존처럼 깔끔하게 숫자로 표시 -->
+            <!-- 상단 KPI는 원래 수치 규격 유지 -->
             <div class="kpi-grid" style="margin-top: 15px;">
                 <div class="kpi-card">
                     <div class="kpi-title">기간 내 총 주문수량</div>
@@ -310,7 +310,7 @@
                     <span id="selected-store-title">🛒 기간 내 주문 상세</span>
                     <div class="summary-badge-group">
                         <button class="btn btn-excel" onclick="exportToExcel()">📥 엑셀 저장</button>
-                        <!-- 2번 반영: 상세 수량/금액 수신 시에만 실시간 로딩 % 표출 -->
+                        <!-- 하단 배지에서만 로딩 시 % 퍼센티지 표출 -->
                         <span class="summary-badge">수량합계: <b id="list-total-qty">0개</b></span>
                         <span class="summary-badge">금액합계: <b id="list-total-amount">0원</b></span>
                     </div>
@@ -394,6 +394,7 @@
         let currentPage = 1;
         let rowsPerPage = 10;
         let totalPages = 1;
+        let isLoadingChunks = false; // 로딩 진행 플래그
 
         /* 💾 IndexedDB 로컬 캐시 엔진 */
         const DB_NAME = "OmsLocalCacheDB";
@@ -679,13 +680,14 @@
 
         /* 🚀 대시보드 종합 조회 */
         async function fetchAllDashboardData() {
-            // 하단 수량/금액 뱃지만 0% 진행률로 초기화
+            isLoadingChunks = true;
             updateBadgePercent(0);
             await Promise.all([fetchChartData(), fetchDetailDataForRange()]);
         }
 
-        /* ⚡ 2번 반영: 하단 상세 뱃지에만 실시간 % 로딩 표출 */
+        /* ⚡ 하단 뱃지 전용 실시간 % 진행 상태 표출 함수 */
         function updateBadgePercent(percent) {
+            if (!isLoadingChunks) return;
             const pText = `⏳ 로딩중 (${percent}%)`;
             document.getElementById('list-total-qty').innerText = pText;
             document.getElementById('list-total-amount').innerText = pText;
@@ -750,7 +752,6 @@
                 dailyMap[dateKey].amount += amt;
             });
 
-            /* 1번 반영: 상단 KPI는 깨끗하게 원래 수치 포맷으로 표시 */
             document.getElementById('kpi-total-qty').innerText = `${totalQty.toLocaleString()} 건`;
             document.getElementById('kpi-total-items').innerText = `${uniqueItems.size.toLocaleString()} 종`;
             document.getElementById('kpi-total-amount').innerText = `${totalAmount.toLocaleString()} 원`;
@@ -808,8 +809,9 @@
             const limit = 200;
             let hasMore = true;
             rawDetailOrders = [];
+            isLoadingChunks = true;
 
-            let totalExpectedRows = 5000;
+            let totalExpectedRows = 10000;
             try {
                 const headRes = await fetch(`${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=id`, {
                     method: 'HEAD',
@@ -817,7 +819,7 @@
                 });
                 const contentRange = headRes.headers.get('content-range');
                 if (contentRange && contentRange.includes('/')) {
-                    totalExpectedRows = parseInt(contentRange.split('/')[1], 10) || 5000;
+                    totalExpectedRows = parseInt(contentRange.split('/')[1], 10) || 10000;
                 }
             } catch(e) {}
 
@@ -830,21 +832,24 @@
                         rawDetailOrders = rawDetailOrders.concat(chunk);
                         filteredDetailOrders = rawDetailOrders;
 
-                        /* 2번 반영: 하단 배지에서만 % 진행률 표시 */
                         let currentPercent = Math.min(99, Math.round((rawDetailOrders.length / totalExpectedRows) * 100));
                         updateBadgePercent(currentPercent);
 
-                        const activeStore = document.querySelector('#store-list .active');
-                        if (activeStore && activeStore.innerText.includes('전체 점포 합산')) {
-                            baseDetailOrders = filteredDetailOrders;
-                            applyColumnFilters();
-                        }
-
                         if (chunk.length < limit) {
                             hasMore = false;
-                        } else offset += limit;
+                        } else {
+                            offset += limit;
+                        }
                     } else { hasMore = false; }
                 } catch(e) { hasMore = false; }
+            }
+
+            // 모든 청크 수신 완료 시에만 로딩 상태 해제 및 최종 100% 수치 렌더링
+            isLoadingChunks = false;
+            const activeStore = document.querySelector('#store-list .active');
+            if (activeStore && activeStore.innerText.includes('전체 점포 합산')) {
+                baseDetailOrders = filteredDetailOrders;
+                applyColumnFilters();
             }
         }
 
@@ -948,6 +953,9 @@
         }
 
         function renderDetailTable() {
+            // 로딩 중일 때는 도중에 최종 결과로 숫자를 덮어씌우지 않음
+            if (isLoadingChunks) return;
+
             const tbody = document.getElementById('order-detail-table');
 
             if (!currentDetailOrders || currentDetailOrders.length === 0) {
@@ -965,7 +973,7 @@
                 sumAmount += (cleanNumber(row.total_amount) || (q * p));
             });
 
-            /* 완성 후 실제 합계 수치 정돈 표출 */
+            // 100% 완전히 다 가져온 후 최종 숫자를 표출
             document.getElementById('list-total-qty').innerText = `${sumQty.toLocaleString()}개`;
             document.getElementById('list-total-amount').innerText = `${sumAmount.toLocaleString()}원`;
 
