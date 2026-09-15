@@ -12,7 +12,6 @@ on:
         required: false
         default: ''
   schedule:
-    # 매일 정해진 시간(예: 한국시간 오전 7시)에 자동 실행
     - cron: '0 22 * * *'
 
 jobs:
@@ -31,20 +30,15 @@ jobs:
       - name: Install dependencies & Selenium Chrome Driver
         run: |
           python -m pip install --upgrade pip
-          pip install pandas requests openpyxl selenium webdriver-manager
+          pip install pandas requests openpyxl selenium
 
       - name: Run Python Screenshot Bot
         env:
-          # Supabase 클라우드 DB Secrets
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-          
-          # 더본 OMS 로그인 정보 Secrets
           OMS_COMPANY_CODE: ${{ secrets.OMS_COMPANY_CODE }}
           OMS_ID: ${{ secrets.OMS_ID }}
           OMS_PW: ${{ secrets.OMS_PW }}
-          
-          # 날짜 기간 파라미터
           START_DATE: ${{ github.event.inputs.start_date }}
           END_DATE: ${{ github.event.inputs.end_date }}
         run: |
