@@ -26,7 +26,7 @@ logging.basicConfig(
 )
 
 # ---------------------------------------------------------------------------
-# Environment Variables (요청하신 변수명 매핑)
+# Environment Variables
 # ---------------------------------------------------------------------------
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://zbilhsgfgyfrolveaego.supabase.co")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
@@ -34,7 +34,7 @@ SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 OMS_LOGIN_URL = "https://oms.theborn.co.kr/login.do"
 OMS_ORDER_LIST_URL = "https://oms.theborn.co.kr/order/orderList.do"
 
-# 🔑 변경된 로그인 환경변수
+# 🔑 Secrets 매핑 변수
 OMS_ID = os.environ.get("OMS_ID", "")
 OMS_PW = os.environ.get("OMS_PW", "")
 OMS_COMPANY_CODE = os.environ.get("OMS_COMPANY_CODE", "")
@@ -136,17 +136,16 @@ def run_capture(target_start_date, target_end_date):
         logging.info(f"🚀 OMS 크롤링 시작 [조회 기간: {target_start_date} ~ {target_end_date}]")
         
         if not OMS_ID or not OMS_PW:
-            logging.error("❌ OMS_ID 또는 OMS_PW 환경 변수가 설정되지 않았습니다! GitHub Secrets를 확인하세요.")
+            logging.error("❌ OMS_ID 또는 OMS_PW 환경 변수가 설정되지 않았습니다! GitHub Secrets를 확인해 주세요.")
             sys.exit(1)
 
         driver = get_chrome_driver()
         wait = WebDriverWait(driver, 20)
 
-        # 1. 로그인 페이지 접속
+        # 1. 로그인
         driver.get(OMS_LOGIN_URL)
         time.sleep(2)
 
-        # 회사코드 입력란이 있을 경우 처리
         if OMS_COMPANY_CODE:
             for comp_sel in ["companyCode", "compCode", "corpCode"]:
                 try:
@@ -159,7 +158,6 @@ def run_capture(target_start_date, target_end_date):
                 except Exception:
                     pass
 
-        # ID / PW 입력
         id_input = wait.until(EC.presence_of_element_located((By.ID, "userId")))
         pw_input = driver.find_element(By.ID, "userPw")
 
@@ -171,69 +169,72 @@ def run_capture(target_start_date, target_end_date):
 
         time.sleep(5)
         
-        # 알림창(Alert) 감지 시 예외 처리
         try:
             alert = driver.switch_to.alert
-            logging.warning(f"⚠️ 로그인 중 알림창 감지: {alert.text}")
+            logging.warning(f"⚠️ 로그인 알림창 감지: {alert.text}")
             alert.accept()
             time.sleep(2)
         except Exception:
             pass
 
-        logging.info("✅ OMS 로그인 성공 및 세션 확보")
+        logging.info("✅ OMS 로그인 완료")
 
         # 2. 주문 내역 페이지 이동
         driver.get(OMS_ORDER_LIST_URL)
         time.sleep(5)
 
-        # iframe 존재 여부 체크 및 전환
+        # iframe 존재 시 프레임 이동
         iframes = driver.find_elements(By.TAG_NAME, "iframe")
         if iframes:
-            logging.info(f"🔍 iframe {len(iframes)}개 감지 - 첫 번째 프레임으로 전환")
+            logging.info(f"🔍 iframe {len(iframes)}개 감지 - 첫 번째 프레임 전환")
             driver.switch_to.frame(0)
 
-        # 3. 날짜 설정 및 검색
-        start_date_elem = None
-        for sel in ["startDate", "sDate", "searchStartDate"]:
+        # 3. 🎯 정확한 ID (BOR111_startDt / BOR111_endDt)로 날짜 값 인젝션
+        logging.info(f"📅 날짜 설정 수행 [시작: {target_start_date} / 종료: {target_end_date}]")
+        js_set_dates = """
+            var s = document.getElementById('BOR111_startDt');
+            var e = document.getElementById('BOR111_endDt');
+            if (s) { s.value = arguments[0]; s.dispatchEvent(new Event('change')); }
+            if (e) { e.value = arguments[1]; e.dispatchEvent(new Event('change')); }
+            
+            // 혹시 다른 보조 날짜 필드가 있을 경우 백업 설정
+            var s2 = document.getElementById('startDate') || document.getElementsByName('startDt')[0];
+            var e2 = document.getElementById('endDate') || document.getElementsByName('endDt')[0];
+            if (s2) s2.value = arguments[0];
+            if (e2) e2.value = arguments[1];
+        """
+        driver.execute_script(js_set_dates, target_start_date, target_end_date)
+        time.sleep(1)
+
+        # 조회 실행 (JS 함수 또는 버튼 클릭)
+        try:
+            driver.execute_script("if(typeof fn_search === 'function') { fn_search(); } else if(typeof doSearch === 'function') { doSearch(); }")
+        except Exception:
+            pass
+
+        search_btn = None
+        for s_sel in ["button.btn-search", "button#btnSearch", "input[value='조회']", "a.btn-search", ".btn_search"]:
             try:
-                start_date_elem = driver.find_element(By.ID, sel)
-                if start_date_elem: break
+                search_btn = driver.find_element(By.CSS_SELECTOR, s_sel)
+                if search_btn:
+                    search_btn.click()
+                    break
             except Exception: pass
 
-        if not start_date_elem:
-            driver.switch_to.default_content()
-            iframes = driver.find_elements(By.TAG_NAME, "iframe")
-            for idx, frame in enumerate(iframes):
-                driver.switch_to.default_content()
-                driver.switch_to.frame(idx)
-                try:
-                    start_date_elem = driver.find_element(By.ID, "startDate")
-                    if start_date_elem:
-                        logging.info(f"🔍 {idx}번째 iframe에서 startDate 포착!")
-                        break
-                except Exception: pass
-
-        if not start_date_elem:
-            raise Exception("날짜 입력란(startDate)을 찾을 수 없습니다. 계정 정보 및 로그인 세션을 확인하세요.")
-
-        end_date_elem = driver.find_element(By.ID, "endDate")
-
-        driver.execute_script("arguments[0].value = arguments[1];", start_date_elem, target_start_date)
-        driver.execute_script("arguments[0].value = arguments[1];", end_date_elem, target_end_date)
-
-        search_btn = driver.find_element(By.CSS_SELECTOR, "button.btn-search, button#btnSearch, input[type='button'][value='조회'], a.btn-search")
-        search_btn.click()
+        logging.info("🔍 조회 실행 - 데이터 응답 대기 중...")
         time.sleep(6)
 
-        # 4. 엑셀 다운로드 또는 테이블 스크래핑
+        # 4. 엑셀 다운로드
         excel_btn = None
-        try:
-            excel_btn = driver.find_element(By.CSS_SELECTOR, "button.btn-excel, a.btn-excel, #btnExcel, input[value='엑셀']")
-        except Exception: pass
+        for ex_sel in ["button.btn-excel", "a.btn-excel", "#btnExcel", "input[value='엑셀']", ".btn_excel"]:
+            try:
+                excel_btn = driver.find_element(By.CSS_SELECTOR, ex_sel)
+                if excel_btn: break
+            except Exception: pass
 
         records = []
         if excel_btn:
-            logging.info("📥 엑셀 다운로드 진행")
+            logging.info("📥 엑셀 다운로드 버튼 클릭")
             excel_btn.click()
             time.sleep(8)
             
@@ -263,7 +264,7 @@ def run_capture(target_start_date, target_end_date):
                 except Exception: pass
 
         if not records:
-            logging.info("📄 화면 테이블 DOM 스크래핑 시도")
+            logging.info("📄 화면 테이블 DOM 스크래핑 백업 수행")
             rows = driver.find_elements(By.CSS_SELECTOR, "table.tb-list tbody tr, table tbody tr")
             for r in rows:
                 cols = r.find_elements(By.TAG_NAME, "td")
@@ -289,12 +290,12 @@ def run_capture(target_start_date, target_end_date):
             upsert_to_supabase("oms_orders", records)
             time.sleep(2)
             refresh_materialized_views()
-            logging.info("✨ 모든 수집 및 뷰 동기화 완료!")
+            logging.info("✨ 모든 수집 및 뷰 동기화 성공!")
         else:
             logging.warning("⚠️ 수집된 데이터가 없습니다.")
 
     except Exception as e:
-        logging.error(f"❌ 크롤링 중 오류 발생: {e}", exc_info=True)
+        logging.error(f"❌ 크롤링 오류 발생: {e}", exc_info=True)
         sys.exit(1)
     finally:
         if driver:
