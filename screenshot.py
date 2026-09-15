@@ -2,9 +2,8 @@ import os
 import sys
 import time
 import re
-import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 import pandas as pd
 import requests
 
@@ -26,6 +25,9 @@ logging.basicConfig(
     datefmt='%H:%M:%S'
 )
 
+# ---------------------------------------------------------------------------
+# Environment Variables & Configuration
+# ---------------------------------------------------------------------------
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://zbilhsgfgyfrolveaego.supabase.co")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
@@ -35,6 +37,9 @@ OMS_ORDER_LIST_URL = "https://oms.theborn.co.kr/order/orderList.do"
 USER_ID = os.environ.get("OMS_USER_ID", "")
 USER_PW = os.environ.get("OMS_USER_PW", "")
 
+# ---------------------------------------------------------------------------
+# Helper Functions
+# ---------------------------------------------------------------------------
 def clean_int(val):
     if not val or pd.isna(val):
         return 0
@@ -58,7 +63,7 @@ def get_chrome_driver():
     chrome_options.add_argument("--window-size=1920,1080")
     chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
-    # 📥 자동 엑셀 다운로드 디렉토리 설정
+    # 📥 자동 다운로드 경로 설정
     download_dir = os.getcwd()
     prefs = {
         "download.default_directory": download_dir,
@@ -72,6 +77,9 @@ def get_chrome_driver():
     driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
 
+# ---------------------------------------------------------------------------
+# Supabase DB & View Operations
+# ---------------------------------------------------------------------------
 def upsert_to_supabase(table_name, records, batch_size=500):
     if not records:
         logging.info(f"[{table_name}] 업서트할 데이터가 없습니다.")
@@ -118,12 +126,15 @@ def refresh_materialized_views():
         except Exception as e:
             logging.error(f"❌ 구체화 뷰 갱신 통신 오류 ({view_rpc}): {e}")
 
+# ---------------------------------------------------------------------------
+# Main Capture Execution
+# ---------------------------------------------------------------------------
 def run_capture(target_start_date, target_end_date):
     driver = None
     try:
         logging.info(f"🚀 OMS 크롤링 시작 [조회 기간: {target_start_date} ~ {target_end_date}]")
         driver = get_chrome_driver()
-        wait = WebDriverWait(driver, 25)
+        wait = WebDriverWait(driver, 20)
 
         # 1. 로그인
         driver.get(OMS_LOGIN_URL)
@@ -138,119 +149,100 @@ def run_capture(target_start_date, target_end_date):
         pw_input.send_keys(USER_PW)
         pw_input.send_keys(Keys.RETURN)
 
-        time.sleep(5)
-        logging.info("✅ OMS 로그인 성공 및 세션 확보")
+        time.sleep(3)
+        logging.info("✅ OMS 로그인 완료")
 
         # 2. 주문 내역 페이지 이동
         driver.get(OMS_ORDER_LIST_URL)
-        time.sleep(5)
+        time.sleep(3)
 
-        iframes = driver.find_elements(By.TAG_NAME, "iframe")
-        if iframes:
-            logging.info(f"🔍 iframe {len(iframes)}개 감지 - 첫 번째 프레임으로 전환")
-            driver.switch_to.frame(0)
-
-        # 3. 날짜 입력 및 조회 클릭
+        # 3. 날짜 설정 및 검색 버튼 클릭
         start_date_elem = wait.until(EC.presence_of_element_located((By.ID, "startDate")))
         end_date_elem = driver.find_element(By.ID, "endDate")
 
         driver.execute_script("arguments[0].value = arguments[1];", start_date_elem, target_start_date)
         driver.execute_script("arguments[0].value = arguments[1];", end_date_elem, target_end_date)
 
-        # 검색 버튼 실행 (이벤트 트리거 포함)
-        driver.execute_script("if(typeof fn_search === 'function') { fn_search(); } else if(typeof doSearch === 'function') { doSearch(); }")
+        search_btn = driver.find_element(By.CSS_SELECTOR, "button.btn-search, button#btnSearch, input[type='button'][value='조회']")
+        search_btn.click()
+        time.sleep(5)
+
+        # 4. 엑셀 다운로드 또는 테이블 스크래핑
+        excel_btn = None
         try:
-            search_btn = driver.find_element(By.CSS_SELECTOR, "button.btn-search, button#btnSearch, input[value='조회'], a.btn-search")
-            search_btn.click()
+            excel_btn = driver.find_element(By.CSS_SELECTOR, "button.btn-excel, a.btn-excel, #btnExcel")
         except Exception:
             pass
 
-        logging.info("🔍 조회 실행 완료 - 데이터 로딩 대기 중...")
-        time.sleep(10) # 서버 응답 대기
-
-        # 4. 엑셀 다운로드 시도 (JS 직접 호출 + 버튼 탐색)
         records = []
-        logging.info("📥 엑셀 다운로드 실행 시도")
-        try:
-            # 더본 OMS 자바스크립트 엑셀 함수 직접 호출
-            driver.execute_script("if(typeof fn_excel === 'function') { fn_excel(); } else if(typeof fn_excelDown === 'function') { fn_excelDown(); } else if(typeof doExcel === 'function') { doExcel(); }")
-        except Exception:
-            pass
-
-        # 엑셀 다운로드 버튼 클릭
-        for ex_sel in ["button.btn-excel", "a.btn-excel", "#btnExcel", "input[value='엑셀']", ".btn_excel"]:
-            try:
-                ex_btn = driver.find_element(By.CSS_SELECTOR, ex_sel)
-                if ex_btn:
-                    ex_btn.click()
-                    break
-            except: pass
-
-        time.sleep(10) # 파일 다운로드 완료 대기
-
-        # 5. 다운로드된 엑셀 파일 읽기
-        download_dir = os.getcwd()
-        files = [os.path.join(download_dir, f) for f in os.listdir(download_dir) if f.endswith('.xlsx') or f.endswith('.xls')]
-        
-        if files:
-            latest_file = max(files, key=os.path.getctime)
-            logging.info(f"📂 엑셀 파일 감지 및 읽기: {latest_file}")
-            df = pd.read_excel(latest_file)
+        if excel_btn:
+            logging.info("📥 엑셀 다운로드 버튼 감지 - 파일 수집 시도")
+            excel_btn.click()
+            time.sleep(8)
             
-            for _, row in df.iterrows():
-                center_val = clean_str(row.get("distribution_center") or row.get("물류센터") or row.get("배송센터") or row.get("센터명"))
-                records.append({
-                    "store_code": clean_str(row.get("점포코드")),
-                    "store_name": clean_str(row.get("점포명")),
-                    "brand_name": clean_str(row.get("브랜드")),
-                    "distribution_center": center_val,
-                    "order_date": clean_str(row.get("주문일자")),
-                    "delivery_date": clean_str(row.get("배송일자")),
-                    "item_code": clean_str(row.get("품목코드")),
-                    "item_name": clean_str(row.get("품목명")),
-                    "qty": clean_int(row.get("수량")),
-                    "price": clean_int(row.get("단가")),
-                    "total_amount": clean_int(row.get("금액") or (clean_int(row.get("수량")) * clean_int(row.get("단가")))),
-                    "created_at": datetime.now().isoformat()
-                })
-            try:
-                os.remove(latest_file)
-            except: pass
+            download_dir = os.getcwd()
+            files = [os.path.join(download_dir, f) for f in os.listdir(download_dir) if f.endswith('.xlsx') or f.endswith('.xls')]
+            if files:
+                latest_file = max(files, key=os.path.getctime)
+                df = pd.read_excel(latest_file)
+                
+                for _, row in df.iterrows():
+                    # 💡 물류센터 / 배송센터 / 센터명 안전 매핑
+                    center_val = clean_str(row.get("distribution_center") or row.get("물류센터") or row.get("배송센터") or row.get("센터명"))
+                    records.append({
+                        "store_code": clean_str(row.get("점포코드")),
+                        "store_name": clean_str(row.get("점포명")),
+                        "brand_name": clean_str(row.get("브랜드")),
+                        "distribution_center": center_val,
+                        "order_date": clean_str(row.get("주문일자")),
+                        "delivery_date": clean_str(row.get("배송일자")),
+                        "item_code": clean_str(row.get("품목코드")),
+                        "item_name": clean_str(row.get("품목명")),
+                        "qty": clean_int(row.get("수량")),
+                        "price": clean_int(row.get("단가")),
+                        "total_amount": clean_int(row.get("금액") or (clean_int(row.get("수량")) * clean_int(row.get("단가")))),
+                        "created_at": datetime.now().isoformat()
+                    })
+                try:
+                    os.remove(latest_file)
+                except Exception:
+                    pass
 
-        # 6. 엑셀 파일이 없을 경우 화면 DOM 직접 스크래핑
+        # 엑셀 미다운로드 시 테이블 스크래핑 백업
         if not records:
-            logging.info("📄 엑셀 파일 미감지 - 화면 테이블 DOM 직접 추출 시도")
-            rows = driver.find_elements(By.CSS_SELECTOR, "table tbody tr")
+            logging.info("📄 화면 테이블 DOM 수동 스크래핑 수행")
+            rows = driver.find_elements(By.CSS_SELECTOR, "table.tb-list tbody tr, table tbody tr")
             for r in rows:
                 cols = r.find_elements(By.TAG_NAME, "td")
-                if len(cols) >= 6:
+                if len(cols) >= 8:
                     records.append({
                         "store_code": clean_str(cols[0].text),
                         "store_name": clean_str(cols[1].text),
-                        "brand_name": clean_str(cols[2].text) if len(cols) > 2 else "",
-                        "distribution_center": clean_str(cols[3].text) if len(cols) > 3 else "",
-                        "order_date": clean_str(cols[4].text) if len(cols) > 4 else "",
-                        "delivery_date": clean_str(cols[5].text) if len(cols) > 5 else "",
-                        "item_code": clean_str(cols[6].text) if len(cols) > 6 else "",
-                        "item_name": clean_str(cols[7].text) if len(cols) > 7 else "",
+                        "brand_name": clean_str(cols[2].text),
+                        "distribution_center": clean_str(cols[3].text),
+                        "order_date": clean_str(cols[4].text),
+                        "delivery_date": clean_str(cols[5].text),
+                        "item_code": clean_str(cols[6].text),
+                        "item_name": clean_str(cols[7].text),
                         "qty": clean_int(cols[8].text) if len(cols) > 8 else 0,
                         "price": clean_int(cols[9].text) if len(cols) > 9 else 0,
                         "total_amount": clean_int(cols[10].text) if len(cols) > 10 else 0,
                         "created_at": datetime.now().isoformat()
                     })
 
-        logging.info(f"📦 총 {len(records)}건 데이터 추출 완료")
+        logging.info(f"📦 총 {len(records)}건 데이터 추출 성공")
 
+        # 5. DB 저장 및 뷰 리프레시
         if records:
             upsert_to_supabase("oms_orders", records)
             time.sleep(2)
             refresh_materialized_views()
-            logging.info("✨ 모든 프로세스가 성공적으로 마무리되었습니다.")
+            logging.info("✨ 모든 수집 및 뷰 동기화 프로세스 완료!")
         else:
-            logging.warning("⚠️ 수집된 데이터가 존재하지 않습니다. OMS 조회 조건 날짜에 데이터가 있는지 확인해 주세요.")
+            logging.warning("⚠️ 수집된 데이터가 없습니다.")
 
     except Exception as e:
-        logging.error(f"❌ 크롤링 오류: {e}", exc_info=True)
+        logging.error(f"❌ 크롤링 중 오류 발생: {e}", exc_info=True)
         sys.exit(1)
     finally:
         if driver:
