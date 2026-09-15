@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>더본 OMS 주문 실시간 대시보드</title>
+    <!-- 📱 모바일 접속 시 mobile.html 자동 리다이렉트 -->
     <script>
         if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
             location.replace('/mobile.html');
@@ -172,7 +173,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v18.0 Final Sync Engine</span>
+            <span class="version-tag">v19.0 1K Chunk & Center Field</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -316,19 +317,20 @@
                 <div class="table-container">
                     <table id="detail-table">
                         <colgroup>
-                            <col style="width: 90px;"><col style="width: 160px;"><col style="width: 100px;">
-                            <col style="width: 100px;"><col style="width: 100px;"><col style="width: 200px;">
-                            <col style="width: 70px;"><col style="width: 90px;"><col style="width: 110px;">
+                            <col style="width: 80px;"><col style="width: 140px;"><col style="width: 120px;">
+                            <col style="width: 90px;"><col style="width: 90px;"><col style="width: 90px;">
+                            <col style="width: 180px;"><col style="width: 65px;"><col style="width: 85px;"><col style="width: 105px;">
                         </colgroup>
                         <thead>
                             <tr>
-                                <th>점포코드</th><th>점포명</th><th>주문일자</th><th>배송일자</th>
+                                <th>점포코드</th><th>점포명</th><th>센터명</th><th>주문일자</th><th>배송일자</th>
                                 <th>품목코드</th><th>품목명</th><th class="text-right">수량</th>
                                 <th class="text-right">단가</th><th class="text-right">금액</th>
                             </tr>
                             <tr class="filter-row-table">
                                 <th><input type="text" id="filter-storeCode" class="table-filter-input" placeholder="Enter" onkeydown="if(event.key==='Enter') applyColumnFilters()"></th>
                                 <th><input type="text" id="filter-storeName" class="table-filter-input" placeholder="Enter" onkeydown="if(event.key==='Enter') applyColumnFilters()"></th>
+                                <th><input type="text" id="filter-centerName" class="table-filter-input" placeholder="Enter" onkeydown="if(event.key==='Enter') applyColumnFilters()"></th>
                                 <th><input type="text" id="filter-orderDate" class="table-filter-input" placeholder="Enter" onkeydown="if(event.key==='Enter') applyColumnFilters()"></th>
                                 <th><input type="text" id="filter-deliveryDate" class="table-filter-input" placeholder="Enter" onkeydown="if(event.key==='Enter') applyColumnFilters()"></th>
                                 <th><input type="text" id="filter-itemCode" class="table-filter-input" placeholder="Enter" onkeydown="if(event.key==='Enter') applyColumnFilters()"></th>
@@ -694,7 +696,7 @@
             document.getElementById('list-total-amount').innerText = pText;
             
             if (rawDetailOrders.length === 0) {
-                document.getElementById('order-detail-table').innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#2563eb;">⚡ 데이터를 로딩 중입니다 (${currentMaxPercent}%)...</td></tr>`;
+                document.getElementById('order-detail-table').innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:#2563eb;">⚡ 데이터를 로딩 중입니다 (${currentMaxPercent}%)...</td></tr>`;
             }
         }
 
@@ -807,10 +809,11 @@
             } catch (err) {}
         }
 
+        /* ⚡ 1,000개 단위 초고속 로딩 + center_name 항목 반영 */
         async function fetchAllOrdersInChunksForRange(startDate, endDate) {
             const currentToken = activeFetchToken;
             let offset = 0;
-            const limit = 200;
+            const limit = 1000; // 청크 수신 한도 1,000개로 확대
             let hasMore = true;
             rawDetailOrders = [];
 
@@ -819,7 +822,7 @@
             while (hasMore) {
                 if (currentToken !== activeFetchToken) return;
 
-                const chunkUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc&limit=${limit}&offset=${offset}`;
+                const chunkUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_code,store_name,center_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc&limit=${limit}&offset=${offset}`;
                 try {
                     const res = await fetchWithUltraCache(chunkUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                     if (res.ok) {
@@ -843,7 +846,6 @@
                 } catch(e) { hasMore = false; }
             }
 
-            /* 🚀 100% 수신 완료 시 최종 숫자 표출 트리거 강제 실행 */
             if (currentToken === activeFetchToken) {
                 currentMaxPercent = 100;
                 const activeStore = document.querySelector('#store-list .active');
@@ -859,7 +861,7 @@
         async function fetchStoreDetailOrders(storeName) {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
-            const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&store_name=eq.${encodeURIComponent(storeName)}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name`;
+            const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&store_name=eq.${encodeURIComponent(storeName)}&select=store_code,store_name,center_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name`;
 
             try {
                 const res = await fetchWithUltraCache(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
@@ -933,9 +935,11 @@
             }
         }
 
+        /* 🔍 센터명 컬럼 필터링 반영 */
         function applyColumnFilters() {
             const qSC = document.getElementById('filter-storeCode').value.toLowerCase().trim();
             const qSN = document.getElementById('filter-storeName').value.toLowerCase().trim();
+            const qCN = document.getElementById('filter-centerName').value.toLowerCase().trim();
             const qOD = document.getElementById('filter-orderDate').value.toLowerCase().trim();
             const qDD = document.getElementById('filter-deliveryDate').value.toLowerCase().trim();
             const qIC = document.getElementById('filter-itemCode').value.toLowerCase().trim();
@@ -944,6 +948,7 @@
             currentDetailOrders = baseDetailOrders.filter(row => {
                 if (qSC && !cleanCode(row.store_code).toLowerCase().includes(qSC)) return false;
                 if (qSN && !String(row.store_name||'').toLowerCase().includes(qSN)) return false;
+                if (qCN && !String(row.center_name||'').toLowerCase().includes(qCN)) return false;
                 if (qOD && !formatDisplayDate(row.order_date).toLowerCase().includes(qOD)) return false;
                 if (qDD && !formatDisplayDate(row.delivery_date).toLowerCase().includes(qDD)) return false;
                 if (qIC && !cleanCode(row.item_code).toLowerCase().includes(qIC)) return false;
@@ -955,12 +960,13 @@
             renderDetailTable();
         }
 
+        /* 🏢 센터명(`center_name`) 표출 적용 테이블 렌더링 */
         function renderDetailTable() {
             const tbody = document.getElementById('order-detail-table');
 
             if (!currentDetailOrders || currentDetailOrders.length === 0) {
                 if (currentMaxPercent < 100) return;
-                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#94a3b8;">데이터가 없습니다.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:#94a3b8;">데이터가 없습니다.</td></tr>`;
                 document.getElementById('list-total-qty').innerText = "0개";
                 document.getElementById('list-total-amount').innerText = "0원";
                 updatePaginationUI(0);
@@ -974,7 +980,6 @@
                 sumAmount += (cleanNumber(row.total_amount) || (q * p));
             });
 
-            /* 100% 완료 시 최종 숫자로 덮어쓰기 */
             if (currentMaxPercent >= 100) {
                 document.getElementById('list-total-qty').innerText = `${sumQty.toLocaleString()}개`;
                 document.getElementById('list-total-amount').innerText = `${sumAmount.toLocaleString()}원`;
@@ -996,6 +1001,7 @@
                     <tr>
                         <td><span class="code-tag">${cleanCode(row.store_code)}</span></td>
                         <td><b>${row.store_name||'-'}</b></td>
+                        <td><span style="color:#475569; font-weight:600;">${row.center_name||'-'}</span></td>
                         <td>${formatDisplayDate(row.order_date)}</td>
                         <td><span style="color:#2563eb; font-weight:bold;">${formatDisplayDate(row.delivery_date)}</span></td>
                         <td><span class="code-tag">${cleanCode(row.item_code)}</span></td>
@@ -1048,6 +1054,7 @@
             if (!currentDetailOrders || currentDetailOrders.length === 0) return alert("저장할 데이터가 없습니다.");
             const exportData = currentDetailOrders.map(row => ({
                 '점포코드': cleanCode(row.store_code), '점포명': row.store_name || '-',
+                '센터명': row.center_name || '-',
                 '주문일자': formatDisplayDate(row.order_date), '배송일자': formatDisplayDate(row.delivery_date),
                 '품목코드': cleanCode(row.item_code), '품목명': row.item_name || '-',
                 '수량': cleanNumber(row.qty), '단가': cleanNumber(row.price),
