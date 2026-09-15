@@ -224,7 +224,7 @@
         </div>
     </div>
 
-    <!-- 📦 품목 다중 선택 모달 (개편) -->
+    <!-- 🔍 품목 다중 선택 모달 -->
     <div class="modal-overlay" id="item-modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -254,9 +254,10 @@
                 <div class="filter-row" style="margin-bottom: 0; padding: 0; background: transparent; border: none;">
                     <div class="filter-group">
                         <label>조회 기간:</label>
-                        <input type="date" id="chart-start-date" class="input-box">
+                        <!-- 🚀 onchange 이벤트로 날짜 선택 즉시 제어 및 검증 -->
+                        <input type="date" id="chart-start-date" class="input-box" onchange="validateDates('start')">
                         <span>~</span>
-                        <input type="date" id="chart-end-date" class="input-box">
+                        <input type="date" id="chart-end-date" class="input-box" onchange="validateDates('end')">
                     </div>
                     <div class="filter-group">
                         <label>브랜드:</label>
@@ -505,6 +506,30 @@
             return str || '-';
         }
 
+        /* 🚨 날짜 유효성 검증 함수 (종료일 < 시작일 방지, 동일날짜 허용) */
+        function validateDates(type) {
+            const startDateEl = document.getElementById('chart-start-date');
+            const endDateEl = document.getElementById('chart-end-date');
+            const sDate = startDateEl.value;
+            const eDate = endDateEl.value;
+
+            if (sDate && eDate) {
+                // 시작일에 따라 종료일의 선택 가능 min 범위 자동 설정
+                endDateEl.min = sDate;
+
+                if (sDate > eDate) {
+                    alert("⚠️ 종료 배송일자는 시작 배송일자보다 이전 일자일 수 없습니다.");
+                    if (type === 'start') {
+                        endDateEl.value = sDate;
+                    } else {
+                        endDateEl.value = sDate;
+                    }
+                    return false;
+                }
+            }
+            return true;
+        }
+
         /* 🏢 브랜드 선택 모달 */
         async function openBrandModal(target = 'chart') {
             activeBrandTarget = target;
@@ -571,7 +596,7 @@
             updateStoreListAndSummary(selectedBrands);
         }
 
-        /* 📦 품목 모달 (브랜드와 동일한 체크박스 다중 선택 구조) */
+        /* 📦 품목 모달 */
         async function openItemModal() {
             document.getElementById('item-modal').style.display = 'flex';
             const listEl = document.getElementById('item-modal-list');
@@ -686,6 +711,7 @@
                 cell.onclick = () => { 
                     document.getElementById('chart-start-date').value = dString;
                     document.getElementById('chart-end-date').value = dString;
+                    validateDates('start');
                     closeCalendarModal(); 
                     fetchAllDashboardData(); 
                 };
@@ -696,6 +722,7 @@
 
         /* 🚀 대시보드 종합 조회 */
         async function fetchAllDashboardData() {
+            if (!validateDates('start')) return;
             activeFetchToken++;
             currentMaxPercent = 0;
             updateBadgePercent(1);
@@ -1097,8 +1124,15 @@
             const today = new Date();
             const past7 = new Date(); past7.setDate(today.getDate() - 7);
 
-            document.getElementById('chart-start-date').value = localStorage.getItem('cached_chart_start_date') || formatDate(past7);
-            document.getElementById('chart-end-date').value = localStorage.getItem('cached_chart_end_date') || formatDate(today);
+            const initialStartDate = localStorage.getItem('cached_chart_start_date') || formatDate(past7);
+            const initialEndDate = localStorage.getItem('cached_chart_end_date') || formatDate(today);
+
+            document.getElementById('chart-start-date').value = initialStartDate;
+            document.getElementById('chart-end-date').value = initialEndDate;
+            
+            // 날짜 선택 범위 제어 바인딩
+            validateDates('start');
+
             document.getElementById('sync-target-date').value = formatDate(today);
             document.getElementById('chart-brand-input').value = localStorage.getItem('cached_brand_input') || '';
             document.getElementById('chart-item-input').value = localStorage.getItem('cached_item_input') || '';
