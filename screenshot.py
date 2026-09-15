@@ -4,7 +4,6 @@ import time
 import re
 import json
 import logging
-import asyncio
 from datetime import datetime, timedelta
 import pandas as pd
 import requests
@@ -148,7 +147,7 @@ def run_capture(target_start_date, target_end_date):
         driver.get(OMS_ORDER_LIST_URL)
         time.sleep(3)
 
-        # 3. 날짜 설정 및 검색 (배송일자/주문일자 조건)
+        # 3. 날짜 설정 및 검색
         start_date_elem = wait.until(EC.presence_of_element_located((By.ID, "startDate")))
         end_date_elem = driver.find_element(By.ID, "endDate")
 
@@ -159,7 +158,7 @@ def run_capture(target_start_date, target_end_date):
         search_btn.click()
         time.sleep(5)
 
-        # 4. 엑셀 다운로드 또는 테이블 스크래핑
+        # 4. 엑셀 다운로드 및 데이터 파싱 (센터명 매핑 포함)
         excel_btn = None
         try:
             excel_btn = driver.find_element(By.CSS_SELECTOR, "button.btn-excel, a.btn-excel, #btnExcel")
@@ -169,10 +168,9 @@ def run_capture(target_start_date, target_end_date):
         records = []
         if excel_btn:
             logging.info("📥 엑셀 다운로드 버튼 감지 - 파일 수집 시도")
-            # 엑셀 다운로드 처리 및 읽기 (생략 시 테이블 내 DOM 스크래핑 병행)
             excel_btn.click()
             time.sleep(8)
-            # 다운로드 폴더 파일 탐색 및 pandas 파싱
+            
             download_dir = os.getcwd()
             files = [os.path.join(download_dir, f) for f in os.listdir(download_dir) if f.endswith('.xlsx') or f.endswith('.xls')]
             if files:
@@ -180,11 +178,13 @@ def run_capture(target_start_date, target_end_date):
                 df = pd.read_excel(latest_file)
                 
                 for _, row in df.iterrows():
+                    # 💡 센터명(물류센터/배송센터/센터명) 컬럼 안전 매핑
+                    center_val = clean_str(row.get("distribution_center") or row.get("물류센터") or row.get("배송센터") or row.get("센터명"))
                     records.append({
                         "store_code": clean_str(row.get("점포코드")),
                         "store_name": clean_str(row.get("점포명")),
                         "brand_name": clean_str(row.get("브랜드")),
-                        "center_name": clean_str(row.get("센터명") or row.get("물류센터")),
+                        "distribution_center": center_val,
                         "order_date": clean_str(row.get("주문일자")),
                         "delivery_date": clean_str(row.get("배송일자")),
                         "item_code": clean_str(row.get("품목코드")),
@@ -206,7 +206,7 @@ def run_capture(target_start_date, target_end_date):
                         "store_code": clean_str(cols[0].text),
                         "store_name": clean_str(cols[1].text),
                         "brand_name": clean_str(cols[2].text),
-                        "center_name": clean_str(cols[3].text),
+                        "distribution_center": clean_str(cols[3].text),
                         "order_date": clean_str(cols[4].text),
                         "delivery_date": clean_str(cols[5].text),
                         "item_code": clean_str(cols[6].text),
@@ -219,11 +219,10 @@ def run_capture(target_start_date, target_end_date):
 
         logging.info(f"📦 총 {len(records)}건 데이터 추출 성공")
 
-        # 5. Supabase 업서트
+        # 5. Supabase 업서트 및 구체화 뷰 리프레시
         if records:
             upsert_to_supabase("oms_orders", records)
             time.sleep(2)
-            # 6. 구체화 뷰 리프레시 (RPC)
             refresh_materialized_views()
             logging.info("✨ 모든 수집 및 뷰 동기화 프로세스 완료!")
         else:
@@ -236,15 +235,10 @@ def run_capture(target_start_date, target_end_date):
         if driver:
             driver.quit()
 
-# ---------------------------------------------------------------------------
-# Entry Point
-# ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    # GitHub Actions의 inputs 인자나 매개변수 파싱
     start_date = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else datetime.now().strftime('%Y/%m/%d')
     end_date = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else start_date
 
-    # 날짜 포맷 표준화 (YYYY/MM/DD)
     start_date = start_date.replace('-', '/')
     end_date = end_date.replace('-', '/')
 
