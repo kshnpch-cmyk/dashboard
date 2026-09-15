@@ -26,7 +26,7 @@ logging.basicConfig(
 )
 
 # ---------------------------------------------------------------------------
-# Environment Variables & Configuration
+# Environment Variables (요청하신 변수명 매핑)
 # ---------------------------------------------------------------------------
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://zbilhsgfgyfrolveaego.supabase.co")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
@@ -34,8 +34,10 @@ SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 OMS_LOGIN_URL = "https://oms.theborn.co.kr/login.do"
 OMS_ORDER_LIST_URL = "https://oms.theborn.co.kr/order/orderList.do"
 
-USER_ID = os.environ.get("OMS_USER_ID", "")
-USER_PW = os.environ.get("OMS_USER_PW", "")
+# 🔑 변경된 로그인 환경변수
+OMS_ID = os.environ.get("OMS_ID", "")
+OMS_PW = os.environ.get("OMS_PW", "")
+OMS_COMPANY_CODE = os.environ.get("OMS_COMPANY_CODE", "")
 
 # ---------------------------------------------------------------------------
 # Helper Functions
@@ -63,7 +65,6 @@ def get_chrome_driver():
     chrome_options.add_argument("--window-size=1920,1080")
     chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
-    # 📥 자동 다운로드 경로 설정
     download_dir = os.getcwd()
     prefs = {
         "download.default_directory": download_dir,
@@ -78,7 +79,7 @@ def get_chrome_driver():
     return driver
 
 # ---------------------------------------------------------------------------
-# Supabase DB & View Operations
+# Supabase Operations
 # ---------------------------------------------------------------------------
 def upsert_to_supabase(table_name, records, batch_size=500):
     if not records:
@@ -133,50 +134,106 @@ def run_capture(target_start_date, target_end_date):
     driver = None
     try:
         logging.info(f"🚀 OMS 크롤링 시작 [조회 기간: {target_start_date} ~ {target_end_date}]")
+        
+        if not OMS_ID or not OMS_PW:
+            logging.error("❌ OMS_ID 또는 OMS_PW 환경 변수가 설정되지 않았습니다! GitHub Secrets를 확인하세요.")
+            sys.exit(1)
+
         driver = get_chrome_driver()
         wait = WebDriverWait(driver, 20)
 
-        # 1. 로그인
+        # 1. 로그인 페이지 접속
         driver.get(OMS_LOGIN_URL)
         time.sleep(2)
 
+        # 회사코드 입력란이 있을 경우 처리
+        if OMS_COMPANY_CODE:
+            for comp_sel in ["companyCode", "compCode", "corpCode"]:
+                try:
+                    comp_input = driver.find_element(By.ID, comp_sel)
+                    if comp_input:
+                        comp_input.clear()
+                        comp_input.send_keys(OMS_COMPANY_CODE)
+                        logging.info("🏢 회사코드 입력 완료")
+                        break
+                except Exception:
+                    pass
+
+        # ID / PW 입력
         id_input = wait.until(EC.presence_of_element_located((By.ID, "userId")))
         pw_input = driver.find_element(By.ID, "userPw")
 
         id_input.clear()
-        id_input.send_keys(USER_ID)
+        id_input.send_keys(OMS_ID)
         pw_input.clear()
-        pw_input.send_keys(USER_PW)
+        pw_input.send_keys(OMS_PW)
         pw_input.send_keys(Keys.RETURN)
 
-        time.sleep(3)
-        logging.info("✅ OMS 로그인 완료")
+        time.sleep(5)
+        
+        # 알림창(Alert) 감지 시 예외 처리
+        try:
+            alert = driver.switch_to.alert
+            logging.warning(f"⚠️ 로그인 중 알림창 감지: {alert.text}")
+            alert.accept()
+            time.sleep(2)
+        except Exception:
+            pass
+
+        logging.info("✅ OMS 로그인 성공 및 세션 확보")
 
         # 2. 주문 내역 페이지 이동
         driver.get(OMS_ORDER_LIST_URL)
-        time.sleep(3)
+        time.sleep(5)
 
-        # 3. 날짜 설정 및 검색 버튼 클릭
-        start_date_elem = wait.until(EC.presence_of_element_located((By.ID, "startDate")))
+        # iframe 존재 여부 체크 및 전환
+        iframes = driver.find_elements(By.TAG_NAME, "iframe")
+        if iframes:
+            logging.info(f"🔍 iframe {len(iframes)}개 감지 - 첫 번째 프레임으로 전환")
+            driver.switch_to.frame(0)
+
+        # 3. 날짜 설정 및 검색
+        start_date_elem = None
+        for sel in ["startDate", "sDate", "searchStartDate"]:
+            try:
+                start_date_elem = driver.find_element(By.ID, sel)
+                if start_date_elem: break
+            except Exception: pass
+
+        if not start_date_elem:
+            driver.switch_to.default_content()
+            iframes = driver.find_elements(By.TAG_NAME, "iframe")
+            for idx, frame in enumerate(iframes):
+                driver.switch_to.default_content()
+                driver.switch_to.frame(idx)
+                try:
+                    start_date_elem = driver.find_element(By.ID, "startDate")
+                    if start_date_elem:
+                        logging.info(f"🔍 {idx}번째 iframe에서 startDate 포착!")
+                        break
+                except Exception: pass
+
+        if not start_date_elem:
+            raise Exception("날짜 입력란(startDate)을 찾을 수 없습니다. 계정 정보 및 로그인 세션을 확인하세요.")
+
         end_date_elem = driver.find_element(By.ID, "endDate")
 
         driver.execute_script("arguments[0].value = arguments[1];", start_date_elem, target_start_date)
         driver.execute_script("arguments[0].value = arguments[1];", end_date_elem, target_end_date)
 
-        search_btn = driver.find_element(By.CSS_SELECTOR, "button.btn-search, button#btnSearch, input[type='button'][value='조회']")
+        search_btn = driver.find_element(By.CSS_SELECTOR, "button.btn-search, button#btnSearch, input[type='button'][value='조회'], a.btn-search")
         search_btn.click()
-        time.sleep(5)
+        time.sleep(6)
 
         # 4. 엑셀 다운로드 또는 테이블 스크래핑
         excel_btn = None
         try:
-            excel_btn = driver.find_element(By.CSS_SELECTOR, "button.btn-excel, a.btn-excel, #btnExcel")
-        except Exception:
-            pass
+            excel_btn = driver.find_element(By.CSS_SELECTOR, "button.btn-excel, a.btn-excel, #btnExcel, input[value='엑셀']")
+        except Exception: pass
 
         records = []
         if excel_btn:
-            logging.info("📥 엑셀 다운로드 버튼 감지 - 파일 수집 시도")
+            logging.info("📥 엑셀 다운로드 진행")
             excel_btn.click()
             time.sleep(8)
             
@@ -187,7 +244,6 @@ def run_capture(target_start_date, target_end_date):
                 df = pd.read_excel(latest_file)
                 
                 for _, row in df.iterrows():
-                    # 💡 물류센터 / 배송센터 / 센터명 안전 매핑
                     center_val = clean_str(row.get("distribution_center") or row.get("물류센터") or row.get("배송센터") or row.get("센터명"))
                     records.append({
                         "store_code": clean_str(row.get("점포코드")),
@@ -203,14 +259,11 @@ def run_capture(target_start_date, target_end_date):
                         "total_amount": clean_int(row.get("금액") or (clean_int(row.get("수량")) * clean_int(row.get("단가")))),
                         "created_at": datetime.now().isoformat()
                     })
-                try:
-                    os.remove(latest_file)
-                except Exception:
-                    pass
+                try: os.remove(latest_file)
+                except Exception: pass
 
-        # 엑셀 미다운로드 시 테이블 스크래핑 백업
         if not records:
-            logging.info("📄 화면 테이블 DOM 수동 스크래핑 수행")
+            logging.info("📄 화면 테이블 DOM 스크래핑 시도")
             rows = driver.find_elements(By.CSS_SELECTOR, "table.tb-list tbody tr, table tbody tr")
             for r in rows:
                 cols = r.find_elements(By.TAG_NAME, "td")
@@ -230,14 +283,13 @@ def run_capture(target_start_date, target_end_date):
                         "created_at": datetime.now().isoformat()
                     })
 
-        logging.info(f"📦 총 {len(records)}건 데이터 추출 성공")
+        logging.info(f"📦 총 {len(records)}건 데이터 추출 완료")
 
-        # 5. DB 저장 및 뷰 리프레시
         if records:
             upsert_to_supabase("oms_orders", records)
             time.sleep(2)
             refresh_materialized_views()
-            logging.info("✨ 모든 수집 및 뷰 동기화 프로세스 완료!")
+            logging.info("✨ 모든 수집 및 뷰 동기화 완료!")
         else:
             logging.warning("⚠️ 수집된 데이터가 없습니다.")
 
