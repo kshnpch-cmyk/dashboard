@@ -51,7 +51,8 @@ jobs:
           OMS_USER_ID: ${{ secrets.OMS_USER_ID }}
           OMS_USER_PW: ${{ secrets.OMS_USER_PW }}
         run: |
-          python capture.py "$START_DATE" "$END_DATE"
+          # 🚀 파이썬 스크립트 실행 (screenshot.py 지정)
+          python screenshot.py "$START_DATE" "$END_DATE"
 
       - name: Supabase 구체화 뷰(MATERIALIZED VIEW) 자동 갱신
         run: |
