@@ -121,7 +121,7 @@
     <div class="m-navbar">
         <div class="m-brand">
             <span>📱 더본 OMS 모바일</span>
-            <span class="m-version">v11.0 Targeted Progress</span>
+            <span class="m-version">v12.0 Targeted Progress</span>
         </div>
         <button class="btn-m btn-dark" style="width: auto; padding: 6px 10px; font-size: 11px;" onclick="openCalendarModal()">📅 캘린더</button>
     </div>
@@ -160,7 +160,7 @@
 
             <button class="btn-m btn-blue" style="margin-bottom: 14px;" onclick="fetchAllDashboardData()">🔍 대시보드 종합 조회</button>
 
-            <!-- 1번 반영: 상단 KPI 수치는 원래 포맷 유지 -->
+            <!-- 상단 KPI는 수치 형태로 표출 -->
             <div class="kpi-scroll-container">
                 <div class="kpi-mini-card">
                     <span class="kpi-mini-title">총 주문수량</span>
@@ -196,7 +196,7 @@
             </div>
         </div>
 
-        <!-- 📦 모바일 카드 리스트 표출 영역 -->
+        <!-- 📦 모바일 카드 리스트 표출 영역 (로딩 시 % 표출) -->
         <div id="store-card-list-container"></div>
 
         <!-- 📄 모바일 전용 페이지네이션 컨트롤 바 -->
@@ -281,6 +281,7 @@
         let mRowsPerPage = 10;
         let mTotalPages = 1;
         let activeFullOrders = []; 
+        let isMobileLoadingChunks = false;
 
         /* 💾 IndexedDB 로컬 캐시 */
         const DB_NAME = "OmsLocalCacheDB_Mobile";
@@ -507,6 +508,7 @@
 
         /* 🚀 모바일 통합 데이터 로드 */
         async function fetchAllDashboardData() {
+            isMobileLoadingChunks = true;
             document.getElementById('store-card-list-container').innerHTML = `<div style="text-align:center; padding:30px; color:#2563eb;">⚡ 데이터를 로딩 중입니다 (0%)...</div>`;
             await Promise.all([fetchChartData(), fetchDetailDataForRange()]);
         }
@@ -559,7 +561,6 @@
                 dailyMap[d].qty += q; dailyMap[d].amt += a;
             });
 
-            /* 1번 반영: 모바일 상단 KPI도 수치 정돈 표출 */
             document.getElementById('kpi-total-qty').innerText = `${qty.toLocaleString()} 건`;
             document.getElementById('kpi-total-items').innerText = `${items.size.toLocaleString()} 종`;
             document.getElementById('kpi-total-amount').innerText = `${amt.toLocaleString()} 원`;
@@ -610,8 +611,9 @@
         async function fetchAllOrdersInChunksForRange(startDate, endDate) {
             let offset = 0, limit = 200, hasMore = true;
             rawDetailOrders = [];
+            isMobileLoadingChunks = true;
 
-            let totalExpectedRows = 5000;
+            let totalExpectedRows = 10000;
             try {
                 const headRes = await fetch(`${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=id`, {
                     method: 'HEAD',
@@ -619,7 +621,7 @@
                 });
                 const contentRange = headRes.headers.get('content-range');
                 if (contentRange && contentRange.includes('/')) {
-                    totalExpectedRows = parseInt(contentRange.split('/')[1], 10) || 5000;
+                    totalExpectedRows = parseInt(contentRange.split('/')[1], 10) || 10000;
                 }
             } catch(e) {}
 
@@ -632,20 +634,23 @@
                         rawDetailOrders = rawDetailOrders.concat(chunk);
                         filteredDetailOrders = rawDetailOrders;
                         
-                        /* 2번 반영: 모바일 카드 컨테이너 로딩 영역에서만 % 퍼센티지 표출 */
                         let currentPercent = Math.min(99, Math.round((rawDetailOrders.length / totalExpectedRows) * 100));
                         document.getElementById('store-card-list-container').innerHTML = `<div style="text-align:center; padding:30px; color:#2563eb;">⚡ 데이터를 로딩 중입니다 (${currentPercent}%)...</div>`;
 
                         if (chunk.length < limit) {
                             hasMore = false;
-                            renderStoreCardListFromSummary();
                         } else offset += limit;
                     } else { hasMore = false; }
                 } catch(e) { hasMore = false; }
             }
+
+            isMobileLoadingChunks = false;
+            renderStoreCardListFromSummary();
         }
 
         function renderStoreCardListFromSummary(selectedBrandsFilter = null) {
+            if (isMobileLoadingChunks) return; // 로딩 도중에는 결과를 가리지 않음
+
             const container = document.getElementById('store-card-list-container');
             document.getElementById('mobile-pagination-container').style.display = 'none'; 
 
