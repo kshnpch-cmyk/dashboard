@@ -2,106 +2,203 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Theborn OMS 데이터 대시보드</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>더본 OMS 주문 실시간 대시보드</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background-color: #f8f9fa; font-family: 'Pretendard', sans-serif; }
-        .card { border-radius: 12px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .table-container { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .badge-center { background-color: #e3f2fd; color: #0d6efd; font-weight: 600; padding: 6px 10px; border-radius: 6px; }
+        :root { --primary-color: #0d6efd; --bg-color: #f4f6f9; }
+        html, body { width: 100%; margin: 0; padding: 0; overflow-x: hidden; background-color: var(--bg-color); font-family: 'Pretendard', sans-serif; }
+        .app-container { width: 100% !important; max-width: 100% !important; padding: 12px; box-sizing: border-box; }
+        .custom-card { background: #fff; border-radius: 10px; border: none; box-shadow: 0 2px 6px rgba(0,0,0,0.04); margin-bottom: 12px; padding: 14px; }
+        .summary-value { font-size: 1.3rem; font-weight: 700; }
+        .table-responsive { width: 100% !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+        .table th, .table td { white-space: nowrap; vertical-align: middle; font-size: 13px; }
+        .badge-center { background-color: #e8f5e9; color: #2e7d32; font-weight: 600; padding: 4px 8px; border-radius: 4px; }
+        
+        /* 모달 다중 선택 목록 스타일 */
+        .multi-select-list { max-height: 320px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 8px; padding: 8px; }
+        .multi-select-item { padding: 6px 10px; border-bottom: 1px solid #f1f3f5; display: flex; align-items: center; gap: 8px; }
+        .multi-select-item:last-child { border-bottom: none; }
+        .multi-select-item:hover { background-color: #f8f9fa; }
+
+        @media (max-width: 768px) {
+            .app-container { padding: 8px !important; }
+            .mobile-col-12 { width: 100% !important; margin-bottom: 6px; }
+            .table th, .table td { font-size: 11px !important; padding: 6px 4px !important; }
+        }
     </style>
 </head>
 <body>
-    <div class="container-fluid py-4">
-        <h2 class="fw-bold mb-4">📦 Theborn OMS 주문 데이터 대시보드</h2>
 
-        <!-- 검색 필터 -->
-        <div class="card p-3 mb-4">
-            <div class="row g-3 align-items-center">
-                <div class="col-md-3">
-                    <label class="form-label fw-bold">시작 배송일자</label>
-                    <input type="date" id="startDate" class="form-control">
+    <div class="app-container">
+        <!-- 헤더 -->
+        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap">
+            <h5 class="fw-bold m-0 py-1">📊 더본 OMS 주문 실시간 대시보드</h5>
+            <span class="badge bg-success">v24.0 Date Validation</span>
+        </div>
+
+        <!-- 필터 영역 -->
+        <div class="custom-card">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-2 col-6 mobile-col-12">
+                    <label class="form-label small fw-bold text-secondary mb-1">시작 배송일자</label>
+                    <input type="date" id="startDate" class="form-control form-control-sm" onchange="validateDates()">
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-bold">종료 배송일자</label>
-                    <input type="date" id="endDate" class="form-control">
+                <div class="col-md-2 col-6 mobile-col-12">
+                    <label class="form-label small fw-bold text-secondary mb-1">종료 배송일자</label>
+                    <input type="date" id="endDate" class="form-control form-control-sm" onchange="validateDates()">
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-bold">물류센터 필터</label>
-                    <select id="centerFilter" class="form-select">
+                <div class="col-md-2 col-12 mobile-col-12">
+                    <label class="form-label small fw-bold text-secondary mb-1">물류센터</label>
+                    <select id="centerFilter" class="form-select form-select-sm">
                         <option value="">전체 물류센터</option>
                     </select>
                 </div>
-                <div class="col-md-3 d-flex align-items-end gap-2">
-                    <button id="btnSearch" class="btn btn-primary w-100 fw-bold" onclick="loadDashboardData()">조회</button>
-                    <button id="btnSync" class="btn btn-outline-success w-50 fw-bold" onclick="triggerBot()">동기화</button>
+                <!-- 브랜드 다중 선택 버튼 -->
+                <div class="col-md-2 col-6 mobile-col-12">
+                    <label class="form-label small fw-bold text-secondary mb-1">브랜드 선택</label>
+                    <button class="btn btn-outline-secondary btn-sm w-100 text-truncate" onclick="openBrandModal()" id="btnBrandSelect">🏢 전체 브랜드</button>
+                </div>
+                <!-- 품목 다중 선택 버튼 -->
+                <div class="col-md-2 col-6 mobile-col-12">
+                    <label class="form-label small fw-bold text-secondary mb-1">품목 선택</label>
+                    <button class="btn btn-outline-secondary btn-sm w-100 text-truncate" onclick="openItemModal()" id="btnItemSelect">📦 전체 품목</button>
+                </div>
+                <div class="col-md-2 col-12 mobile-col-12">
+                    <button class="btn btn-primary btn-sm w-100 fw-bold" onclick="loadDashboardData()">조회</button>
                 </div>
             </div>
         </div>
 
-        <!-- 요약 집계 카드 -->
-        <div class="row g-3 mb-4">
-            <div class="col-md-4">
-                <div class="card p-3 text-center">
-                    <div class="text-secondary mb-1">총 주문 건수</div>
-                    <h3 id="totalCount" class="fw-bold text-dark">0건</h3>
+        <!-- 요약 집계 -->
+        <div class="row g-2 mb-2">
+            <div class="col-4">
+                <div class="custom-card text-center p-2 mb-0">
+                    <div class="text-secondary small">총 주문건수</div>
+                    <div id="totalCount" class="summary-value text-dark">0건</div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card p-3 text-center">
-                    <div class="text-secondary mb-1">총 주문 수량</div>
-                    <h3 id="totalQty" class="fw-bold text-primary">0개</h3>
+            <div class="col-4">
+                <div class="custom-card text-center p-2 mb-0">
+                    <div class="text-secondary small">총 주문수량</div>
+                    <div id="totalQty" class="summary-value text-primary">0개</div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card p-3 text-center">
-                    <div class="text-secondary mb-1">총 주문 금액</div>
-                    <h3 id="totalAmount" class="fw-bold text-success">0원</h3>
+            <div class="col-4">
+                <div class="custom-card text-center p-2 mb-0">
+                    <div class="text-secondary small">총 주문금액</div>
+                    <div id="totalAmount" class="summary-value text-success">0원</div>
                 </div>
             </div>
         </div>
 
-        <!-- 주문 데이터 테이블 -->
-        <div class="table-container">
+        <!-- 데이터 테이블 -->
+        <div class="custom-card p-0 overflow-hidden">
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
                         <tr>
                             <th>배송일자</th>
                             <th>브랜드</th>
-                            <th>점포명 (코드)</th>
-                            <th class="text-center">물류센터</th>
+                            <th>점포명(코드)</th>
+                            <th class="text-center">센터명</th>
+                            <th>품목코드</th>
                             <th>품목명</th>
                             <th class="text-end">수량</th>
                             <th class="text-end">단가</th>
-                            <th class="text-end">총 금액</th>
+                            <th class="text-end">금액</th>
                         </tr>
                     </thead>
                     <tbody id="orderTableBody">
-                        <tr>
-                            <td colspan="8" class="text-center py-4 text-muted">조회할 날짜를 선택 후 조회를 눌러주세요.</td>
-                        </tr>
+                        <tr><td colspan="9" class="text-center py-4 text-muted">조회할 날짜를 선택 후 조회를 눌러주세요.</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
 
+    <!-- 🏢 브랜드 다중 선택 모달 -->
+    <div class="modal fade" id="brandModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title fw-bold">🏢 브랜드 다중 선택</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="input-group input-group-sm mb-2">
+                        <input type="text" id="brandSearchKeyword" class="form-control" placeholder="브랜드명 검색 (Enter)" onkeyup="filterBrandList()">
+                        <button class="btn btn-primary" onclick="filterBrandList()">검색</button>
+                        <button class="btn btn-outline-dark" onclick="toggleAllBrands(true)">전체선택</button>
+                        <button class="btn btn-outline-secondary" onclick="toggleAllBrands(false)">해제</button>
+                    </div>
+                    <div class="multi-select-list" id="brandContainer"></div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button class="btn btn-primary btn-sm w-100" data-bs-dismiss="modal" onclick="applyFilterAndRender()">적용하기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 📦 품목 다중 선택 모달 -->
+    <div class="modal fade" id="itemModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title fw-bold">📦 품목 다중 선택</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="input-group input-group-sm mb-2">
+                        <input type="text" id="itemSearchKeyword" class="form-control" placeholder="품목명/코드 검색 (Enter)" onkeyup="filterItemList()">
+                        <button class="btn btn-primary" onclick="filterItemList()">검색</button>
+                        <button class="btn btn-outline-dark" onclick="toggleAllItems(true)">전체선택</button>
+                        <button class="btn btn-outline-secondary" onclick="toggleAllItems(false)">해제</button>
+                    </div>
+                    <div class="multi-select-list" id="itemContainer"></div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button class="btn btn-primary btn-sm w-100" data-bs-dismiss="modal" onclick="applyFilterAndRender()">적용하기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co";
         const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN";
 
         let currentOrdersData = [];
+        let selectedBrands = new Set();
+        let selectedItems = new Set();
+        let brandModalObj, itemModalObj;
 
         window.onload = function() {
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('startDate').value = today;
             document.getElementById('endDate').value = today;
+
+            brandModalObj = new bootstrap.Modal(document.getElementById('brandModal'));
+            itemModalObj = new bootstrap.Modal(document.getElementById('itemModal'));
+
             loadDashboardData();
         };
 
-        // 🚀 Supabase API 호출 (distribution_center 컬럼 명시 포함)
+        // 🚨 날짜 유효성 검증 함수 (종료날짜 < 시작날짜 일 경우 경고 및 복원)
+        function validateDates() {
+            const sDate = document.getElementById('startDate').value;
+            const eDate = document.getElementById('endDate').value;
+
+            if (sDate && eDate && sDate > eDate) {
+                alert("⚠️ 종료 배송일자는 시작 배송일자보다 이전 일자일 수 없습니다.");
+                document.getElementById('endDate').value = sDate;
+                return false;
+            }
+            return true;
+        }
+
         async function fetchAllOrdersInChunksForRange(startDate, endDate) {
             let allData = [];
             let page = 0;
@@ -112,84 +209,156 @@
             const eDate = endDate.replace(/\//g, '-');
 
             while (hasMore) {
-                // select 쿼리에 distribution_center 명시
                 const selectCols = "order_date,delivery_date,store_code,store_name,brand_name,distribution_center,item_code,item_name,qty,price,total_amount";
                 const url = `${SUPABASE_URL}/rest/v1/oms_orders?select=${selectCols}&delivery_date=gte.${sDate}&delivery_date=lte.${eDate}&order=delivery_date.desc`;
 
                 const response = await fetch(url, {
-                    method: 'GET',
-                    headers: {
-                        'apikey': SUPABASE_ANON_KEY,
-                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                        'Range': `${page * pageSize}-${(page + 1) * pageSize - 1}`
-                    }
+                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Range': `${page * pageSize}-${(page + 1) * pageSize - 1}` }
                 });
 
-                if (!response.ok) {
-                    console.error("데이터 패치 실패:", response.statusText);
-                    break;
-                }
-
+                if (!response.ok) break;
                 const data = await response.json();
                 allData = allData.concat(data);
 
-                if (data.length < pageSize) {
-                    hasMore = false;
-                } else {
-                    page++;
-                }
+                if (data.length < pageSize) hasMore = false;
+                else page++;
             }
             return allData;
         }
 
         async function loadDashboardData() {
+            if (!validateDates()) return;
+
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
+            if (!startDate || !endDate) return;
 
-            if (!startDate || !endDate) {
-                alert("조회 날짜를 지정하세요.");
-                return;
-            }
-
-            const tbody = document.getElementById('orderTableBody');
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4">⏳ 데이터 불러오는 중...</td></tr>';
-
+            document.getElementById('orderTableBody').innerHTML = '<tr><td colspan="9" class="text-center py-4">⏳ 데이터 불러오는 중...</td></tr>';
             currentOrdersData = await fetchAllOrdersInChunksForRange(startDate, endDate);
             
-            populateCenterFilter(currentOrdersData);
+            initFilters();
             applyFilterAndRender();
         }
 
-        function populateCenterFilter(data) {
+        function initFilters() {
             const centerSelect = document.getElementById('centerFilter');
-            const selectedVal = centerSelect.value;
-            
             const centers = new Set();
-            data.forEach(row => {
-                const cName = (row.distribution_center || row.center_name || row.center || '').trim();
-                if (cName) centers.add(cName);
+            const brands = new Set();
+            const items = new Map();
+
+            currentOrdersData.forEach(r => {
+                const c = (r.distribution_center || r.center_name || '').trim();
+                if (c) centers.add(c);
+
+                const b = (r.brand_name || '').trim();
+                if (b) brands.add(b);
+
+                const iCode = (r.item_code || '').trim();
+                const iName = (r.item_name || '').trim();
+                if (iCode || iName) items.set(iCode || iName, `[${iCode}] ${iName}`);
             });
 
             centerSelect.innerHTML = '<option value="">전체 물류센터</option>';
-            Array.from(centers).sort().forEach(center => {
-                const opt = document.createElement('option');
-                opt.value = center;
-                opt.textContent = center;
-                if (center === selectedVal) opt.selected = true;
-                centerSelect.appendChild(opt);
+            Array.from(centers).sort().forEach(c => {
+                centerSelect.innerHTML += `<option value="${c}">${c}</option>`;
             });
+
+            selectedBrands = new Set(brands);
+            renderBrandCheckboxes(Array.from(brands).sort());
+
+            selectedItems = new Set(items.keys());
+            renderItemCheckboxes(Array.from(items.entries()).sort());
         }
 
+        /* 🏢 브랜드 선택 로직 */
+        function openBrandModal() { brandModalObj.show(); }
+        function renderBrandCheckboxes(brandList) {
+            const container = document.getElementById('brandContainer');
+            container.innerHTML = brandList.map(b => `
+                <div class="multi-select-item">
+                    <input type="checkbox" class="form-check-input brand-chk" value="${b}" id="chk_b_${b}" ${selectedBrands.has(b) ? 'checked' : ''} onchange="onBrandChkChange('${b}', this.checked)">
+                    <label class="form-check-label w-100" for="chk_b_${b}">${b}</label>
+                </div>
+            `).join('');
+        }
+        function onBrandChkChange(brand, isChecked) {
+            if (isChecked) selectedBrands.add(brand);
+            else selectedBrands.delete(brand);
+            updateBrandBtnText();
+        }
+        function toggleAllBrands(checked) {
+            document.querySelectorAll('.brand-chk').forEach(chk => {
+                chk.checked = checked;
+                if (checked) selectedBrands.add(chk.value);
+                else selectedBrands.delete(chk.value);
+            });
+            updateBrandBtnText();
+        }
+        function filterBrandList() {
+            const kw = document.getElementById('brandSearchKeyword').value.toLowerCase();
+            document.querySelectorAll('#brandContainer .multi-select-item').forEach(el => {
+                const txt = el.textContent.toLowerCase();
+                el.style.display = txt.includes(kw) ? 'flex' : 'none';
+            });
+        }
+        function updateBrandBtnText() {
+            const btn = document.getElementById('btnBrandSelect');
+            if (selectedBrands.size === 0) btn.textContent = '🏢 브랜드 선택 없음';
+            else btn.textContent = `🏢 브랜드 (${selectedBrands.size}개 선택)`;
+        }
+
+        /* 📦 품목 선택 로직 */
+        function openItemModal() { itemModalObj.show(); }
+        function renderItemCheckboxes(itemList) {
+            const container = document.getElementById('itemContainer');
+            container.innerHTML = itemList.map(([key, label]) => `
+                <div class="multi-select-item">
+                    <input type="checkbox" class="form-check-input item-chk" value="${key}" id="chk_i_${key}" ${selectedItems.has(key) ? 'checked' : ''} onchange="onItemChkChange('${key}', this.checked)">
+                    <label class="form-check-label w-100" for="chk_i_${key}">${label}</label>
+                </div>
+            `).join('');
+        }
+        function onItemChkChange(itemKey, isChecked) {
+            if (isChecked) selectedItems.add(itemKey);
+            else selectedItems.delete(itemKey);
+            updateItemBtnText();
+        }
+        function toggleAllItems(checked) {
+            document.querySelectorAll('.item-chk').forEach(chk => {
+                chk.checked = checked;
+                if (checked) selectedItems.add(chk.value);
+                else selectedItems.delete(chk.value);
+            });
+            updateItemBtnText();
+        }
+        function filterItemList() {
+            const kw = document.getElementById('itemSearchKeyword').value.toLowerCase();
+            document.querySelectorAll('#itemContainer .multi-select-item').forEach(el => {
+                const txt = el.textContent.toLowerCase();
+                el.style.display = txt.includes(kw) ? 'flex' : 'none';
+            });
+        }
+        function updateItemBtnText() {
+            const btn = document.getElementById('btnItemSelect');
+            if (selectedItems.size === 0) btn.textContent = '📦 품목 선택 없음';
+            else btn.textContent = `📦 품목 (${selectedItems.size}개 선택)`;
+        }
+
+        /* 필터 통합 적용 및 테이블 렌더링 */
         function applyFilterAndRender() {
             const selectedCenter = document.getElementById('centerFilter').value;
-            let filtered = currentOrdersData;
 
-            if (selectedCenter) {
-                filtered = currentOrdersData.filter(row => {
-                    const cName = (row.distribution_center || row.center_name || row.center || '').trim();
-                    return cName === selectedCenter;
-                });
-            }
+            const filtered = currentOrdersData.filter(row => {
+                const cName = (row.distribution_center || row.center_name || '').trim();
+                const bName = (row.brand_name || '').trim();
+                const iKey = (row.item_code || row.item_name || '').trim();
+
+                const centerMatch = !selectedCenter || cName === selectedCenter;
+                const brandMatch = selectedBrands.has(bName);
+                const itemMatch = selectedItems.has(iKey) || selectedItems.has(row.item_code) || selectedItems.has(row.item_name);
+
+                return centerMatch && brandMatch && itemMatch;
+            });
 
             renderDashboard(filtered);
         }
@@ -204,7 +373,7 @@
             let totalAmount = 0;
 
             if (dataList.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">수집된 데이터가 없습니다.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">선택 조건에 맞는 데이터가 없습니다.</td></tr>';
             } else {
                 dataList.forEach(row => {
                     const qty = Number(row.qty || 0);
@@ -212,15 +381,15 @@
                     totalQty += qty;
                     totalAmount += amount;
 
-                    // 💡 DB 컬럼명 바인딩 및 Fallback 처리
-                    const centerName = (row.distribution_center || row.center_name || row.center || '').trim() || '-';
+                    const centerName = (row.distribution_center || row.center_name || '').trim() || '-';
 
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td>${row.delivery_date || '-'}</td>
                         <td>${row.brand_name || '-'}</td>
-                        <td><strong>${row.store_name || '-'}</strong> <span class="text-muted font-monospace">(${row.store_code || ''})</span></td>
+                        <td><strong>${row.store_name || '-'}</strong> <span class="text-muted small">(${row.store_code || ''})</span></td>
                         <td class="text-center"><span class="badge-center">${centerName}</span></td>
+                        <td class="font-monospace">${row.item_code || '-'}</td>
                         <td>${row.item_name || '-'}</td>
                         <td class="text-end fw-bold">${qty.toLocaleString()}</td>
                         <td class="text-end">${Number(row.price || 0).toLocaleString()}원</td>
@@ -233,10 +402,6 @@
             document.getElementById('totalCount').textContent = `${dataList.length.toLocaleString()}건`;
             document.getElementById('totalQty').textContent = `${totalQty.toLocaleString()}개`;
             document.getElementById('totalAmount').textContent = `${totalAmount.toLocaleString()}원`;
-        }
-
-        function triggerBot() {
-            alert("동기화 요청이 트리거되었습니다.");
         }
     </script>
 </body>
