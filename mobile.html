@@ -147,9 +147,10 @@
             <div class="input-group">
                 <label>조회 기간</label>
                 <div style="display: flex; gap: 6px; align-items: center;">
-                    <input type="date" id="chart-start-date" class="m-input">
+                    <!-- 🚀 모바일 날짜 선택 변경 즉시 제어 및 검증 -->
+                    <input type="date" id="chart-start-date" class="m-input" onchange="validateMobileDates('start')">
                     <span>~</span>
-                    <input type="date" id="chart-end-date" class="m-input">
+                    <input type="date" id="chart-end-date" class="m-input" onchange="validateMobileDates('end')">
                 </div>
             </div>
 
@@ -386,6 +387,29 @@
             return str || '-';
         }
 
+        /* 🚨 모바일 날짜 유효성 검증 함수 (종료일 < 시작일 방지, 동일날짜 허용) */
+        function validateMobileDates(type) {
+            const startDateEl = document.getElementById('chart-start-date');
+            const endDateEl = document.getElementById('chart-end-date');
+            const sDate = startDateEl.value;
+            const eDate = endDateEl.value;
+
+            if (sDate && eDate) {
+                endDateEl.min = sDate;
+
+                if (sDate > eDate) {
+                    alert("⚠️ 종료 배송일자는 시작 배송일자보다 이전 일자일 수 없습니다.");
+                    if (type === 'start') {
+                        endDateEl.value = sDate;
+                    } else {
+                        endDateEl.value = sDate;
+                    }
+                    return false;
+                }
+            }
+            return true;
+        }
+
         function openCalendarModal() { document.getElementById('calendar-modal').style.display = 'flex'; loadCalendarData(); }
         function closeCalendarModal() { document.getElementById('calendar-modal').style.display = 'none'; }
 
@@ -445,6 +469,7 @@
                 cell.onclick = () => {
                     document.getElementById('chart-start-date').value = dString;
                     document.getElementById('chart-end-date').value = dString;
+                    validateMobileDates('start');
                     closeCalendarModal();
                     fetchAllDashboardData();
                 };
@@ -511,6 +536,7 @@
 
         /* 🚀 모바일 통합 데이터 로드 */
         async function fetchAllDashboardData() {
+            if (!validateMobileDates('start')) return;
             activeMobileToken++;
             mCurrentMaxPercent = 0;
             document.getElementById('store-card-list-container').innerHTML = `<div style="text-align:center; padding:30px; color:#2563eb;">⚡ 데이터를 로딩 중입니다 (1%)...</div>`;
@@ -870,8 +896,14 @@
             const today = new Date();
             const past7 = new Date(); past7.setDate(today.getDate() - 7);
 
-            document.getElementById('chart-start-date').value = localStorage.getItem('cached_chart_start_date') || formatDate(past7);
-            document.getElementById('chart-end-date').value = localStorage.getItem('cached_chart_end_date') || formatDate(today);
+            const initialStartDate = localStorage.getItem('cached_chart_start_date') || formatDate(past7);
+            const initialEndDate = localStorage.getItem('cached_chart_end_date') || formatDate(today);
+
+            document.getElementById('chart-start-date').value = initialStartDate;
+            document.getElementById('chart-end-date').value = initialEndDate;
+
+            validateMobileDates('start');
+
             document.getElementById('sync-target-date').value = formatDate(today);
             document.getElementById('chart-brand-input').value = localStorage.getItem('cached_brand_input') || '';
 
