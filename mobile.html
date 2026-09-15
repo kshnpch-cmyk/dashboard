@@ -121,7 +121,7 @@
     <div class="m-navbar">
         <div class="m-brand">
             <span>📱 더본 OMS 모바일</span>
-            <span class="m-version">v14.0 Final Sync Engine</span>
+            <span class="m-version">v15.0 1K Chunk & Center Field</span>
         </div>
         <button class="btn-m btn-dark" style="width: auto; padding: 6px 10px; font-size: 11px;" onclick="openCalendarModal()">📅 캘린더</button>
     </div>
@@ -190,7 +190,7 @@
             </div>
             
             <div style="display: flex; gap: 6px; margin-top: 8px;">
-                <input type="text" id="store-search-input" class="m-input" placeholder="🔍 점포명/품목명 입력 후 Enter" onkeydown="if(event.key==='Enter') filterCards()">
+                <input type="text" id="store-search-input" class="m-input" placeholder="🔍 점포명/센터명/품목명 입력 후 Enter" onkeydown="if(event.key==='Enter') filterCards()">
                 <button class="btn-m btn-blue" style="width: 70px;" onclick="filterCards()">검색</button>
             </div>
         </div>
@@ -609,9 +609,10 @@
             } catch (e) {}
         }
 
+        /* ⚡ 모바일 1,000개 단위 청크 로딩 및 센터명 항목 추가 */
         async function fetchAllOrdersInChunksForRange(startDate, endDate) {
             const currentToken = activeMobileToken;
-            let offset = 0, limit = 200, hasMore = true;
+            let offset = 0, limit = 1000, hasMore = true;
             rawDetailOrders = [];
 
             let totalExpectedRows = storeSummaryList.reduce((sum, r) => sum + cleanNumber(r.order_count), 0) || 5000;
@@ -619,7 +620,7 @@
             while (hasMore) {
                 if (currentToken !== activeMobileToken) return;
 
-                const chunkUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc&limit=${limit}&offset=${offset}`;
+                const chunkUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_code,store_name,center_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc&limit=${limit}&offset=${offset}`;
                 try {
                     const res = await fetchWithUltraCache(chunkUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                     if (res.ok) {
@@ -640,7 +641,6 @@
                 } catch(e) { hasMore = false; }
             }
 
-            /* 🚀 모바일도 100% 완료 시 카드 리스트 표출 트리거 실행 */
             if (currentToken === activeMobileToken) {
                 mCurrentMaxPercent = 100;
                 renderStoreCardListFromSummary();
@@ -719,7 +719,7 @@
             if (body.classList.contains('open')) {
                 const startDate = document.getElementById('chart-start-date').value;
                 const endDate = document.getElementById('chart-end-date').value;
-                const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&store_name=eq.${encodeURIComponent(storeName)}&select=item_code,item_name,qty,price,total_amount,order_date,delivery_date`;
+                const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&store_name=eq.${encodeURIComponent(storeName)}&select=item_code,item_name,center_name,qty,price,total_amount,order_date,delivery_date`;
                 try {
                     const res = await fetchWithUltraCache(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                     if (res.ok) {
@@ -731,7 +731,7 @@
                                     <span style="color:#2563eb;">${cleanNumber(o.qty).toLocaleString()}개</span>
                                 </div>
                                 <div class="item-row-sub">
-                                    <span>품목코드: ${cleanCode(o.item_code)}</span>
+                                    <span>센터: ${o.center_name || '-'} | 품목코드: ${cleanCode(o.item_code)}</span>
                                     <span>${cleanNumber(o.total_amount || (cleanNumber(o.qty)*cleanNumber(o.price))).toLocaleString()}원</span>
                                 </div>
                                 <div class="item-row-sub" style="color: #94a3b8; font-size: 10px;">
@@ -744,6 +744,7 @@
             }
         }
 
+        /* 🔍 모바일 검색 시 센터명(`center_name`) 포함 개편 */
         function filterCards() {
             const query = document.getElementById('store-search-input').value.toLowerCase().trim();
             if (!query) {
@@ -754,12 +755,13 @@
             activeFullOrders = filteredDetailOrders.filter(row => {
                 const sCode = cleanCode(row.store_code).toLowerCase();
                 const sName = String(row.store_name||'').toLowerCase();
+                const cName = String(row.center_name||'').toLowerCase();
                 const oDate = formatDisplayDate(row.order_date).toLowerCase();
                 const dDate = formatDisplayDate(row.delivery_date).toLowerCase();
                 const iCode = cleanCode(row.item_code).toLowerCase();
                 const iName = String(row.item_name||'').toLowerCase();
 
-                return sCode.includes(query) || sName.includes(query) || oDate.includes(query) || dDate.includes(query) || iCode.includes(query) || iName.includes(query);
+                return sCode.includes(query) || sName.includes(query) || cName.includes(query) || oDate.includes(query) || dDate.includes(query) || iCode.includes(query) || iName.includes(query);
             });
 
             mCurrentPage = 1;
@@ -796,7 +798,7 @@
                         <span style="color:#2563eb;">${cleanNumber(o.qty).toLocaleString()}개</span>
                     </div>
                     <div class="item-row-sub">
-                        <span>점포코드: ${cleanCode(o.store_code)} | 품목코드: ${cleanCode(o.item_code)}</span>
+                        <span>센터: ${o.center_name||'-'} | 점포코드: ${cleanCode(o.store_code)}</span>
                         <span><b>${cleanNumber(o.total_amount || (cleanNumber(o.qty)*cleanNumber(o.price))).toLocaleString()}원</b></span>
                     </div>
                     <div class="item-row-sub" style="color: #94a3b8; font-size: 10px;">
