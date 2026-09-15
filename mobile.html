@@ -4,339 +4,931 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>더본 OMS 모바일 대시보드</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
-        :root { --navy-header: #141a29; --bg-body: #eaedf1; --card-border: #dcdfe6; }
-        body { background-color: var(--bg-body); font-family: 'Pretendard', sans-serif; margin: 0; padding: 0; }
-        
-        .top-navbar { background-color: var(--navy-header); color: #fff; padding: 10px 14px; }
-        .badge-sync { background-color: #10b981; color: #fff; font-size: 10px; font-weight: 600; padding: 3px 6px; border-radius: 4px; }
-        
-        .card-custom { background: #ffffff; border-radius: 8px; border: 1px solid var(--card-border); padding: 12px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
-        .mobile-order-card { background: #fff; border-radius: 8px; border: 1px solid var(--card-border); padding: 12px; margin-bottom: 8px; }
-        
-        .summary-mini { text-align: center; padding: 8px 4px; }
-        .summary-label { font-size: 11px; color: #6c757d; font-weight: 600; }
-        .summary-val { font-size: 15px; font-weight: 800; color: #111827; }
-        .badge-center { background-color: #e3f2fd; color: #0d6efd; font-weight: 600; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
-        
-        .multi-select-list { max-height: 260px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 6px; padding: 6px; }
-        .multi-select-item { padding: 6px 8px; border-bottom: 1px solid #f1f3f5; display: flex; align-items: center; gap: 8px; font-size: 13px; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            margin: 0; padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', 'Malgun Gothic', sans-serif;
+            background-color: #f8fafc; color: #0f172a; padding-bottom: 30px;
+        }
 
-        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-        .calendar-day-cell { min-height: 50px; padding: 3px; display: flex; flex-direction: column; justify-content: space-between; align-items: center; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; }
-        .badge-qty-exist { background-color: #dbeafe; color: #1d4ed8; font-weight: 700; font-size: 10px; padding: 2px 3px; border-radius: 4px; width: 100%; text-align: center; }
-        .badge-qty-empty { background-color: #f3f4f6; color: #9ca3af; font-size: 10px; padding: 2px 3px; border-radius: 4px; }
+        .m-navbar {
+            background-color: #0f172a; color: white; padding: 12px 16px;
+            display: flex; justify-content: space-between; align-items: center;
+            position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .m-brand { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 6px; }
+        .m-version { background-color: #10b981; color: white; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 8px; }
+
+        .container { padding: 12px; }
+
+        .m-card {
+            background: white; border-radius: 12px; padding: 14px; margin-bottom: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;
+        }
+        .m-card-title { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+
+        .input-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+        .input-group label { font-size: 12px; font-weight: 700; color: #64748b; }
+        .m-input {
+            width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px;
+            font-size: 14px; outline: none; background-color: #fff; appearance: none;
+        }
+
+        .btn-m {
+            width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 14px;
+            font-weight: 700; color: white; cursor: pointer; text-align: center;
+        }
+        .btn-blue { background-color: #2563eb; }
+        .btn-dark { background-color: #334155; }
+
+        .kpi-scroll-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+        .kpi-mini-card {
+            background: #fff; padding: 12px 16px; border-radius: 10px; border-left: 4px solid #2563eb;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .kpi-mini-card.green { border-left-color: #10b981; }
+        .kpi-mini-card.purple { border-left-color: #8b5cf6; }
+        .kpi-mini-title { font-size: 12px; font-weight: 600; color: #64748b; }
+        .kpi-mini-val { font-size: 17px; font-weight: 800; color: #0f172a; }
+
+        .chart-wrapper { position: relative; height: 210px; width: 100%; }
+
+        .store-card {
+            background: white; border-radius: 10px; border: 1px solid #e2e8f0;
+            margin-bottom: 8px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        }
+        .store-card-header {
+            padding: 12px 14px; background: #fff; display: flex; justify-content: space-between;
+            align-items: center; font-size: 14px; font-weight: 700; cursor: pointer;
+        }
+        .store-card-header.total-header { background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+        .badge-cnt { background-color: #eff6ff; color: #2563eb; font-size: 11px; padding: 3px 8px; border-radius: 12px; font-weight: 800; }
+        
+        .item-detail-list { display: none; background: #f8fafc; padding: 10px; }
+        .item-detail-list.open { display: block; }
+        .item-row {
+            background: white; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0;
+            margin-bottom: 6px; font-size: 12px; display: flex; flex-direction: column; gap: 4px;
+        }
+        .item-row-header { display: flex; justify-content: space-between; font-weight: 700; color: #0f172a; }
+        .item-row-sub { display: flex; justify-content: space-between; color: #64748b; font-size: 11px; }
+
+        .m-pagination-box {
+            background: white; border-radius: 12px; padding: 12px; margin-top: 10px; margin-bottom: 15px;
+            border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .m-pagination-top { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 700; color: #475569; }
+        .m-pagination-btns { display: flex; justify-content: space-between; gap: 4px; }
+        .m-page-btn {
+            flex: 1; padding: 8px 0; font-size: 12px; font-weight: bold; background-color: #f8fafc;
+            border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; text-align: center; cursor: pointer;
+        }
+        .m-page-btn:active { background-color: #e2e8f0; }
+        .m-page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .m-page-input { width: 45px; text-align: center; padding: 3px 4px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; font-weight: bold; }
+
+        .bottom-sheet-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.6); z-index: 999; justify-content: flex-end; flex-direction: column;
+        }
+        .bottom-sheet-content {
+            background: white; border-top-left-radius: 16px; border-top-right-radius: 16px;
+            padding: 20px; max-height: 85vh; display: flex; flex-direction: column; animation: slideUp 0.2s ease-out;
+        }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .sheet-scroll { flex: 1; overflow-y: auto; margin-top: 10px; }
+
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 10px; }
+        .calendar-header-day { text-align: center; font-weight: bold; font-size: 11px; color: #64748b; padding: 4px 0; background: #f8fafc; }
+        .calendar-day-cell {
+            background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; height: 46px; padding: 3px;
+            display: flex; flex-direction: column; justify-content: space-between; cursor: pointer;
+        }
+        .calendar-day-cell:active { background-color: #eff6ff; }
+        .day-number { font-size: 10px; font-weight: bold; }
+        
+        /* 💡 모바일 캘린더 수량 뱃지 스타일 */
+        .data-status-badge { font-size: 8.5px; font-weight: bold; padding: 1px 2px; border-radius: 3px; text-align: center; }
+        .badge-has-data { background-color: #d1fae5; color: #047857; }
+        .badge-no-data { background-color: #f1f5f9; color: #94a3b8; }
     </style>
 </head>
 <body>
 
-    <div class="top-navbar d-flex justify-content-between align-items-center">
-        <div class="d-flex align-items-center gap-1">
-            <span class="fw-bold fs-6">📱 OMS 주문 현황</span>
-            <span class="badge-sync">v24.0</span>
+    <div class="m-navbar">
+        <div class="m-brand">
+            <span>📱 더본 OMS 모바일</span>
+            <span class="m-version">v18.0 Fully Synchronized</span>
         </div>
-        <button class="btn btn-sm btn-outline-light" onclick="openCalendarModal()">🗓️ 캘린더</button>
+        <button class="btn-m btn-dark" style="width: auto; padding: 6px 10px; font-size: 11px;" onclick="openCalendarModal()">📅 캘린더</button>
     </div>
 
-    <div class="p-2">
-        <div class="card-custom">
-            <div class="row g-2">
-                <div class="col-6">
-                    <label class="form-label small fw-bold text-secondary mb-1">시작 배송일자</label>
-                    <input type="date" id="mStartDate" class="form-control form-control-sm" onchange="validateMobileDates()">
+    <div class="container">
+        
+        <!-- 🚀 OMS 동기화 -->
+        <div class="m-card">
+            <div class="m-card-title">
+                <span>🚀 OMS 수동 동기화</span>
+                <span id="last-updated-text" style="font-size: 11px; color: #0284c7; font-weight: 600;">최신: 계산 중...</span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <input type="date" id="sync-target-date" class="m-input" style="flex:1;">
+                <button id="run-btn" class="btn-m btn-blue" style="width: 110px;" onclick="triggerBot()">동기화</button>
+            </div>
+        </div>
+
+        <!-- 📊 통합 추이 및 상세 내역 대시보드 -->
+        <div class="m-card">
+            <div class="m-card-title">📈 기간별 주문 대시보드</div>
+            
+            <div class="input-group">
+                <label>조회 기간</label>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                    <input type="date" id="chart-start-date" class="m-input">
+                    <span>~</span>
+                    <input type="date" id="chart-end-date" class="m-input">
                 </div>
-                <div class="col-6">
-                    <label class="form-label small fw-bold text-secondary mb-1">종료 배송일자</label>
-                    <input type="date" id="mEndDate" class="form-control form-control-sm" onchange="validateMobileDates()">
+            </div>
+
+            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                <input type="text" id="chart-brand-input" class="m-input" placeholder="브랜드 선택 (다중)" readonly onclick="openBrandModal('chart')">
+                <button class="btn-m btn-dark" style="width: 70px;" onclick="openBrandModal('chart')">🔍</button>
+            </div>
+
+            <button class="btn-m btn-blue" style="margin-bottom: 14px;" onclick="fetchAllDashboardData()">🔍 대시보드 종합 조회</button>
+
+            <div class="kpi-scroll-container">
+                <div class="kpi-mini-card">
+                    <span class="kpi-mini-title">총 주문수량</span>
+                    <span class="kpi-mini-val" id="kpi-total-qty">0 건</span>
                 </div>
-                <div class="col-12">
-                    <select id="mCenterFilter" class="form-select form-select-sm">
-                        <option value="">전체 물류센터</option>
+                <div class="kpi-mini-card green">
+                    <span class="kpi-mini-title">취급 품목수</span>
+                    <span class="kpi-mini-val" id="kpi-total-items">0 종</span>
+                </div>
+                <div class="kpi-mini-card purple">
+                    <span class="kpi-mini-title">총 주문금액</span>
+                    <span class="kpi-mini-val" id="kpi-total-amount">0 원</span>
+                </div>
+            </div>
+
+            <div class="chart-wrapper">
+                <canvas id="dailyTrendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 🛒 점포 및 필터 패널 -->
+        <div class="m-card">
+            <div class="m-card-title">🏢 브랜드/점포 상세 검색</div>
+
+            <div style="display: flex; gap: 8px;">
+                <input type="text" id="detail-brand-input" class="m-input" placeholder="브랜드 필터 선택..." readonly onclick="openBrandModal('detail')">
+                <button class="btn-m btn-dark" style="width: 70px;" onclick="openBrandModal('detail')">🔍</button>
+            </div>
+            
+            <div style="display: flex; gap: 6px; margin-top: 8px;">
+                <input type="text" id="store-search-input" class="m-input" placeholder="🔍 점포명/센터명/품목명 입력 후 Enter" onkeydown="if(event.key==='Enter') filterCards()">
+                <button class="btn-m btn-blue" style="width: 70px;" onclick="filterCards()">검색</button>
+            </div>
+        </div>
+
+        <!-- 📦 모바일 카드 리스트 표출 영역 -->
+        <div id="store-card-list-container"></div>
+
+        <!-- 📄 모바일 전용 페이지네이션 컨트롤 바 -->
+        <div class="m-pagination-box" id="mobile-pagination-container" style="display: none;">
+            <div class="m-pagination-top">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <label>보기:</label>
+                    <select id="m-rows-per-page" class="m-input" style="padding: 4px 8px; width: auto; font-size: 12px;" onchange="changeMobileRowsPerPage()">
+                        <option value="10" selected>10개씩</option>
+                        <option value="50">50개씩</option>
+                        <option value="100">100개씩</option>
+                        <option value="1000">1000개씩</option>
                     </select>
                 </div>
-                <div class="col-6">
-                    <button class="btn btn-outline-secondary btn-sm w-100 text-truncate" onclick="openMItemModal()" id="btnMItemSelect">📦 품목 선택</button>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <input type="number" id="m-page-input-box" class="m-page-input" value="1" min="1" onkeydown="if(event.key==='Enter') handleMobilePageInput(this.value)" onblur="handleMobilePageInput(this.value)">
+                    <span>/ <b id="m-total-page-text">1</b> 페이지</span>
+                    <span style="font-weight:normal; color:#94a3b8; font-size:11px;" id="m-total-rows-text">(총 0건)</span>
                 </div>
-                <div class="col-6">
-                    <button class="btn btn-primary btn-sm w-100 fw-bold" onclick="loadMobileData()">조회하기</button>
-                </div>
+            </div>
+            <div class="m-pagination-btns">
+                <button class="m-page-btn" id="m-btn-first" onclick="goToMobilePage(1)">« 처음</button>
+                <button class="m-page-btn" id="m-btn-prev" onclick="goToMobilePage(mCurrentPage - 1)">‹ 이전</button>
+                <button class="m-page-btn" id="m-btn-next" onclick="goToMobilePage(mCurrentPage + 1)">다음 ›</button>
+                <button class="m-page-btn" id="m-btn-last" onclick="goToMobilePage(mTotalPages)">끝 »</button>
             </div>
         </div>
 
-        <div class="row g-2 mb-2">
-            <div class="col-4">
-                <div class="card-custom summary-mini mb-0">
-                    <div class="summary-label">총 주문수량</div>
-                    <div id="mTotalQty" class="summary-val text-primary">0건</div>
-                </div>
-            </div>
-            <div class="col-4">
-                <div class="card-custom summary-mini mb-0">
-                    <div class="summary-label">취급 품목수</div>
-                    <div id="mTotalItemTypes" class="summary-val text-success">0종</div>
-                </div>
-            </div>
-            <div class="col-4">
-                <div class="card-custom summary-mini mb-0">
-                    <div class="summary-label">총 주문금액</div>
-                    <div id="mTotalAmount" class="summary-val text-purple" style="font-size: 13px;">0원</div>
-                </div>
-            </div>
-        </div>
-
-        <div id="mobileList">
-            <div class="text-center py-4 text-muted">조회 버튼을 눌러주세요.</div>
-        </div>
     </div>
 
-    <div class="modal fade" id="mItemModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header py-2">
-                    <h6 class="modal-title fw-bold">📦 품목 다중 선택</h6>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="input-group input-group-sm mb-2">
-                        <input type="text" id="mItemSearchKeyword" class="form-control" placeholder="품목명/코드 검색" onkeyup="filterMItemList()">
-                        <button class="btn btn-outline-dark" onclick="toggleAllMItems(true)">전체</button>
-                        <button class="btn btn-outline-secondary" onclick="toggleAllMItems(false)">해제</button>
-                    </div>
-                    <div class="multi-select-list" id="mItemContainer"></div>
-                </div>
-                <div class="modal-footer py-2">
-                    <button class="btn btn-primary btn-sm w-100" data-bs-dismiss="modal" onclick="renderMobileView()">적용하기</button>
-                </div>
+    <!-- 📅 캘린더 모달 -->
+    <div class="bottom-sheet-overlay" id="calendar-modal">
+        <div class="bottom-sheet-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 16px;">
+                <span>📅 배송일자 데이터 존재 현황</span>
+                <span style="cursor: pointer; padding: 4px;" onclick="closeCalendarModal()">✕</span>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 10px; align-items: center;">
+                <label style="font-size: 12px; font-weight: bold;">월 선택:</label>
+                <input type="month" id="calendar-month-picker" class="m-input" style="flex:1;" onchange="loadCalendarData()">
+            </div>
+            <div class="sheet-scroll">
+                <div class="calendar-grid" id="calendar-grid"></div>
             </div>
         </div>
     </div>
 
-    <div class="modal fade" id="calendarModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header py-2">
-                    <h6 class="modal-title fw-bold">🗓️ 배송일자 데이터 존재 및 수량 현황</h6>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                        <label class="fw-bold small">월 선택:</label>
-                        <input type="month" id="calendarMonthPicker" class="form-control form-control-sm w-auto" onchange="renderCalendarWithQty(this.value)">
-                    </div>
-                    <div class="row text-center fw-bold small text-secondary mb-1 g-0">
-                        <div class="col">일</div><div class="col">월</div><div class="col">화</div><div class="col">수</div><div class="col">목</div><div class="col">금</div><div class="col">토</div>
-                    </div>
-                    <div class="calendar-grid" id="calendarGridContainer"></div>
-                </div>
+    <!-- 🔍 브랜드 다중 선택 모달 -->
+    <div class="bottom-sheet-overlay" id="brand-modal">
+        <div class="bottom-sheet-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 16px;">
+                <span>🏢 브랜드 다중 선택</span>
+                <span style="cursor: pointer; padding: 4px;" onclick="closeBrandModal()">✕</span>
             </div>
+            <div style="display: flex; gap: 8px; margin-top: 10px;">
+                <input type="text" id="modal-brand-search" class="m-input" placeholder="브랜드명 검색 (Enter)" onkeydown="if(event.key==='Enter') renderBrandModalList()">
+                <button class="btn-m btn-blue" style="width: 70px;" onclick="renderBrandModalList()">검색</button>
+                <button class="btn-m btn-dark" style="width: 60px;" onclick="toggleAllBrandCheck(true)">전체</button>
+                <button class="btn-m btn-dark" style="width: 60px;" onclick="toggleAllBrandCheck(false)">해제</button>
+            </div>
+            <div class="sheet-scroll" id="brand-modal-list"></div>
+            <button class="btn-m btn-blue" style="margin-top: 10px;" onclick="applyBrandSelection()">선택 완료</button>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co";
-        const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN";
+        const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co"; 
+        const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN"; 
 
-        let mRawData = [];
-        let mSelectedItems = new Set();
-        let mItemModalObj, calendarModalObj;
+        const githubId = 'kshnpch-cmyk'; 
+        const repoName = 'dashboard'; 
 
-        window.onload = function() {
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('mStartDate').value = today;
-            document.getElementById('mEndDate').value = today;
+        const tokenPart1 = "ghp_DPLQYilEaFD";
+        const tokenPart2 = "g2jVxPlK8Kh18uwaCu220wnZB";
+        const token = tokenPart1 + tokenPart2;
 
-            mItemModalObj = new bootstrap.Modal(document.getElementById('mItemModal'));
-            calendarModalObj = new bootstrap.Modal(document.getElementById('calendarModal'));
-            
-            loadMobileData();
-        };
+        let rawDetailOrders = [], filteredDetailOrders = [], storeSummaryList = [];
+        let trendChart = null, allBrandList = [];
+        let activeBrandTarget = 'chart';
 
-        function validateMobileDates() {
-            const sDate = document.getElementById('mStartDate').value;
-            const eDate = document.getElementById('mEndDate').value;
-            if (sDate && eDate && sDate > eDate) {
-                alert("⚠️ 종료 배송일자는 시작 배송일자보다 이전 일자일 수 없습니다.");
-                document.getElementById('mEndDate').value = sDate;
-                return false;
-            }
-            return true;
-        }
+        let mCurrentPage = 1;
+        let mRowsPerPage = 10;
+        let mTotalPages = 1;
+        let activeFullOrders = []; 
+        let mCurrentMaxPercent = 0;
+        let activeMobileToken = 0;
 
-        async function loadMobileData() {
-            if (!validateMobileDates()) return;
-            const sDate = document.getElementById('mStartDate').value;
-            const eDate = document.getElementById('mEndDate').value;
-            if (!sDate || !eDate) return;
+        /* 💾 IndexedDB 로컬 캐시 */
+        const DB_NAME = "OmsLocalCacheDB_Mobile";
+        const STORE_NAME = "query_cache";
 
-            document.getElementById('mobileList').innerHTML = '<div class="text-center py-4">⏳ 데이터 불러오는 중...</div>';
-
-            let allData = [];
-            let page = 0;
-            const pageSize = 1000;
-            let hasMore = true;
-
-            while (hasMore) {
-                const selectCols = "order_date,delivery_date,store_code,store_name,brand_name,distribution_center,item_code,item_name,qty,price,total_amount";
-                const url = `${SUPABASE_URL}/rest/v1/oms_orders?select=${selectCols}&delivery_date=gte.${sDate}&delivery_date=lte.${eDate}&order=delivery_date.desc`;
-
-                const res = await fetch(url, {
-                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Range': `${page * pageSize}-${(page + 1) * pageSize - 1}` }
-                });
-                if (!res.ok) break;
-                const data = await res.json();
-                allData = allData.concat(data);
-                if (data.length < pageSize) hasMore = false; else page++;
-            }
-
-            mRawData = allData;
-            initMobileFilters();
-            renderMobileView();
-        }
-
-        function initMobileFilters() {
-            const select = document.getElementById('mCenterFilter');
-            const centers = new Set(), items = new Map();
-
-            mRawData.forEach(r => {
-                const c = (r.distribution_center || r.center_name || '').trim();
-                if (c) centers.add(c);
-                const iCode = (r.item_code || '').trim(), iName = (r.item_name || '').trim();
-                if (iCode || iName) items.set(iCode || iName, `[${iCode}] ${iName}`);
+        function openIndexedDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, 1);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { keyPath: "url" });
+                    }
+                };
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
             });
-
-            select.innerHTML = '<option value="">전체 물류센터</option>';
-            Array.from(centers).sort().forEach(c => select.innerHTML += `<option value="${c}">${c}</option>`);
-
-            mSelectedItems = new Set(items.keys());
-            renderMItemCheckboxes(Array.from(items.entries()).sort());
         }
 
-        function openMItemModal() { mItemModalObj.show(); }
-        function renderMItemCheckboxes(itemList) {
-            document.getElementById('mItemContainer').innerHTML = itemList.map(([k, label]) => `
-                <div class="multi-select-item">
-                    <input type="checkbox" class="form-check-input m-item-chk" value="${k}" id="chk_m_${k}" ${mSelectedItems.has(k) ? 'checked' : ''} onchange="onMItemChkChange('${k}', this.checked)">
-                    <label class="form-check-label w-100" for="chk_m_${k}">${label}</label>
-                </div>`).join('');
-        }
-        function onMItemChkChange(k, checked) {
-            if (checked) mSelectedItems.add(k); else mSelectedItems.delete(k);
-            updateMItemBtnText();
-        }
-        function toggleAllMItems(checked) {
-            document.querySelectorAll('.m-item-chk').forEach(c => { c.checked = checked; if (checked) mSelectedItems.add(c.value); else mSelectedItems.delete(c.value); });
-            updateMItemBtnText();
-        }
-        function filterMItemList() {
-            const kw = document.getElementById('mItemSearchKeyword').value.toLowerCase();
-            document.querySelectorAll('#mItemContainer .multi-select-item').forEach(el => el.style.display = el.textContent.toLowerCase().includes(kw) ? 'flex' : 'none');
-        }
-        function updateMItemBtnText() {
-            document.getElementById('btnMItemSelect').textContent = mSelectedItems.size === 0 ? '📦 품목 선택 없음' : `📦 품목 (${mSelectedItems.size}개)`;
-        }
-
-        function openCalendarModal() {
-            const ym = document.getElementById('mStartDate').value.slice(0, 7);
-            document.getElementById('calendarMonthPicker').value = ym;
-            calendarModalObj.show();
-            renderCalendarWithQty(ym);
-        }
-
-        async function renderCalendarWithQty(yearMonthStr) {
-            const [y, m] = yearMonthStr.split('-');
-            const startOfMonth = `${y}-${m}-01`;
-            const lastDay = new Date(y, m, 0).getDate();
-            const endOfMonth = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
-            const grid = document.getElementById('calendarGridContainer');
-            grid.innerHTML = '<div class="text-center py-3 w-100">⏳ 날짜별 수량 집계 중...</div>';
-
-            const url = `${SUPABASE_URL}/rest/v1/oms_orders?select=delivery_date,qty&delivery_date=gte.${startOfMonth}&delivery_date=lte.${endOfMonth}`;
-            let data = [];
+        async function getCacheIDB(url) {
             try {
-                const res = await fetch(url, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
-                if (res.ok) data = await res.json();
+                const db = await openIndexedDB();
+                return new Promise((resolve) => {
+                    const tx = db.transaction(STORE_NAME, "readonly");
+                    const store = tx.objectStore(STORE_NAME);
+                    const req = store.get(url);
+                    req.onsuccess = () => {
+                        const res = req.result;
+                        if (res && (Date.now() - res.timestamp < 1000 * 60 * 15)) {
+                            resolve(res.data);
+                        } else resolve(null);
+                    };
+                    req.onerror = () => resolve(null);
+                });
+            } catch (e) { return null; }
+        }
+
+        async function setCacheIDB(url, data) {
+            try {
+                const db = await openIndexedDB();
+                const tx = db.transaction(STORE_NAME, "readwrite");
+                tx.objectStore(STORE_NAME).put({ url, data, timestamp: Date.now() });
             } catch (e) {}
+        }
 
-            const qtyMap = {};
-            data.forEach(r => { if (r.delivery_date) qtyMap[r.delivery_date] = (qtyMap[r.delivery_date] || 0) + Number(r.qty || 0); });
+        async function fetchWithUltraCache(url, options, retries = 2) {
+            const cachedData = await getCacheIDB(url);
+            if (cachedData) {
+                return new Response(JSON.stringify(cachedData), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            }
 
-            grid.innerHTML = '';
-            const firstDayIdx = new Date(y, m - 1, 1).getDay();
-            for (let i = 0; i < firstDayIdx; i++) grid.appendChild(document.createElement('div'));
+            const res = await fetchWithRetry(url, options, retries);
+            if (res.ok) {
+                const clone = res.clone();
+                const jsonData = await clone.json();
+                setCacheIDB(url, jsonData);
+            }
+            return res;
+        }
 
-            for (let d = 1; d <= lastDay; d++) {
-                const dStr = String(d).padStart(2, '0');
-                const fDate = `${y}-${m}-${dStr}`;
-                const q = qtyMap[fDate] || 0;
+        function safeSetStorage(key, value) {
+            try { localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); }
+            catch (e) { localStorage.clear(); }
+        }
+
+        async function fetchWithRetry(url, options, retries = 2) {
+            try {
+                const res = await fetch(url, options);
+                if (!res.ok && res.status >= 500 && retries > 0) throw new Error();
+                return res;
+            } catch (err) {
+                if (retries > 0) {
+                    await new Promise(r => setTimeout(r, 400));
+                    return fetchWithRetry(url, options, retries - 1);
+                }
+                throw err;
+            }
+        }
+
+        function formatDate(d) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        function formatDisplayDate(dateStr) {
+            if (!dateStr) return '-';
+            let s = String(dateStr).split('T')[0];
+            return s.replace(/-/g, '/');
+        }
+
+        function cleanNumber(val) {
+            if (!val) return 0;
+            return parseFloat(String(val).replace(/[^0-9.-]/g, '')) || 0;
+        }
+
+        function cleanCode(val) {
+            if (!val && val !== 0) return '-';
+            let str = String(val).trim();
+            if (str.endsWith('.0')) str = str.substring(0, str.length - 2);
+            return str || '-';
+        }
+
+        function openCalendarModal() { document.getElementById('calendar-modal').style.display = 'flex'; loadCalendarData(); }
+        function closeCalendarModal() { document.getElementById('calendar-modal').style.display = 'none'; }
+
+        async function loadCalendarData() {
+            const monthVal = document.getElementById('calendar-month-picker').value;
+            if (!monthVal) return;
+
+            const [year, month] = monthVal.split('-').map(Number);
+            const startDateStr = formatDate(new Date(year, month - 1, 1));
+            const endDateStr = formatDate(new Date(year, month, 0));
+
+            const queryUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date,total_qty`;
+
+            let dateQtyMap = {}, availableDates = [];
+            try {
+                const res = await fetchWithUltraCache(queryUrl, {
+                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                });
+                if (res.ok) {
+                    const rows = await res.json();
+                    rows.forEach(r => {
+                        let dKey = formatDisplayDate(r.delivery_date).replace(/\//g, '-');
+                        let q = cleanNumber(r.total_qty);
+                        dateQtyMap[dKey] = (dateQtyMap[dKey] || 0) + q;
+                        if (q > 0) availableDates.push(dKey);
+                    });
+                }
+            } catch (err) {}
+
+            if (availableDates.length > 0) {
+                availableDates.sort();
+                const latestDate = availableDates[availableDates.length - 1].replace(/-/g, '/');
+                document.getElementById('last-updated-text').innerText = `최신: ${latestDate}`;
+                safeSetStorage('cached_last_updated', latestDate);
+            }
+            renderCalendarGrid(year, month, dateQtyMap);
+        }
+
+        function renderCalendarGrid(year, month, dateQtyMap) {
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = "";
+            ['일', '월', '화', '수', '목', '금', '토'].forEach(d => grid.innerHTML += `<div class="calendar-header-day">${d}</div>`);
+
+            const firstDayIndex = new Date(year, month - 1, 1).getDay();
+            const totalDays = new Date(year, month, 0).getDate();
+
+            for (let i = 0; i < firstDayIndex; i++) grid.innerHTML += `<div class="calendar-day-cell" style="background:#f8fafc; opacity:0.3;"></div>`;
+
+            for (let day = 1; day <= totalDays; day++) {
+                const dString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const qty = dateQtyMap[dString] || 0;
+                
+                // 💡 수량이 있으면 숫자로 표출, 없으면 0 표출
+                const badgeHtml = qty > 0 ? `<span class="data-status-badge badge-has-data">${qty.toLocaleString()}</span>` : `<span class="data-status-badge badge-no-data">0</span>`;
+                
                 const cell = document.createElement('div');
                 cell.className = 'calendar-day-cell';
-                cell.innerHTML = `<div class="fw-bold small">${d}</div>${q > 0 ? `<span class="badge-qty-exist">${q.toLocaleString()}개</span>` : `<span class="badge-qty-empty">0개</span>`}`;
                 cell.onclick = () => {
-                    document.getElementById('mStartDate').value = fDate;
-                    document.getElementById('mEndDate').value = fDate;
-                    calendarModalObj.hide();
-                    loadMobileData();
+                    document.getElementById('chart-start-date').value = dString;
+                    document.getElementById('chart-end-date').value = dString;
+                    closeCalendarModal();
+                    fetchAllDashboardData();
                 };
+                cell.innerHTML = `<span class="day-number">${day}</span>${badgeHtml}`;
                 grid.appendChild(cell);
             }
         }
 
-        document.getElementById('mCenterFilter').addEventListener('change', renderMobileView);
+        async function openBrandModal(target = 'chart') {
+            activeBrandTarget = target;
+            document.getElementById('brand-modal').style.display = 'flex';
+            if (allBrandList.length === 0) {
+                try {
+                    const res = await fetchWithUltraCache(`${SUPABASE_URL}/rest/v1/daily_order_summary?select=brand_name`, {
+                        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        allBrandList = [...new Set(data.map(r => r.brand_name))].filter(Boolean).sort();
+                    }
+                } catch (e) {}
+            }
+            renderBrandModalList();
+        }
 
-        function renderMobileView() {
-            const selectedCenter = document.getElementById('mCenterFilter').value;
-            const container = document.getElementById('mobileList');
-            container.innerHTML = '';
+        function closeBrandModal() { document.getElementById('brand-modal').style.display = 'none'; }
 
-            const filtered = mRawData.filter(row => {
-                const cName = (row.distribution_center || row.center_name || '').trim();
-                const iKey = (row.item_code || row.item_name || '').trim();
+        function renderBrandModalList() {
+            const inputId = activeBrandTarget === 'chart' ? 'chart-brand-input' : 'detail-brand-input';
+            const selected = document.getElementById(inputId).value.split(',').map(s => s.trim());
+            const keyword = document.getElementById('modal-brand-search').value.toLowerCase().trim();
+            const filtered = allBrandList.filter(b => b.toLowerCase().includes(keyword));
 
-                const centerMatch = !selectedCenter || cName === selectedCenter;
-                const itemMatch = mSelectedItems.has(iKey) || mSelectedItems.has(row.item_code) || mSelectedItems.has(row.item_name);
-                return centerMatch && itemMatch;
+            const html = filtered.map(b => `
+                <div style="padding: 10px; border-bottom: 1px solid #f1f3f5; display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" class="m-brand-chk" value="${b}" ${selected.includes(b) ? 'checked' : ''} style="transform: scale(1.2);">
+                    <span style="font-size: 14px;">${b}</span>
+                </div>
+            `).join('');
+            document.getElementById('brand-modal-list').innerHTML = html;
+        }
+
+        function toggleAllBrandCheck(status) {
+            document.querySelectorAll('.m-brand-chk').forEach(c => c.checked = status);
+        }
+
+        function applyBrandSelection() {
+            const checked = Array.from(document.querySelectorAll('.m-brand-chk:checked')).map(c => c.value);
+            const brandStr = checked.join(', ');
+
+            if (activeBrandTarget === 'chart') {
+                document.getElementById('chart-brand-input').value = brandStr;
+                safeSetStorage('cached_brand_input', brandStr);
+            } else {
+                document.getElementById('detail-brand-input').value = brandStr;
+                onDetailBrandChange(checked);
+            }
+            closeBrandModal();
+        }
+
+        function onDetailBrandChange(selectedBrands) {
+            renderStoreCardListFromSummary(selectedBrands);
+        }
+
+        /* 🚀 모바일 통합 데이터 로드 */
+        async function fetchAllDashboardData() {
+            activeMobileToken++;
+            mCurrentMaxPercent = 0;
+            document.getElementById('store-card-list-container').innerHTML = `<div style="text-align:center; padding:30px; color:#2563eb;">⚡ 데이터를 로딩 중입니다 (1%)...</div>`;
+            await Promise.all([fetchChartData(), fetchDetailDataForRange()]);
+        }
+
+        async function fetchChartData() {
+            const startDate = document.getElementById('chart-start-date').value;
+            const endDate = document.getElementById('chart-end-date').value;
+            const brandVal = document.getElementById('chart-brand-input').value.trim();
+
+            if (!startDate || !endDate) return alert("조회 기간을 선택하세요.");
+
+            safeSetStorage('cached_chart_start_date', startDate);
+            safeSetStorage('cached_chart_end_date', endDate);
+
+            let queryUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,brand_name,item_name`;
+
+            if (brandVal) {
+                const brands = brandVal.split(',').map(b => b.trim()).filter(Boolean);
+                if (brands.length === 1) queryUrl += `&brand_name=ilike.*${encodeURIComponent(brands[0])}*`;
+                else if (brands.length > 1) queryUrl += `&or=(${brands.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`;
+            }
+
+            try {
+                const res = await fetchWithUltraCache(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                if (res.ok) {
+                    const data = await res.json();
+                    renderChartAndKPI(data);
+                }
+            } catch (e) {}
+        }
+
+        function renderChartAndKPI(data) {
+            if (!data || !Array.isArray(data) || data.length === 0) {
+                document.getElementById('kpi-total-qty').innerText = "0 건";
+                document.getElementById('kpi-total-items').innerText = "0 종";
+                document.getElementById('kpi-total-amount').innerText = "0 원";
+                return;
+            }
+            let qty = 0, amt = 0, items = new Set(), dailyMap = {};
+
+            data.forEach(r => {
+                const q = cleanNumber(r.total_qty), a = cleanNumber(r.total_amount);
+                qty += q; amt += a;
+                if (r.item_name) items.add(r.item_name);
+
+                let d = formatDisplayDate(r.delivery_date);
+                if (!d || d === '-') return;
+
+                if (!dailyMap[d]) dailyMap[d] = { qty: 0, amt: 0 };
+                dailyMap[d].qty += q; dailyMap[d].amt += a;
             });
 
-            let tQty = 0, tAmt = 0;
-            const itemTypeSet = new Set();
+            document.getElementById('kpi-total-qty').innerText = `${qty.toLocaleString()} 건`;
+            document.getElementById('kpi-total-items').innerText = `${items.size.toLocaleString()} 종`;
+            document.getElementById('kpi-total-amount').innerText = `${amt.toLocaleString()} 원`;
 
-            if (filtered.length === 0) {
-                container.innerHTML = '<div class="text-center py-4 text-muted">선택 조건에 맞는 데이터가 없습니다.</div>';
-                document.getElementById('mTotalQty').textContent = '0건';
-                document.getElementById('mTotalItemTypes').textContent = '0종';
-                document.getElementById('mTotalAmount').textContent = '0원';
+            const labels = Object.keys(dailyMap).sort();
+            const canvas = document.getElementById('dailyTrendChart');
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+            if (trendChart) trendChart.destroy();
+
+            trendChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: '수량', data: labels.map(k => dailyMap[k].qty), backgroundColor: 'rgba(37, 99, 235, 0.6)', yAxisID: 'y1' },
+                        { label: '금액', data: labels.map(k => dailyMap[k].amt), type: 'line', borderColor: '#8b5cf6', borderWidth: 2, yAxisID: 'y2' }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        y1: { type: 'linear', position: 'left', beginAtZero: true },
+                        y2: { type: 'linear', position: 'right', beginAtZero: true, grid: { drawOnChartArea: false } }
+                    }
+                }
+            });
+        }
+
+        async function fetchDetailDataForRange() {
+            const startDate = document.getElementById('chart-start-date').value;
+            const endDate = document.getElementById('chart-end-date').value;
+            if (!startDate || !endDate) return;
+
+            const summaryUrl = `${SUPABASE_URL}/rest/v1/store_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_code,store_name,brand_name,order_count,total_qty,total_amount`;
+
+            try {
+                const res = await fetchWithUltraCache(summaryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                if (res.ok) {
+                    storeSummaryList = await res.json();
+                    renderStoreCardListFromSummary();
+                    fetchAllOrdersInChunksForRange(startDate, endDate);
+                }
+            } catch (e) {}
+        }
+
+        async function fetchAllOrdersInChunksForRange(startDate, endDate) {
+            const currentToken = activeMobileToken;
+            let offset = 0, limit = 1000, hasMore = true;
+            rawDetailOrders = [];
+
+            let totalExpectedRows = storeSummaryList.reduce((sum, r) => sum + cleanNumber(r.order_count), 0) || 5000;
+
+            while (hasMore) {
+                if (currentToken !== activeMobileToken) return;
+
+                const chunkUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_code,store_name,distribution_center,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc&limit=${limit}&offset=${offset}`;
+                try {
+                    const res = await fetchWithUltraCache(chunkUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                    if (res.ok) {
+                        const chunk = await res.json();
+                        chunk.forEach(r => { r.center_name = r.distribution_center || r.center_name || '-'; });
+
+                        rawDetailOrders = rawDetailOrders.concat(chunk);
+                        filteredDetailOrders = rawDetailOrders;
+                        
+                        let calculatedPercent = Math.min(99, Math.round((rawDetailOrders.length / totalExpectedRows) * 100));
+                        if (calculatedPercent > mCurrentMaxPercent) {
+                            mCurrentMaxPercent = calculatedPercent;
+                            document.getElementById('store-card-list-container').innerHTML = `<div style="text-align:center; padding:30px; color:#2563eb;">⚡ 데이터를 로딩 중입니다 (${mCurrentMaxPercent}%)...</div>`;
+                        }
+
+                        if (chunk.length < limit) {
+                            hasMore = false;
+                        } else offset += limit;
+                    } else { hasMore = false; }
+                } catch(e) { hasMore = false; }
+            }
+
+            if (currentToken === activeMobileToken) {
+                mCurrentMaxPercent = 100;
+                renderStoreCardListFromSummary();
+            }
+        }
+
+        function renderStoreCardListFromSummary(selectedBrandsFilter = null) {
+            const container = document.getElementById('store-card-list-container');
+            document.getElementById('mobile-pagination-container').style.display = 'none'; 
+
+            let activeList = storeSummaryList;
+            if (selectedBrandsFilter && selectedBrandsFilter.length > 0) {
+                activeList = storeSummaryList.filter(r => selectedBrandsFilter.includes(r.brand_name));
+            } else {
+                const detailBrandVal = document.getElementById('detail-brand-input').value.trim();
+                if (detailBrandVal) {
+                    const bList = detailBrandVal.split(',').map(s => s.trim()).filter(Boolean);
+                    if (bList.length > 0) activeList = storeSummaryList.filter(r => bList.includes(r.brand_name));
+                }
+            }
+
+            if (!activeList || activeList.length === 0) {
+                container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">데이터가 없습니다.</div>';
                 return;
             }
 
-            filtered.forEach(row => {
-                const qty = Number(row.qty || 0), amt = Number(row.total_amount || 0);
-                tQty += qty; tAmt += amt;
-                if (row.item_code) itemTypeSet.add(row.item_code);
-
-                const centerName = (row.distribution_center || row.center_name || '').trim() || '-';
-
-                const card = document.createElement('div');
-                card.className = 'mobile-order-card';
-                card.innerHTML = `
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <span class="badge bg-secondary font-monospace">${row.delivery_date || '-'}</span>
-                        <span class="badge-center">${centerName}</span>
-                    </div>
-                    <div class="fw-bold text-dark mb-1">${row.store_name || '-'} <span class="small text-muted">(${row.brand_name || '-'})</span></div>
-                    <div class="text-secondary small mb-2">[${row.item_code || '-'}] ${row.item_name || '-'}</div>
-                    <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-                        <span class="small text-muted">수량: <strong class="text-dark">${qty.toLocaleString()}개</strong></span>
-                        <span class="fw-bold text-success">${amt.toLocaleString()}원</span>
-                    </div>
-                `;
-                container.appendChild(card);
+            const storeGroupMap = {};
+            activeList.forEach(r => {
+                const sName = r.store_name;
+                if (!sName) return;
+                if (!storeGroupMap[sName]) storeGroupMap[sName] = { qty: 0, count: 0 };
+                storeGroupMap[sName].qty += cleanNumber(r.total_qty);
+                storeGroupMap[sName].count += cleanNumber(r.order_count);
             });
 
-            document.getElementById('mTotalQty').textContent = `${tQty.toLocaleString()}건`;
-            document.getElementById('mTotalItemTypes').textContent = `${itemTypeSet.size.toLocaleString()}종`;
-            document.getElementById('mTotalAmount').textContent = `${tAmt.toLocaleString()}원`;
+            const sortedStores = Object.keys(storeGroupMap).sort();
+
+            const totalQty = activeList.reduce((sum, r) => sum + cleanNumber(r.total_qty), 0);
+            const totalAmt = activeList.reduce((sum, r) => sum + cleanNumber(r.total_amount), 0);
+            const totalOrders = activeList.reduce((sum, r) => sum + cleanNumber(r.order_count), 0);
+
+            let html = `
+                <div class="store-card">
+                    <div class="store-card-header total-header" onclick="toggleStoreCard('total')">
+                        <span>🏢 전체점포 합산 상세 (${totalOrders.toLocaleString()}건)</span>
+                        <span class="badge-cnt">${totalQty.toLocaleString()}개 / ${totalAmt.toLocaleString()}원 ▼</span>
+                    </div>
+                    <div class="item-detail-list open" id="store-card-body-total">
+                        <div style="text-align:center; color:#2563eb; padding:10px;">⚡ 데이터 렌더링 완료 (검색 시 분할 표출)</div>
+                    </div>
+                </div>
+            `;
+
+            sortedStores.forEach((sName, idx) => {
+                const s = storeGroupMap[sName];
+                html += `
+                    <div class="store-card">
+                        <div class="store-card-header" onclick="toggleAndLoadStoreCard('${sName}', ${idx})">
+                            <span>🏪 ${sName}</span>
+                            <span class="badge-cnt">${s.qty.toLocaleString()}개 (${s.count.toLocaleString()}건) ▼</span>
+                        </div>
+                        <div class="item-detail-list" id="store-card-body-${idx}">
+                            <div style="text-align:center; color:#64748b; padding:10px;">클릭 시 상세 품목 로드</div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        async function toggleAndLoadStoreCard(storeName, idx) {
+            const body = document.getElementById(`store-card-body-${idx}`);
+            body.classList.toggle('open');
+
+            if (body.classList.contains('open')) {
+                const startDate = document.getElementById('chart-start-date').value;
+                const endDate = document.getElementById('chart-end-date').value;
+                const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&store_name=eq.${encodeURIComponent(storeName)}&select=item_code,item_name,distribution_center,qty,price,total_amount,order_date,delivery_date`;
+                try {
+                    const res = await fetchWithUltraCache(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                    if (res.ok) {
+                        const items = await res.json();
+                        body.innerHTML = items.map(o => `
+                            <div class="item-row">
+                                <div class="item-row-header">
+                                    <span>${o.item_name || '-'}</span>
+                                    <span style="color:#2563eb;">${cleanNumber(o.qty).toLocaleString()}개</span>
+                                </div>
+                                <div class="item-row-sub">
+                                    <span>센터: ${o.distribution_center || o.center_name || '-'} | 품목코드: ${cleanCode(o.item_code)}</span>
+                                    <span>${cleanNumber(o.total_amount || (cleanNumber(o.qty)*cleanNumber(o.price))).toLocaleString()}원</span>
+                                </div>
+                                <div class="item-row-sub" style="color: #94a3b8; font-size: 10px;">
+                                    <span>주문: ${formatDisplayDate(o.order_date)} | 배송: ${formatDisplayDate(o.delivery_date)}</span>
+                                </div>
+                            </div>
+                        `).join('');
+                    }
+                } catch(e) {}
+            }
+        }
+
+        function filterCards() {
+            const query = document.getElementById('store-search-input').value.toLowerCase().trim();
+            if (!query) {
+                renderStoreCardListFromSummary();
+                return;
+            }
+
+            activeFullOrders = filteredDetailOrders.filter(row => {
+                const sCode = cleanCode(row.store_code).toLowerCase();
+                const sName = String(row.store_name||'').toLowerCase();
+                const cName = String(row.center_name||row.distribution_center||'').toLowerCase();
+                const oDate = formatDisplayDate(row.order_date).toLowerCase();
+                const dDate = formatDisplayDate(row.delivery_date).toLowerCase();
+                const iCode = cleanCode(row.item_code).toLowerCase();
+                const iName = String(row.item_name||'').toLowerCase();
+
+                return sCode.includes(query) || sName.includes(query) || cName.includes(query) || oDate.includes(query) || dDate.includes(query) || iCode.includes(query) || iName.includes(query);
+            });
+
+            mCurrentPage = 1;
+            renderPaginatedMobileList();
+        }
+
+        function renderPaginatedMobileList() {
+            const container = document.getElementById('store-card-list-container');
+            const pagContainer = document.getElementById('mobile-pagination-container');
+
+            if (!activeFullOrders || activeFullOrders.length === 0) {
+                container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">데이터가 없습니다.</div>';
+                pagContainer.style.display = 'none';
+                return;
+            }
+
+            pagContainer.style.display = 'flex';
+
+            const totalItems = activeFullOrders.length;
+            mTotalPages = Math.ceil(totalItems / mRowsPerPage) || 1;
+            if (mCurrentPage > mTotalPages) mCurrentPage = mTotalPages;
+            if (mCurrentPage < 1) mCurrentPage = 1;
+
+            const startIndex = (mCurrentPage - 1) * mRowsPerPage;
+            const pageData = activeFullOrders.slice(startIndex, startIndex + mRowsPerPage);
+
+            const totalQty = activeFullOrders.reduce((sum, r) => sum + cleanNumber(r.qty), 0);
+            const totalAmt = activeFullOrders.reduce((sum, r) => sum + (cleanNumber(r.total_amount) || (cleanNumber(r.qty)*cleanNumber(r.price))), 0);
+
+            const itemsHtml = pageData.map(o => `
+                <div class="item-row">
+                    <div class="item-row-header">
+                        <span>[${o.store_name||'-'}] ${o.item_name || '-'}</span>
+                        <span style="color:#2563eb;">${cleanNumber(o.qty).toLocaleString()}개</span>
+                    </div>
+                    <div class="item-row-sub">
+                        <span>센터: ${o.center_name||o.distribution_center||'-'} | 점포코드: ${cleanCode(o.store_code)}</span>
+                        <span><b>${cleanNumber(o.total_amount || (cleanNumber(o.qty)*cleanNumber(o.price))).toLocaleString()}원</b></span>
+                    </div>
+                    <div class="item-row-sub" style="color: #94a3b8; font-size: 10px;">
+                        <span>주문: ${formatDisplayDate(o.order_date)} | 배송: ${formatDisplayDate(o.delivery_date)}</span>
+                    </div>
+                </div>
+            `).join('');
+
+            let html = `
+                <div class="store-card">
+                    <div class="store-card-header total-header" onclick="toggleStoreCard('total')">
+                        <span>🏢 검색 상세 결과 (${totalItems.toLocaleString()}건)</span>
+                        <span class="badge-cnt">${totalQty.toLocaleString()}개 / ${totalAmt.toLocaleString()}원 ▼</span>
+                    </div>
+                    <div class="item-detail-list open" id="store-card-body-total">
+                        ${itemsHtml}
+                    </div>
+                </div>
+            `;
+
+            container.innerHTML = html;
+            updateMobilePaginationUI(totalItems);
+        }
+
+        function updateMobilePaginationUI(totalItems) {
+            document.getElementById('m-page-input-box').value = mCurrentPage;
+            document.getElementById('m-total-page-text').innerText = mTotalPages.toLocaleString();
+            document.getElementById('m-total-rows-text').innerText = `(총 ${totalItems.toLocaleString()}건)`;
+
+            document.getElementById('m-btn-first').disabled = (mCurrentPage === 1);
+            document.getElementById('m-btn-prev').disabled = (mCurrentPage === 1);
+            document.getElementById('m-btn-next').disabled = (mCurrentPage === mTotalPages || mTotalPages === 0);
+            document.getElementById('m-btn-last').disabled = (mCurrentPage === mTotalPages || mTotalPages === 0);
+        }
+
+        function handleMobilePageInput(val) {
+            let page = parseInt(val, 10);
+            if (isNaN(page)) page = 1;
+            if (page < 1) page = 1;
+            if (page > mTotalPages) page = mTotalPages;
+            
+            mCurrentPage = page;
+            renderPaginatedMobileList();
+            window.scrollTo({ top: 300, behavior: 'smooth' });
+        }
+
+        function goToMobilePage(page) {
+            if (page < 1 || page > mTotalPages) return;
+            mCurrentPage = page;
+            renderPaginatedMobileList();
+            window.scrollTo({ top: 300, behavior: 'smooth' });
+        }
+
+        function changeMobileRowsPerPage() {
+            mRowsPerPage = parseInt(document.getElementById('m-rows-per-page').value, 10);
+            mCurrentPage = 1;
+            renderPaginatedMobileList();
+        }
+
+        function toggleStoreCard(idx) {
+            const body = document.getElementById(`store-card-body-${idx}`);
+            body.classList.toggle('open');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date();
+            const past7 = new Date(); past7.setDate(today.getDate() - 7);
+
+            document.getElementById('chart-start-date').value = localStorage.getItem('cached_chart_start_date') || formatDate(past7);
+            document.getElementById('chart-end-date').value = localStorage.getItem('cached_chart_end_date') || formatDate(today);
+            document.getElementById('sync-target-date').value = formatDate(today);
+            document.getElementById('chart-brand-input').value = localStorage.getItem('cached_brand_input') || '';
+
+            document.getElementById('calendar-month-picker').value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2, '0')}`;
+
+            const cachedUpdated = localStorage.getItem('cached_last_updated');
+            if (cachedUpdated) document.getElementById('last-updated-text').innerText = `최신: ${cachedUpdated}`;
+
+            fetchAllDashboardData();
+        });
+
+        async function triggerBot() {
+            const btn = document.getElementById('run-btn');
+            const targetVal = document.getElementById('sync-target-date').value.replace(/-/g, '/');
+
+            if (!targetVal) return alert("일자를 선택하세요.");
+
+            btn.disabled = true; btn.innerText = "동기화 중...";
+
+            try {
+                const res = await fetch(`https://api.github.com/repos/${githubId}/${repoName}/actions/workflows/capture.yml/dispatches`, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/vnd.github.v3+json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ ref: 'main', inputs: { start_date: targetVal, end_date: targetVal } })
+                });
+
+                if (res.ok) {
+                    alert(`✅ [${targetVal}] 동기화 요청 완료!`);
+                    setTimeout(async () => { 
+                        try {
+                            const db = await openIndexedDB();
+                            db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME).clear();
+
+                            await fetch(`${SUPABASE_URL}/rest/v1/rpc/refresh_daily_summary`, {
+                                method: 'POST',
+                                headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                            });
+                            await fetch(`${SUPABASE_URL}/rest/v1/rpc/refresh_store_summary`, {
+                                method: 'POST',
+                                headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                            });
+                        } catch(e) {}
+
+                        btn.disabled = false; 
+                        btn.innerText = "동기화"; 
+                        loadCalendarData();
+                        fetchAllDashboardData(); 
+                    }, 35000);
+                } else {
+                    alert("❌ 동기화 요청 실패"); btn.disabled = false; btn.innerText = "동기화";
+                }
+            } catch (err) {
+                alert("❌ 네트워크 오류"); btn.disabled = false; btn.innerText = "동기화";
+            }
         }
     </script>
 </body>
