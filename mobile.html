@@ -111,8 +111,6 @@
         }
         .calendar-day-cell:active { background-color: #eff6ff; }
         .day-number { font-size: 10px; font-weight: bold; }
-        
-        /* 💡 모바일 캘린더 수량 뱃지 스타일 */
         .data-status-badge { font-size: 8.5px; font-weight: bold; padding: 1px 2px; border-radius: 3px; text-align: center; }
         .badge-has-data { background-color: #d1fae5; color: #047857; }
         .badge-no-data { background-color: #f1f5f9; color: #94a3b8; }
@@ -440,7 +438,6 @@
                 const dString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 const qty = dateQtyMap[dString] || 0;
                 
-                // 💡 수량이 있으면 숫자로 표출, 없으면 0 표출
                 const badgeHtml = qty > 0 ? `<span class="data-status-badge badge-has-data">${qty.toLocaleString()}</span>` : `<span class="data-status-badge badge-no-data">0</span>`;
                 
                 const cell = document.createElement('div');
