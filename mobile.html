@@ -121,7 +121,7 @@
     <div class="m-navbar">
         <div class="m-brand">
             <span>📱 더본 OMS 모바일</span>
-            <span class="m-version">v12.0 Targeted Progress</span>
+            <span class="m-version">v13.0 Stream Engine</span>
         </div>
         <button class="btn-m btn-dark" style="width: auto; padding: 6px 10px; font-size: 11px;" onclick="openCalendarModal()">📅 캘린더</button>
     </div>
@@ -160,7 +160,6 @@
 
             <button class="btn-m btn-blue" style="margin-bottom: 14px;" onclick="fetchAllDashboardData()">🔍 대시보드 종합 조회</button>
 
-            <!-- 상단 KPI는 수치 형태로 표출 -->
             <div class="kpi-scroll-container">
                 <div class="kpi-mini-card">
                     <span class="kpi-mini-title">총 주문수량</span>
@@ -196,7 +195,7 @@
             </div>
         </div>
 
-        <!-- 📦 모바일 카드 리스트 표출 영역 (로딩 시 % 표출) -->
+        <!-- 📦 모바일 카드 리스트 표출 영역 -->
         <div id="store-card-list-container"></div>
 
         <!-- 📄 모바일 전용 페이지네이션 컨트롤 바 -->
@@ -281,7 +280,8 @@
         let mRowsPerPage = 10;
         let mTotalPages = 1;
         let activeFullOrders = []; 
-        let isMobileLoadingChunks = false;
+        let mCurrentMaxPercent = 0;
+        let activeMobileToken = 0;
 
         /* 💾 IndexedDB 로컬 캐시 */
         const DB_NAME = "OmsLocalCacheDB_Mobile";
@@ -508,8 +508,9 @@
 
         /* 🚀 모바일 통합 데이터 로드 */
         async function fetchAllDashboardData() {
-            isMobileLoadingChunks = true;
-            document.getElementById('store-card-list-container').innerHTML = `<div style="text-align:center; padding:30px; color:#2563eb;">⚡ 데이터를 로딩 중입니다 (0%)...</div>`;
+            activeMobileToken++;
+            mCurrentMaxPercent = 0;
+            document.getElementById('store-card-list-container').innerHTML = `<div style="text-align:center; padding:30px; color:#2563eb;">⚡ 데이터를 로딩 중입니다 (1%)...</div>`;
             await Promise.all([fetchChartData(), fetchDetailDataForRange()]);
         }
 
@@ -609,23 +610,15 @@
         }
 
         async function fetchAllOrdersInChunksForRange(startDate, endDate) {
+            const currentToken = activeMobileToken;
             let offset = 0, limit = 200, hasMore = true;
             rawDetailOrders = [];
-            isMobileLoadingChunks = true;
 
-            let totalExpectedRows = 10000;
-            try {
-                const headRes = await fetch(`${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=id`, {
-                    method: 'HEAD',
-                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Prefer': 'count=exact' }
-                });
-                const contentRange = headRes.headers.get('content-range');
-                if (contentRange && contentRange.includes('/')) {
-                    totalExpectedRows = parseInt(contentRange.split('/')[1], 10) || 10000;
-                }
-            } catch(e) {}
+            let totalExpectedRows = storeSummaryList.reduce((sum, r) => sum + cleanNumber(r.order_count), 0) || 5000;
 
             while (hasMore) {
+                if (currentToken !== activeMobileToken) return;
+
                 const chunkUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc&limit=${limit}&offset=${offset}`;
                 try {
                     const res = await fetchWithUltraCache(chunkUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
@@ -634,8 +627,11 @@
                         rawDetailOrders = rawDetailOrders.concat(chunk);
                         filteredDetailOrders = rawDetailOrders;
                         
-                        let currentPercent = Math.min(99, Math.round((rawDetailOrders.length / totalExpectedRows) * 100));
-                        document.getElementById('store-card-list-container').innerHTML = `<div style="text-align:center; padding:30px; color:#2563eb;">⚡ 데이터를 로딩 중입니다 (${currentPercent}%)...</div>`;
+                        let calculatedPercent = Math.min(99, Math.round((rawDetailOrders.length / totalExpectedRows) * 100));
+                        if (calculatedPercent > mCurrentMaxPercent) {
+                            mCurrentMaxPercent = calculatedPercent;
+                            document.getElementById('store-card-list-container').innerHTML = `<div style="text-align:center; padding:30px; color:#2563eb;">⚡ 데이터를 로딩 중입니다 (${mCurrentMaxPercent}%)...</div>`;
+                        }
 
                         if (chunk.length < limit) {
                             hasMore = false;
@@ -644,12 +640,14 @@
                 } catch(e) { hasMore = false; }
             }
 
-            isMobileLoadingChunks = false;
-            renderStoreCardListFromSummary();
+            if (currentToken === activeMobileToken) {
+                mCurrentMaxPercent = 100;
+                renderStoreCardListFromSummary();
+            }
         }
 
         function renderStoreCardListFromSummary(selectedBrandsFilter = null) {
-            if (isMobileLoadingChunks) return; // 로딩 도중에는 결과를 가리지 않음
+            if (mCurrentMaxPercent < 100 && rawDetailOrders.length === 0) return;
 
             const container = document.getElementById('store-card-list-container');
             document.getElementById('mobile-pagination-container').style.display = 'none'; 
