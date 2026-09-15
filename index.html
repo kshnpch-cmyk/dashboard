@@ -172,7 +172,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v17.0 Stream Engine</span>
+            <span class="version-tag">v18.0 Final Sync Engine</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -392,7 +392,6 @@
         let rowsPerPage = 10;
         let totalPages = 1;
 
-        // 🚀 단조 증가 퍼센티지 트래커 변수
         let currentMaxPercent = 0;
         let activeFetchToken = 0;
 
@@ -686,9 +685,8 @@
             await Promise.all([fetchChartData(), fetchDetailDataForRange()]);
         }
 
-        /* ⚡ 단조 증가(Monotonic Increase) 보장 퍼센티지 함수 */
         function updateBadgePercent(percent) {
-            if (percent < currentMaxPercent) return; // 이전보다 작아지지 않게 방어
+            if (percent < currentMaxPercent) return;
             currentMaxPercent = percent;
             
             const pText = `⏳ 로딩중 (${currentMaxPercent}%)`;
@@ -791,7 +789,6 @@
             });
         }
 
-        /* 🛒 스트리밍 청크 데이터 즉시 렌더링 로직 */
         async function fetchDetailDataForRange() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -817,11 +814,10 @@
             let hasMore = true;
             rawDetailOrders = [];
 
-            // 정확한 총 건수를 storeSummaryList 수량 합계 기반으로 도출 (분모 보정)
             let totalExpectedRows = storeSummaryList.reduce((sum, r) => sum + cleanNumber(r.order_count), 0) || 5000;
 
             while (hasMore) {
-                if (currentToken !== activeFetchToken) return; // 이전 중복 요청 취소
+                if (currentToken !== activeFetchToken) return;
 
                 const chunkUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc&limit=${limit}&offset=${offset}`;
                 try {
@@ -834,7 +830,6 @@
                         let calculatedPercent = Math.min(99, Math.round((rawDetailOrders.length / totalExpectedRows) * 100));
                         updateBadgePercent(calculatedPercent);
 
-                        // ⚡ 수신받는 즉시 테이블 데이터를 실시간 업데이트
                         const activeStore = document.querySelector('#store-list .active');
                         if (activeStore && activeStore.innerText.includes('전체 점포 합산')) {
                             baseDetailOrders = filteredDetailOrders;
@@ -848,8 +843,16 @@
                 } catch(e) { hasMore = false; }
             }
 
+            /* 🚀 100% 수신 완료 시 최종 숫자 표출 트리거 강제 실행 */
             if (currentToken === activeFetchToken) {
-                updateBadgePercent(100);
+                currentMaxPercent = 100;
+                const activeStore = document.querySelector('#store-list .active');
+                if (activeStore && activeStore.innerText.includes('전체 점포 합산')) {
+                    baseDetailOrders = filteredDetailOrders;
+                    applyColumnFilters();
+                } else {
+                    renderDetailTable();
+                }
             }
         }
 
@@ -956,7 +959,7 @@
             const tbody = document.getElementById('order-detail-table');
 
             if (!currentDetailOrders || currentDetailOrders.length === 0) {
-                if (currentMaxPercent < 100) return; // 아직 수신 중이면 퍼센티지 문구 유지
+                if (currentMaxPercent < 100) return;
                 tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#94a3b8;">데이터가 없습니다.</td></tr>`;
                 document.getElementById('list-total-qty').innerText = "0개";
                 document.getElementById('list-total-amount').innerText = "0원";
@@ -971,7 +974,7 @@
                 sumAmount += (cleanNumber(row.total_amount) || (q * p));
             });
 
-            // 완료되었거나 수신 중인 수치 실시간 계산해서 표시
+            /* 100% 완료 시 최종 숫자로 덮어쓰기 */
             if (currentMaxPercent >= 100) {
                 document.getElementById('list-total-qty').innerText = `${sumQty.toLocaleString()}개`;
                 document.getElementById('list-total-amount').innerText = `${sumAmount.toLocaleString()}원`;
