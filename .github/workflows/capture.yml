@@ -48,10 +48,11 @@ jobs:
           END_DATE: ${{ github.event.inputs.end_date }}
           SUPABASE_URL: "https://zbilhsgfgyfrolveaego.supabase.co"
           SUPABASE_SERVICE_ROLE_KEY: "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN"
-          OMS_USER_ID: ${{ secrets.OMS_USER_ID }}
-          OMS_USER_PW: ${{ secrets.OMS_USER_PW }}
+          # 🚀 지정해주신 GitHub Secrets 환경변수 매핑
+          OMS_ID: ${{ secrets.OMS_ID }}
+          OMS_PW: ${{ secrets.OMS_PW }}
+          OMS_COMPANY_CODE: ${{ secrets.OMS_COMPANY_CODE }}
         run: |
-          # 🚀 파이썬 스크립트 실행 (screenshot.py 지정)
           python screenshot.py "$START_DATE" "$END_DATE"
 
       - name: Supabase 구체화 뷰(MATERIALIZED VIEW) 자동 갱신
