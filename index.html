@@ -34,7 +34,7 @@
         <!-- 헤더 -->
         <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap">
             <h5 class="fw-bold m-0 py-1">📊 더본 OMS 주문 실시간 대시보드</h5>
-            <span class="badge bg-success">v24.0 Date Validation</span>
+            <span class="badge bg-success">v23.0 Multi-Select Ready</span>
         </div>
 
         <!-- 필터 영역 -->
@@ -42,11 +42,11 @@
             <div class="row g-2 align-items-end">
                 <div class="col-md-2 col-6 mobile-col-12">
                     <label class="form-label small fw-bold text-secondary mb-1">시작 배송일자</label>
-                    <input type="date" id="startDate" class="form-control form-control-sm" onchange="validateDates()">
+                    <input type="date" id="startDate" class="form-control form-control-sm">
                 </div>
                 <div class="col-md-2 col-6 mobile-col-12">
                     <label class="form-label small fw-bold text-secondary mb-1">종료 배송일자</label>
-                    <input type="date" id="endDate" class="form-control form-control-sm" onchange="validateDates()">
+                    <input type="date" id="endDate" class="form-control form-control-sm">
                 </div>
                 <div class="col-md-2 col-12 mobile-col-12">
                     <label class="form-label small fw-bold text-secondary mb-1">물류센터</label>
@@ -59,7 +59,7 @@
                     <label class="form-label small fw-bold text-secondary mb-1">브랜드 선택</label>
                     <button class="btn btn-outline-secondary btn-sm w-100 text-truncate" onclick="openBrandModal()" id="btnBrandSelect">🏢 전체 브랜드</button>
                 </div>
-                <!-- 품목 다중 선택 버튼 -->
+                <!-- 품목 다중 선택 버튼 (개편) -->
                 <div class="col-md-2 col-6 mobile-col-12">
                     <label class="form-label small fw-bold text-secondary mb-1">품목 선택</label>
                     <button class="btn btn-outline-secondary btn-sm w-100 text-truncate" onclick="openItemModal()" id="btnItemSelect">📦 전체 품목</button>
@@ -141,7 +141,7 @@
         </div>
     </div>
 
-    <!-- 📦 품목 다중 선택 모달 -->
+    <!-- 📦 품목 다중 선택 모달 (새로 개편된 UI) -->
     <div class="modal fade" id="itemModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -186,19 +186,6 @@
             loadDashboardData();
         };
 
-        // 🚨 날짜 유효성 검증 함수 (종료날짜 < 시작날짜 일 경우 경고 및 복원)
-        function validateDates() {
-            const sDate = document.getElementById('startDate').value;
-            const eDate = document.getElementById('endDate').value;
-
-            if (sDate && eDate && sDate > eDate) {
-                alert("⚠️ 종료 배송일자는 시작 배송일자보다 이전 일자일 수 없습니다.");
-                document.getElementById('endDate').value = sDate;
-                return false;
-            }
-            return true;
-        }
-
         async function fetchAllOrdersInChunksForRange(startDate, endDate) {
             let allData = [];
             let page = 0;
@@ -227,8 +214,6 @@
         }
 
         async function loadDashboardData() {
-            if (!validateDates()) return;
-
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
             if (!startDate || !endDate) return;
@@ -241,8 +226,10 @@
         }
 
         function initFilters() {
+            // 센터 필터
             const centerSelect = document.getElementById('centerFilter');
             const centers = new Set();
+            // 브랜드 & 품목 목록
             const brands = new Set();
             const items = new Map();
 
@@ -263,9 +250,11 @@
                 centerSelect.innerHTML += `<option value="${c}">${c}</option>`;
             });
 
+            // 브랜드 목록 생성
             selectedBrands = new Set(brands);
             renderBrandCheckboxes(Array.from(brands).sort());
 
+            // 품목 목록 생성
             selectedItems = new Set(items.keys());
             renderItemCheckboxes(Array.from(items.entries()).sort());
         }
@@ -307,7 +296,7 @@
             else btn.textContent = `🏢 브랜드 (${selectedBrands.size}개 선택)`;
         }
 
-        /* 📦 품목 선택 로직 */
+        /* 📦 품목 선택 로직 (개편) */
         function openItemModal() { itemModalObj.show(); }
         function renderItemCheckboxes(itemList) {
             const container = document.getElementById('itemContainer');
