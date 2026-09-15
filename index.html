@@ -122,7 +122,7 @@
         .search-list-item:hover { background-color: #eff6ff; }
         .search-list-item label { cursor: pointer; width: 100%; display: flex; align-items: center; gap: 8px; }
 
-        .dashboard-layout { display: grid; grid-template-columns: 300px 1fr; gap: 20px; }
+        .dashboard-layout { display: grid; grid-template-columns: 300px 1fr; gap: 20px; align-items: start; }
         .panel { background: white; padding: 20px; border-radius: 12px; }
         .panel-title {
             font-size: 18px; font-weight: 700; margin-bottom: 15px; border-bottom: 2px solid #f1f5f9;
@@ -142,7 +142,8 @@
         .store-item:hover, .store-item.active { background-color: #eff6ff; border-color: #2563eb; font-weight: bold; }
         .store-item.total-item { background-color: #f8fafc; font-weight: 700; }
 
-        .table-container { width: 100%; overflow-x: auto; max-height: 550px; overflow-y: auto; }
+        /* 📐 스크롤바 조절: 고정 높이 제거하고 선택된 건수에 맞춰 높이가 자동으로 늘어남 */
+        .table-container { width: 100%; overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #e2e8f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
         th { background-color: #f8fafc; color: #475569; cursor: pointer; position: sticky; top: 0; z-index: 2; }
@@ -162,7 +163,8 @@
         }
         .page-btn.active { background-color: #2563eb; color: white; border-color: #2563eb; }
         .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .page-info { font-size: 13px; color: #64748b; font-weight: 600; }
+        .page-info { font-size: 13px; color: #64748b; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+        .page-input { width: 50px; text-align: center; padding: 4px 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; font-weight: bold; }
         .rows-per-page-selector {
             display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #475569;
         }
@@ -173,7 +175,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v11.0 Paginated Engine</span>
+            <span class="version-tag">v12.0 Ultra Auto-Fit</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -350,14 +352,14 @@
                     </table>
                 </div>
 
-                <!-- 📄 [페이지네이션 및 건수 선택 컨트롤 바] -->
+                <!-- 📄 [개선된 페이지네이션] 페이지 입력 기능 추가 및 10개선택 시 높이 자동 맞춤 -->
                 <div class="pagination-container">
                     <div class="rows-per-page-selector">
                         <label>페이지당 보기:</label>
                         <select id="rows-per-page" class="input-box" onchange="changeRowsPerPage()">
-                            <option value="10">10개씩</option>
+                            <option value="10" selected>10개씩</option>
                             <option value="50">50개씩</option>
-                            <option value="100" selected>100개씩</option>
+                            <option value="100">100개씩</option>
                             <option value="1000">1000개씩</option>
                         </select>
                     </div>
@@ -365,7 +367,13 @@
                     <div class="pagination-controls">
                         <button class="page-btn" id="btn-first-page" onclick="goToPage(1)">« 처음</button>
                         <button class="page-btn" id="btn-prev-page" onclick="goToPage(currentPage - 1)">‹ 이전</button>
-                        <span class="page-info" id="page-info-text">1 / 1 페이지</span>
+                        
+                        <div class="page-info">
+                            <input type="number" id="page-input-box" class="page-input" value="1" min="1" onkeydown="if(event.key==='Enter') handlePageInput(this.value)" onblur="handlePageInput(this.value)">
+                            <span>/ <b id="total-page-text">1</b> 페이지</span>
+                            <span style="font-weight:normal; color:#94a3b8; font-size:11px;" id="total-rows-text">(총 0건)</span>
+                        </div>
+
                         <button class="page-btn" id="btn-next-page" onclick="goToPage(currentPage + 1)">다음 ›</button>
                         <button class="page-btn" id="btn-last-page" onclick="goToPage(totalPages)">끝 »</button>
                     </div>
@@ -393,12 +401,12 @@
         let allBrandList = [], allItemList = [];
         let activeBrandTarget = 'chart';
 
-        /* 📄 페이지네이션 상태 변수 */
+        /* 📄 페이지네이션 상태 변수 (기본 10개씩 선택) */
         let currentPage = 1;
-        let rowsPerPage = 100;
+        let rowsPerPage = 10;
         let totalPages = 1;
 
-        /* 💾 IndexedDB 브라우저 캐시 Engine */
+        /* 💾 IndexedDB 캐시 */
         const DB_NAME = "OmsLocalCacheDB";
         const STORE_NAME = "query_cache";
 
@@ -563,13 +571,9 @@
             closeBrandModal();
         }
 
+        /* 🔧 [버그 수정 완료] 브랜드 선택 시 점포 수 요약 뷰 필터링 보정 */
         function onDetailBrandChange(selectedBrands) {
-            if (!selectedBrands || selectedBrands.length === 0) {
-                filteredDetailOrders = rawDetailOrders;
-            } else {
-                filteredDetailOrders = rawDetailOrders.filter(r => selectedBrands.includes(r.brand_name));
-            }
-            updateStoreListAndSummary();
+            updateStoreListAndSummary(selectedBrands);
         }
 
         /* 📦 품목 모달 */
@@ -828,20 +832,33 @@
             } catch(e) {}
         }
 
-        function updateStoreListAndSummary() {
-            const stores = [...new Set(storeSummaryList.map(r => r.store_name))].filter(Boolean);
+        /* 🔧 [브랜드 필터 동작 수정] 점포 리스트 및 요약 보정 */
+        function updateStoreListAndSummary(selectedBrandsFilter = null) {
+            let activeList = storeSummaryList;
+            
+            if (selectedBrandsFilter && selectedBrandsFilter.length > 0) {
+                activeList = storeSummaryList.filter(r => selectedBrandsFilter.includes(r.brand_name));
+            } else {
+                const detailBrandVal = document.getElementById('detail-brand-input').value.trim();
+                if (detailBrandVal) {
+                    const bList = detailBrandVal.split(',').map(s => s.trim()).filter(Boolean);
+                    if (bList.length > 0) activeList = storeSummaryList.filter(r => bList.includes(r.brand_name));
+                }
+            }
+
+            const stores = [...new Set(activeList.map(r => r.store_name))].filter(Boolean);
             document.getElementById('brand-store-count').innerText = stores.length;
             document.getElementById('brand-item-count').innerText = '-';
 
             const storeListEl = document.getElementById('store-list');
-            const totalCount = storeSummaryList.reduce((sum, r) => sum + cleanNumber(r.order_count), 0);
+            const totalCount = activeList.reduce((sum, r) => sum + cleanNumber(r.order_count), 0);
 
             let listItemsHtml = [`<li class="store-item total-item active" onclick="onStoreSelect('ALL', this)">
                 <span>🏢 전체 점포 합산</span><span style="color:#2563eb;">${totalCount}건</span>
             </li>`];
 
             stores.forEach(store => {
-                const sData = storeSummaryList.filter(r => r.store_name === store);
+                const sData = activeList.filter(r => r.store_name === store);
                 const count = sData.reduce((sum, r) => sum + cleanNumber(r.order_count), 0);
                 listItemsHtml.push(`<li class="store-item" onclick="onStoreSelect('${store}', this)">
                     <span>${store}</span><span style="color:#64748b;">${count}건</span>
@@ -891,11 +908,11 @@
                 return true;
             });
 
-            currentPage = 1; // 필터 적용 시 1페이지로 이동
+            currentPage = 1; 
             renderDetailTable();
         }
 
-        /* 📄 [페이지네이션 렌더링 엔진] 사용자가 선택한 건수만큼 끊어서 화면 조율 */
+        /* 📄 [동적 높이 조절 & 페이지 이동 입력 엔진] */
         function renderDetailTable() {
             const tbody = document.getElementById('order-detail-table');
 
@@ -907,7 +924,6 @@
                 return;
             }
 
-            // 전체 합계 계산 (전체 검색 필터링 건 기준)
             let sumQty = 0, sumAmount = 0;
             currentDetailOrders.forEach(row => {
                 const q = cleanNumber(row.qty), p = cleanNumber(row.price);
@@ -917,13 +933,11 @@
             document.getElementById('list-total-qty').innerText = sumQty.toLocaleString();
             document.getElementById('list-total-amount').innerText = sumAmount.toLocaleString();
 
-            // 페이지 수 계산
             const totalItems = currentDetailOrders.length;
             totalPages = Math.ceil(totalItems / rowsPerPage) || 1;
             if (currentPage > totalPages) currentPage = totalPages;
             if (currentPage < 1) currentPage = 1;
 
-            // 현재 페이지의 데이터 슬라이싱 (성능 극대화 핵심)
             const startIndex = (currentPage - 1) * rowsPerPage;
             const pageData = currentDetailOrders.slice(startIndex, startIndex + rowsPerPage);
 
@@ -950,22 +964,33 @@
             updatePaginationUI(totalItems);
         }
 
-        /* 📄 페이지네이션 컨트롤 UI 업데이트 */
+        /* 📄 컨트롤 UI 조율 및 페이지 직접 입력 로직 */
         function updatePaginationUI(totalItems) {
-            document.getElementById('page-info-text').innerText = `${currentPage} / ${totalPages} 페이지 (총 ${totalItems.toLocaleString()}건)`;
-            
+            document.getElementById('page-input-box').value = currentPage;
+            document.getElementById('total-page-text').innerText = totalPages;
+            document.getElementById('total-rows-text').innerText = `(총 ${totalItems.toLocaleString()}건)`;
+
             document.getElementById('btn-first-page').disabled = (currentPage === 1);
             document.getElementById('btn-prev-page').disabled = (currentPage === 1);
             document.getElementById('btn-next-page').disabled = (currentPage === totalPages || totalPages === 0);
             document.getElementById('btn-last-page').disabled = (currentPage === totalPages || totalPages === 0);
         }
 
+        /* 🔢 숫자를 직접 넣고 이동하는 이벤트 핸들러 */
+        function handlePageInput(val) {
+            let page = parseInt(val, 10);
+            if (isNaN(page)) page = 1;
+            if (page < 1) page = 1;
+            if (page > totalPages) page = totalPages;
+            
+            currentPage = page;
+            renderDetailTable();
+        }
+
         function goToPage(page) {
             if (page < 1 || page > totalPages) return;
             currentPage = page;
             renderDetailTable();
-            // 테이블 최상단으로 스크롤 이동
-            document.querySelector('.table-container').scrollTop = 0;
         }
 
         function changeRowsPerPage() {
@@ -1027,7 +1052,7 @@
                 });
 
                 if (res.ok) {
-                    alert(`✅ [${targetDateVal}] OMS 데이터 동기화 요청 완료! (약 35초 후 캐시 갱신 및 자동으로 그려집니다.)`);
+                    alert(`✅ [${targetDateVal}] OMS 데이터 동기화 요청 완료!`);
                     setTimeout(async () => { 
                         try {
                             const db = await openIndexedDB();
