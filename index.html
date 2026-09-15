@@ -173,7 +173,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v20.0 Schema Corrected</span>
+            <span class="version-tag">v21.0 Fallback Safe Engine</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -809,7 +809,7 @@
             } catch (err) {}
         }
 
-        /* 🔧 [버그 수정 완료] distribution_center 컬럼명으로 400 에러 해결 */
+        /* 🛡️ 400 에러 호환 안전 구문 적용 (select절의 유효 기본 컬럼 수신 후 center_name 유연 매핑) */
         async function fetchAllOrdersInChunksForRange(startDate, endDate) {
             const currentToken = activeFetchToken;
             let offset = 0;
@@ -822,15 +822,14 @@
             while (hasMore) {
                 if (currentToken !== activeFetchToken) return;
 
-                // distribution_center 컬럼으로 안전하게 수신
-                const chunkUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_code,store_name,distribution_center,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc&limit=${limit}&offset=${offset}`;
+                // 400 에러를 완전 우회하는 표준 쿼리
+                const chunkUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc&limit=${limit}&offset=${offset}`;
                 try {
                     const res = await fetchWithUltraCache(chunkUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                     if (res.ok) {
                         const chunk = await res.json();
                         
-                        // distribution_center 값을 center_name 속성으로 호환 보정
-                        chunk.forEach(r => { r.center_name = r.distribution_center || r.center_name || '-'; });
+                        chunk.forEach(r => { r.center_name = r.center_name || r.distribution_center || '-'; });
 
                         rawDetailOrders = rawDetailOrders.concat(chunk);
                         filteredDetailOrders = rawDetailOrders;
@@ -866,13 +865,13 @@
         async function fetchStoreDetailOrders(storeName) {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
-            const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&store_name=eq.${encodeURIComponent(storeName)}&select=store_code,store_name,distribution_center,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name`;
+            const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&store_name=eq.${encodeURIComponent(storeName)}&select=store_code,store_name,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name`;
 
             try {
                 const res = await fetchWithUltraCache(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                 if (res.ok) {
                     const data = await res.json();
-                    data.forEach(r => { r.center_name = r.distribution_center || r.center_name || '-'; });
+                    data.forEach(r => { r.center_name = r.center_name || r.distribution_center || '-'; });
                     baseDetailOrders = data;
                     applyColumnFilters();
                 }
