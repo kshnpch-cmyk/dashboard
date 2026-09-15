@@ -77,6 +77,21 @@
         .item-row-header { display: flex; justify-content: space-between; font-weight: 700; color: #0f172a; }
         .item-row-sub { display: flex; justify-content: space-between; color: #64748b; font-size: 11px; }
 
+        /* 📱 모바일 전용 페이지네이션 컨트롤 스타일 */
+        .m-pagination-box {
+            background: white; border-radius: 12px; padding: 12px; margin-top: 10px; margin-bottom: 15px;
+            border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .m-pagination-top { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 700; color: #475569; }
+        .m-pagination-btns { display: flex; justify-content: space-between; gap: 6px; }
+        .m-page-btn {
+            flex: 1; padding: 9px 0; font-size: 12px; font-weight: bold; background-color: #f8fafc;
+            border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; text-align: center; cursor: pointer;
+        }
+        .m-page-btn:active { background-color: #e2e8f0; }
+        .m-page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
         .bottom-sheet-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(15, 23, 42, 0.6); z-index: 999; justify-content: flex-end; flex-direction: column;
@@ -106,7 +121,7 @@
     <div class="m-navbar">
         <div class="m-brand">
             <span>📱 더본 OMS 모바일</span>
-            <span class="m-version">v6.0 Ultra Action</span>
+            <span class="m-version">v7.0 Paginated Engine</span>
         </div>
         <button class="btn-m btn-dark" style="width: auto; padding: 6px 10px; font-size: 11px;" onclick="openCalendarModal()">📅 캘린더</button>
     </div>
@@ -182,13 +197,35 @@
             </div>
             
             <div style="display: flex; gap: 6px; margin-top: 8px;">
-                <!-- ⚡ 모바일 입력 렉 제거: Enter 키 조작 또는 검색 버튼 시 검색 수행 -->
                 <input type="text" id="store-search-input" class="m-input" placeholder="🔍 점포명/품목명 입력 후 Enter" onkeydown="if(event.key==='Enter') filterCards()">
                 <button class="btn-m btn-blue" style="width: 70px;" onclick="filterCards()">검색</button>
             </div>
         </div>
 
+        <!-- 📦 모바일 카드 리스트 표출 영역 -->
         <div id="store-card-list-container"></div>
+
+        <!-- 📄 모바일 전용 페이지네이션 컨트롤 바 -->
+        <div class="m-pagination-box" id="mobile-pagination-container" style="display: none;">
+            <div class="m-pagination-top">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <label>보기:</label>
+                    <select id="m-rows-per-page" class="m-input" style="padding: 4px 8px; width: auto; font-size: 12px;" onchange="changeMobileRowsPerPage()">
+                        <option value="10">10개씩</option>
+                        <option value="50">50개씩</option>
+                        <option value="100" selected>100개씩</option>
+                        <option value="1000">1000개씩</option>
+                    </select>
+                </div>
+                <span id="m-page-info-text">1 / 1 페이지</span>
+            </div>
+            <div class="m-pagination-btns">
+                <button class="m-page-btn" id="m-btn-first" onclick="goToMobilePage(1)">« 처음</button>
+                <button class="m-page-btn" id="m-btn-prev" onclick="goToMobilePage(mCurrentPage - 1)">‹ 이전</button>
+                <button class="m-page-btn" id="m-btn-next" onclick="goToMobilePage(mCurrentPage + 1)">다음 ›</button>
+                <button class="m-page-btn" id="m-btn-last" onclick="goToMobilePage(mTotalPages)">끝 »</button>
+            </div>
+        </div>
 
     </div>
 
@@ -217,7 +254,7 @@
                 <span style="cursor: pointer; padding: 4px;" onclick="closeBrandModal()">✕</span>
             </div>
             <div style="display: flex; gap: 8px; margin-top: 10px;">
-                <input type="text" id="modal-brand-search" class="m-input" placeholder="브랜드명 검색 (Enter 키를 누르세요)" onkeydown="if(event.key==='Enter') renderBrandModalList()">
+                <input type="text" id="modal-brand-search" class="m-input" placeholder="브랜드명 검색 (Enter)" onkeydown="if(event.key==='Enter') renderBrandModalList()">
                 <button class="btn-m btn-blue" style="width: 70px;" onclick="renderBrandModalList()">검색</button>
                 <button class="btn-m btn-dark" style="width: 60px;" onclick="toggleAllBrandCheck(true)">전체</button>
                 <button class="btn-m btn-dark" style="width: 60px;" onclick="toggleAllBrandCheck(false)">해제</button>
@@ -241,6 +278,12 @@
         let rawDetailOrders = [], filteredDetailOrders = [], storeSummaryList = [];
         let trendChart = null, allBrandList = [];
         let activeBrandTarget = 'chart';
+
+        /* 📱 모바일 전용 페이지네이션 상태 변수 */
+        let mCurrentPage = 1;
+        let mRowsPerPage = 100;
+        let mTotalPages = 1;
+        let activeFullOrders = []; // 현재 검색/필터링된 전체 품목 리스트
 
         /* 💾 모바일 IndexedDB 로컬 캐시 */
         const DB_NAME = "OmsLocalCacheDB_Mobile";
@@ -466,7 +509,7 @@
             } else {
                 filteredDetailOrders = rawDetailOrders.filter(r => selectedBrands.includes(r.brand_name));
             }
-            renderStoreCardList(filteredDetailOrders);
+            renderStoreCardListFromSummary();
         }
 
         async function fetchChartData() {
@@ -582,6 +625,8 @@
 
         function renderStoreCardListFromSummary() {
             const container = document.getElementById('store-card-list-container');
+            document.getElementById('mobile-pagination-container').style.display = 'none'; // 요약보기 상태에선 페이지네이션 숨김
+
             if (!storeSummaryList || storeSummaryList.length === 0) {
                 container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">데이터가 없습니다.</div>';
                 return;
@@ -598,7 +643,7 @@
                         <span class="badge-cnt">${totalQty.toLocaleString()}개 / ${totalAmt.toLocaleString()}원 ▼</span>
                     </div>
                     <div class="item-detail-list open" id="store-card-body-total">
-                        <div style="text-align:center; color:#2563eb; padding:10px;">⚡ 데이터 수신 및 초고속 렌더링 완료</div>
+                        <div style="text-align:center; color:#2563eb; padding:10px;">⚡ 초고속 데이터 렌더링 준비 완료 (검색 시 즉시 분할 표출)</div>
                     </div>
                 </div>
             `;
@@ -651,7 +696,7 @@
             }
         }
 
-        /* ⚡ 모바일 카드 검색 실행 함수 */
+        /* 📱 모바일 검색 및 페이지네이션 결합 엔진 */
         function filterCards() {
             const query = document.getElementById('store-search-input').value.toLowerCase().trim();
             if (!query) {
@@ -659,7 +704,7 @@
                 return;
             }
 
-            const searchedOrders = filteredDetailOrders.filter(row => {
+            activeFullOrders = filteredDetailOrders.filter(row => {
                 const sCode = cleanCode(row.store_code).toLowerCase();
                 const sName = String(row.store_name||'').toLowerCase();
                 const oDate = formatDisplayDate(row.order_date).toLowerCase();
@@ -670,20 +715,35 @@
                 return sCode.includes(query) || sName.includes(query) || oDate.includes(query) || dDate.includes(query) || iCode.includes(query) || iName.includes(query);
             });
 
-            renderStoreCardListFull(searchedOrders);
+            mCurrentPage = 1;
+            renderPaginatedMobileList();
         }
 
-        function renderStoreCardListFull(orders) {
+        /* 📱 모바일 분할 렌더링 함수 */
+        function renderPaginatedMobileList() {
             const container = document.getElementById('store-card-list-container');
-            if (!orders || orders.length === 0) {
+            const pagContainer = document.getElementById('mobile-pagination-container');
+
+            if (!activeFullOrders || activeFullOrders.length === 0) {
                 container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">데이터가 없습니다.</div>';
+                pagContainer.style.display = 'none';
                 return;
             }
 
-            const totalQty = orders.reduce((sum, r) => sum + cleanNumber(r.qty), 0);
-            const totalAmt = orders.reduce((sum, r) => sum + (cleanNumber(r.total_amount) || (cleanNumber(r.qty)*cleanNumber(r.price))), 0);
+            pagContainer.style.display = 'flex';
 
-            const totalItemsHtml = orders.map(o => `
+            const totalItems = activeFullOrders.length;
+            mTotalPages = Math.ceil(totalItems / mRowsPerPage) || 1;
+            if (mCurrentPage > mTotalPages) mCurrentPage = mTotalPages;
+            if (mCurrentPage < 1) mCurrentPage = 1;
+
+            const startIndex = (mCurrentPage - 1) * mRowsPerPage;
+            const pageData = activeFullOrders.slice(startIndex, startIndex + mRowsPerPage);
+
+            const totalQty = activeFullOrders.reduce((sum, r) => sum + cleanNumber(r.qty), 0);
+            const totalAmt = activeFullOrders.reduce((sum, r) => sum + (cleanNumber(r.total_amount) || (cleanNumber(r.qty)*cleanNumber(r.price))), 0);
+
+            const itemsHtml = pageData.map(o => `
                 <div class="item-row">
                     <div class="item-row-header">
                         <span>[${o.store_name||'-'}] ${o.item_name || '-'}</span>
@@ -702,16 +762,39 @@
             let html = `
                 <div class="store-card">
                     <div class="store-card-header total-header" onclick="toggleStoreCard('total')">
-                        <span>🏢 전체점포 합산 상세 (${orders.length}건)</span>
+                        <span>🏢 검색 상세 결과 (${totalItems.toLocaleString()}건)</span>
                         <span class="badge-cnt">${totalQty.toLocaleString()}개 / ${totalAmt.toLocaleString()}원 ▼</span>
                     </div>
                     <div class="item-detail-list open" id="store-card-body-total">
-                        ${totalItemsHtml}
+                        ${itemsHtml}
                     </div>
                 </div>
             `;
 
             container.innerHTML = html;
+            updateMobilePaginationUI(totalItems);
+        }
+
+        function updateMobilePaginationUI(totalItems) {
+            document.getElementById('m-page-info-text').innerText = `${mCurrentPage} / ${mTotalPages} 페이지 (총 ${totalItems.toLocaleString()}건)`;
+            
+            document.getElementById('m-btn-first').disabled = (mCurrentPage === 1);
+            document.getElementById('m-btn-prev').disabled = (mCurrentPage === 1);
+            document.getElementById('m-btn-next').disabled = (mCurrentPage === mTotalPages || mTotalPages === 0);
+            document.getElementById('m-btn-last').disabled = (mCurrentPage === mTotalPages || mTotalPages === 0);
+        }
+
+        function goToMobilePage(page) {
+            if (page < 1 || page > mTotalPages) return;
+            mCurrentPage = page;
+            renderPaginatedMobileList();
+            window.scrollTo({ top: 300, behavior: 'smooth' });
+        }
+
+        function changeMobileRowsPerPage() {
+            mRowsPerPage = parseInt(document.getElementById('m-rows-per-page').value, 10);
+            mCurrentPage = 1;
+            renderPaginatedMobileList();
         }
 
         function toggleStoreCard(idx) {
