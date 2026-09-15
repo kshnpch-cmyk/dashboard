@@ -2,171 +2,80 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <!-- 🚀 모바일 기기 화면에 맞게 100% 가변 자동 확장 처리 -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>더본 OMS 주문 실시간 대시보드</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Theborn OMS 데이터 대시보드</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        :root {
-            --primary-color: #0d6efd;
-            --bg-color: #f4f6f9;
-        }
-
-        html, body {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            overflow-x: hidden; /* 모바일 좌우 잘림 및 전체 스크롤 방지 */
-            background-color: var(--bg-color);
-            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
-        }
-
-        /* 메인 컨테이너 모바일 100% 대응 */
-        .app-container {
-            width: 100% !important;
-            max-width: 100% !important;
-            padding: 12px;
-            box-sizing: border-box;
-        }
-
-        /* 카드 및 컨테이너 가변 반응형 */
-        .custom-card {
-            background: #ffffff;
-            border-radius: 10px;
-            border: none;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
-            margin-bottom: 12px;
-            padding: 14px;
-            width: 100%;
-            box-sizing: border-box;
-        }
-
-        /* 요약 집계 카드 */
-        .summary-value {
-            font-size: 1.4rem;
-            font-weight: 700;
-        }
-
-        /* 테이블 스크롤 최적화 */
-        .table-responsive {
-            width: 100% !important;
-            overflow-x: auto !important;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        .table th, .table td {
-            white-space: nowrap;
-            vertical-align: middle;
-            font-size: 13px;
-        }
-
-        .badge-center {
-            background-color: #e8f5e9;
-            color: #2e7d32;
-            font-weight: 600;
-            padding: 4px 8px;
-            border-radius: 4px;
-        }
-
-        /* 📱 모바일 디스플레이 전용 반응형 레이아웃 (화면 너비 768px 이하) */
-        @media (max-width: 768px) {
-            .app-container {
-                padding: 8px !important;
-            }
-
-            .summary-value {
-                font-size: 1.1rem !important;
-            }
-
-            /* 폼 엘리먼트 세로 1열 강제 확장 */
-            .mobile-col-12 {
-                width: 100% !important;
-                flex: 0 0 100% !important;
-                max-width: 100% !important;
-                margin-bottom: 6px;
-            }
-
-            .btn-mobile {
-                width: 100% !important;
-                margin-top: 4px;
-            }
-
-            .table th, .table td {
-                font-size: 11px !important;
-                padding: 6px 4px !important;
-            }
-        }
+        body { background-color: #f8f9fa; font-family: 'Pretendard', sans-serif; }
+        .card { border-radius: 12px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .table-container { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .badge-center { background-color: #e3f2fd; color: #0d6efd; font-weight: 600; padding: 6px 10px; border-radius: 6px; }
     </style>
 </head>
 <body>
+    <div class="container-fluid py-4">
+        <h2 class="fw-bold mb-4">📦 Theborn OMS 주문 데이터 대시보드</h2>
 
-    <div class="app-container">
-        <!-- 1. 헤더 영역 -->
-        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap">
-            <h5 class="fw-bold m-0 py-1">📊 더본 OMS 주문 실시간 대시보드</h5>
-            <span class="badge bg-success">v22.0 Fully Synchronized</span>
-        </div>
-
-        <!-- 2. 필터 영역 -->
-        <div class="custom-card">
-            <div class="row g-2 align-items-end">
-                <div class="col-md-3 col-6 mobile-col-12">
-                    <label class="form-label small fw-bold text-secondary mb-1">시작 배송일자</label>
-                    <input type="date" id="startDate" class="form-control form-control-sm">
+        <!-- 검색 필터 -->
+        <div class="card p-3 mb-4">
+            <div class="row g-3 align-items-center">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">시작 배송일자</label>
+                    <input type="date" id="startDate" class="form-control">
                 </div>
-                <div class="col-md-3 col-6 mobile-col-12">
-                    <label class="form-label small fw-bold text-secondary mb-1">종료 배송일자</label>
-                    <input type="date" id="endDate" class="form-control form-control-sm">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">종료 배송일자</label>
+                    <input type="date" id="endDate" class="form-control">
                 </div>
-                <div class="col-md-3 col-12 mobile-col-12">
-                    <label class="form-label small fw-bold text-secondary mb-1">물류센터</label>
-                    <select id="centerFilter" class="form-select form-select-sm">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">물류센터 필터</label>
+                    <select id="centerFilter" class="form-select">
                         <option value="">전체 물류센터</option>
                     </select>
                 </div>
-                <div class="col-md-3 col-12 mobile-col-12 d-flex gap-1">
-                    <button class="btn btn-primary btn-sm btn-mobile fw-bold flex-fill" onclick="loadDashboardData()">조회</button>
+                <div class="col-md-3 d-flex align-items-end gap-2">
+                    <button id="btnSearch" class="btn btn-primary w-100 fw-bold" onclick="loadDashboardData()">조회</button>
+                    <button id="btnSync" class="btn btn-outline-success w-50 fw-bold" onclick="triggerBot()">동기화</button>
                 </div>
             </div>
         </div>
 
-        <!-- 3. 핵심 요약 카드 (상단 3종) -->
-        <div class="row g-2 mb-2">
-            <div class="col-md-4 col-4">
-                <div class="custom-card text-center p-2 mb-0">
-                    <div class="text-secondary small">총 주문건수</div>
-                    <div id="totalCount" class="summary-value text-dark">0건</div>
+        <!-- 요약 집계 카드 -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="card p-3 text-center">
+                    <div class="text-secondary mb-1">총 주문 건수</div>
+                    <h3 id="totalCount" class="fw-bold text-dark">0건</h3>
                 </div>
             </div>
-            <div class="col-md-4 col-4">
-                <div class="custom-card text-center p-2 mb-0">
-                    <div class="text-secondary small">총 주문수량</div>
-                    <div id="totalQty" class="summary-value text-primary">0개</div>
+            <div class="col-md-4">
+                <div class="card p-3 text-center">
+                    <div class="text-secondary mb-1">총 주문 수량</div>
+                    <h3 id="totalQty" class="fw-bold text-primary">0개</h3>
                 </div>
             </div>
-            <div class="col-md-4 col-4">
-                <div class="custom-card text-center p-2 mb-0">
-                    <div class="text-secondary small">총 주문금액</div>
-                    <div id="totalAmount" class="summary-value text-success">0원</div>
+            <div class="col-md-4">
+                <div class="card p-3 text-center">
+                    <div class="text-secondary mb-1">총 주문 금액</div>
+                    <h3 id="totalAmount" class="fw-bold text-success">0원</h3>
                 </div>
             </div>
         </div>
 
-        <!-- 4. 데이터 테이블 영역 -->
-        <div class="custom-card p-0 overflow-hidden">
+        <!-- 주문 데이터 테이블 -->
+        <div class="table-container">
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
                         <tr>
                             <th>배송일자</th>
                             <th>브랜드</th>
-                            <th>점포명(코드)</th>
-                            <th class="text-center">센터명</th>
+                            <th>점포명 (코드)</th>
+                            <th class="text-center">물류센터</th>
                             <th>품목명</th>
                             <th class="text-end">수량</th>
                             <th class="text-end">단가</th>
-                            <th class="text-end">금액</th>
+                            <th class="text-end">총 금액</th>
                         </tr>
                     </thead>
                     <tbody id="orderTableBody">
@@ -192,7 +101,7 @@
             loadDashboardData();
         };
 
-        // 🚀 Supabase DB 조회 (distribution_center 컬럼 명시)
+        // 🚀 Supabase API 호출 (distribution_center 컬럼 명시 포함)
         async function fetchAllOrdersInChunksForRange(startDate, endDate) {
             let allData = [];
             let page = 0;
@@ -203,6 +112,7 @@
             const eDate = endDate.replace(/\//g, '-');
 
             while (hasMore) {
+                // select 쿼리에 distribution_center 명시
                 const selectCols = "order_date,delivery_date,store_code,store_name,brand_name,distribution_center,item_code,item_name,qty,price,total_amount";
                 const url = `${SUPABASE_URL}/rest/v1/oms_orders?select=${selectCols}&delivery_date=gte.${sDate}&delivery_date=lte.${eDate}&order=delivery_date.desc`;
 
@@ -237,7 +147,7 @@
             const endDate = document.getElementById('endDate').value;
 
             if (!startDate || !endDate) {
-                alert("조회 날짜를 선택하세요.");
+                alert("조회 날짜를 지정하세요.");
                 return;
             }
 
@@ -302,14 +212,14 @@
                     totalQty += qty;
                     totalAmount += amount;
 
-                    // 💡 DB 컬럼명 불일치 방지 및 Fallback 처리
+                    // 💡 DB 컬럼명 바인딩 및 Fallback 처리
                     const centerName = (row.distribution_center || row.center_name || row.center || '').trim() || '-';
 
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td>${row.delivery_date || '-'}</td>
                         <td>${row.brand_name || '-'}</td>
-                        <td><strong>${row.store_name || '-'}</strong> <span class="text-muted small">(${row.store_code || ''})</span></td>
+                        <td><strong>${row.store_name || '-'}</strong> <span class="text-muted font-monospace">(${row.store_code || ''})</span></td>
                         <td class="text-center"><span class="badge-center">${centerName}</span></td>
                         <td>${row.item_name || '-'}</td>
                         <td class="text-end fw-bold">${qty.toLocaleString()}</td>
@@ -323,6 +233,10 @@
             document.getElementById('totalCount').textContent = `${dataList.length.toLocaleString()}건`;
             document.getElementById('totalQty').textContent = `${totalQty.toLocaleString()}개`;
             document.getElementById('totalAmount').textContent = `${totalAmount.toLocaleString()}원`;
+        }
+
+        function triggerBot() {
+            alert("동기화 요청이 트리거되었습니다.");
         }
     </script>
 </body>
