@@ -26,9 +26,6 @@ logging.basicConfig(
     datefmt='%H:%M:%S'
 )
 
-# ---------------------------------------------------------------------------
-# Environment Variables & Configuration
-# ---------------------------------------------------------------------------
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://zbilhsgfgyfrolveaego.supabase.co")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
@@ -38,9 +35,6 @@ OMS_ORDER_LIST_URL = "https://oms.theborn.co.kr/order/orderList.do"
 USER_ID = os.environ.get("OMS_USER_ID", "")
 USER_PW = os.environ.get("OMS_USER_PW", "")
 
-# ---------------------------------------------------------------------------
-# Helper Functions
-# ---------------------------------------------------------------------------
 def clean_int(val):
     if not val or pd.isna(val):
         return 0
@@ -68,9 +62,6 @@ def get_chrome_driver():
     driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
 
-# ---------------------------------------------------------------------------
-# Supabase Operations via REST API
-# ---------------------------------------------------------------------------
 def upsert_to_supabase(table_name, records, batch_size=500):
     if not records:
         logging.info(f"[{table_name}] 업서트할 데이터가 없습니다.")
@@ -117,9 +108,6 @@ def refresh_materialized_views():
         except Exception as e:
             logging.error(f"❌ 구체화 뷰 갱신 통신 오류 ({view_rpc}): {e}")
 
-# ---------------------------------------------------------------------------
-# Main Scraping Logic
-# ---------------------------------------------------------------------------
 def run_capture(target_start_date, target_end_date):
     driver = None
     try:
@@ -140,34 +128,68 @@ def run_capture(target_start_date, target_end_date):
         pw_input.send_keys(USER_PW)
         pw_input.send_keys(Keys.RETURN)
 
-        time.sleep(3)
-        logging.info("✅ OMS 로그인 완료")
+        time.sleep(5) # 로그인 후 페이지 안정화 대기
+        logging.info("✅ OMS 로그인 성공 및 세션 확보")
 
         # 2. 주문 내역 페이지 이동
         driver.get(OMS_ORDER_LIST_URL)
-        time.sleep(3)
-
-        # 3. 날짜 설정 및 검색
-        start_date_elem = wait.until(EC.presence_of_element_located((By.ID, "startDate")))
-        end_date_elem = driver.find_element(By.ID, "endDate")
-
-        driver.execute_script("arguments[0].value = arguments[1];", start_date_elem, target_start_date)
-        driver.execute_script("arguments[0].value = arguments[1];", end_date_elem, target_end_date)
-
-        search_btn = driver.find_element(By.CSS_SELECTOR, "button.btn-search, button#btnSearch, input[type='button'][value='조회']")
-        search_btn.click()
         time.sleep(5)
 
-        # 4. 엑셀 다운로드 및 데이터 파싱 (센터명 매핑 포함)
+        # 🚀 iframe 존재 여부 확인 및 전환
+        iframes = driver.find_elements(By.TAG_NAME, "iframe")
+        if iframes:
+            logging.info(f"🔍 iframe {len(iframes)}개 감지 - 첫 번째 프레임으로 전환")
+            driver.switch_to.frame(0)
+
+        # 3. 날짜 입력 유연한 탐색 (ID, Name, Class 대응)
+        start_date_elem = None
+        for selector in ["startDate", "sDate", "searchStartDate", "start_date"]:
+            try:
+                start_date_elem = driver.find_element(By.ID, selector)
+                if start_date_elem: break
+            except: pass
+
+        if not start_date_elem:
+            try:
+                start_date_elem = driver.find_element(By.CSS_SELECTOR, "input[type='text']")
+            except: pass
+
+        if start_date_elem:
+            logging.info("📅 날짜 입력 필드 정상 포착 완료")
+            end_date_elem = None
+            for selector in ["endDate", "eDate", "searchEndDate", "end_date"]:
+                try:
+                    end_date_elem = driver.find_element(By.ID, selector)
+                    if end_date_elem: break
+                except: pass
+
+            driver.execute_script("arguments[0].value = arguments[1];", start_date_elem, target_start_date)
+            if end_date_elem:
+                driver.execute_script("arguments[0].value = arguments[1];", end_date_elem, target_end_date)
+
+            # 검색 버튼 유연 탐색
+            search_btn = None
+            for btn_sel in ["button.btn-search", "button#btnSearch", "input[type='button'][value='조회']", "a.btn-search"]:
+                try:
+                    search_btn = driver.find_element(By.CSS_SELECTOR, btn_sel)
+                    if search_btn: break
+                except: pass
+
+            if search_btn:
+                search_btn.click()
+                time.sleep(6)
+
+        # 4. 엑셀 다운로드 및 데이터 파싱
         excel_btn = None
-        try:
-            excel_btn = driver.find_element(By.CSS_SELECTOR, "button.btn-excel, a.btn-excel, #btnExcel")
-        except Exception:
-            pass
+        for ex_sel in ["button.btn-excel", "a.btn-excel", "#btnExcel", "input[value='엑셀']"]:
+            try:
+                excel_btn = driver.find_element(By.CSS_SELECTOR, ex_sel)
+                if excel_btn: break
+            except: pass
 
         records = []
         if excel_btn:
-            logging.info("📥 엑셀 다운로드 버튼 감지 - 파일 수집 시도")
+            logging.info("📥 엑셀 다운로드 수행")
             excel_btn.click()
             time.sleep(8)
             
@@ -178,7 +200,6 @@ def run_capture(target_start_date, target_end_date):
                 df = pd.read_excel(latest_file)
                 
                 for _, row in df.iterrows():
-                    # 💡 센터명(물류센터/배송센터/센터명) 컬럼 안전 매핑
                     center_val = clean_str(row.get("distribution_center") or row.get("물류센터") or row.get("배송센터") or row.get("센터명"))
                     records.append({
                         "store_code": clean_str(row.get("점포코드")),
@@ -197,8 +218,8 @@ def run_capture(target_start_date, target_end_date):
                 os.remove(latest_file)
 
         if not records:
-            logging.info("📄 화면 테이블 DOM 수동 스크래핑 수행")
-            rows = driver.find_elements(By.CSS_SELECTOR, "table.tb-list tbody tr")
+            logging.info("📄 테이블 스크래핑 시도")
+            rows = driver.find_elements(By.CSS_SELECTOR, "table tbody tr")
             for r in rows:
                 cols = r.find_elements(By.TAG_NAME, "td")
                 if len(cols) >= 8:
@@ -217,19 +238,18 @@ def run_capture(target_start_date, target_end_date):
                         "created_at": datetime.now().isoformat()
                     })
 
-        logging.info(f"📦 총 {len(records)}건 데이터 추출 성공")
+        logging.info(f"📦 총 {len(records)}건 데이터 추출 완료")
 
-        # 5. Supabase 업서트 및 구체화 뷰 리프레시
         if records:
             upsert_to_supabase("oms_orders", records)
             time.sleep(2)
             refresh_materialized_views()
-            logging.info("✨ 모든 수집 및 뷰 동기화 프로세스 완료!")
+            logging.info("✨ 모든 프로세스가 성공적으로 마무리되었습니다.")
         else:
-            logging.warning("⚠️ 수집된 데이터가 없습니다.")
+            logging.warning("⚠️ 수집된 데이터가 존재하지 않습니다.")
 
     except Exception as e:
-        logging.error(f"❌ 크롤링 중 오류 발생: {e}", exc_info=True)
+        logging.error(f"❌ 크롤링 오류: {e}", exc_info=True)
         sys.exit(1)
     finally:
         if driver:
