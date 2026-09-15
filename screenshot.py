@@ -21,23 +21,24 @@ from webdriver_manager.chrome import ChromeDriverManager
 # ---------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
-    format='[%(asctime)s] %(levelname)s - %(message)s',
-    datefmt='%H:%M:%S'
+    format='[%(asctime)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
 )
 
 # ---------------------------------------------------------------------------
-# Environment Variables
+# Environment Variables (성공 YML 비밀키 호환)
 # ---------------------------------------------------------------------------
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://zbilhsgfgyfrolveaego.supabase.co")
-SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+# 💡 YML의 SUPABASE_SECRET_KEY 또는 기본 파블리싱 키 수신
+SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN")
 
 OMS_LOGIN_URL = "https://oms.theborn.co.kr/login.do"
 OMS_ORDER_LIST_URL = "https://oms.theborn.co.kr/order/orderList.do"
 
-# 🔑 Secrets 매핑 변수
+# OMS 계정 정보
+OMS_COMPANY_CODE = os.environ.get("OMS_COMPANY_CODE", "")
 OMS_ID = os.environ.get("OMS_ID", "")
 OMS_PW = os.environ.get("OMS_PW", "")
-OMS_COMPANY_CODE = os.environ.get("OMS_COMPANY_CODE", "")
 
 # ---------------------------------------------------------------------------
 # Helper Functions
@@ -79,66 +80,70 @@ def get_chrome_driver():
     return driver
 
 # ---------------------------------------------------------------------------
-# Supabase Operations
+# Supabase Operations (기존 레코드 선-삭제 ➔ 1000건 단위 재업로드)
 # ---------------------------------------------------------------------------
-def upsert_to_supabase(table_name, records, batch_size=500):
+def delete_existing_range(start_date_hyphen, end_date_hyphen):
+    headers = {
+        "apikey": SUPABASE_SECRET_KEY,
+        "Authorization": f"Bearer {SUPABASE_SECRET_KEY}"
+    }
+    delete_url = f"{SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.{start_date_hyphen}&delivery_date=lte.{end_date_hyphen}"
+    try:
+        logging.info(f"🧹 [선-삭제 실행] DB 기존 배송일자 범위 데이터 삭제 진행 ({start_date_hyphen} ~ {end_date_hyphen})...")
+        res = requests.delete(delete_url, headers=headers, timeout=30)
+        if res.status_code in [200, 204]:
+            logging.info(f"🗑️ 기존 데이터 삭제 성공 ({start_date_hyphen} ~ {end_date_hyphen})")
+        else:
+            logging.warning(f"⚠️ 기존 데이터 삭제 응답 ({res.status_code}): {res.text}")
+    except Exception as e:
+        logging.error(f"❌ 기존 데이터 삭제 중 오류: {e}")
+
+def sync_to_supabase(records, batch_size=1000):
     if not records:
-        logging.info(f"[{table_name}] 업서트할 데이터가 없습니다.")
         return
 
+    total = len(records)
     headers = {
-        "apikey": SUPABASE_SERVICE_ROLE_KEY,
-        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+        "apikey": SUPABASE_SECRET_KEY,
+        "Authorization": f"Bearer {SUPABASE_SECRET_KEY}",
         "Content-Type": "application/json",
         "Prefer": "resolution=merge-duplicates"
     }
 
-    url = f"{SUPABASE_URL}/rest/v1/{table_name}"
-    total = len(records)
-    logging.info(f"[{table_name}] 총 {total}건 업서트 시작 (Batch Size: {batch_size})")
+    url = f"{SUPABASE_URL}/rest/v1/oms_orders"
+    logging.info(f"🚀 Supabase 클라우드 DB 동기화를 시작합니다... (Target: oms_orders)")
 
     for i in range(0, total, batch_size):
         batch = records[i:i + batch_size]
         try:
-            res = requests.post(url, headers=headers, json=batch, timeout=30)
+            res = requests.post(url, headers=headers, json=batch, timeout=60)
+            current_count = min(i + batch_size, total)
             if res.status_code in [200, 201]:
-                logging.info(f"  - [{i + len(batch)}/{total}] 완료")
+                logging.info(f"✅ DB 동기화(새로 재업로드) 완료: {current_count} / {total} 건")
             else:
-                logging.error(f"  - [{i + len(batch)}/{total}] 실패 ({res.status_code}): {res.text}")
+                logging.error(f"❌ DB 동기화 실패 [{current_count}/{total}] ({res.status_code}): {res.text}")
         except Exception as e:
-            logging.error(f"  - [{i + len(batch)}/{total}] 통신 에러: {e}")
-
-def refresh_materialized_views():
-    headers = {
-        "apikey": SUPABASE_SERVICE_ROLE_KEY,
-        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    views = ["refresh_daily_summary", "refresh_store_summary"]
-    for view_rpc in views:
-        url = f"{SUPABASE_URL}/rest/v1/rpc/{view_rpc}"
-        try:
-            res = requests.post(url, headers=headers, json={}, timeout=60)
-            if res.status_code in [200, 204]:
-                logging.info(f"✅ 구체화 뷰 갱신 성공: {view_rpc}")
-            else:
-                logging.warning(f"⚠️ 구체화 뷰 갱신 응답 ({res.status_code}): {res.text}")
-        except Exception as e:
-            logging.error(f"❌ 구체화 뷰 갱신 통신 오류 ({view_rpc}): {e}")
+            logging.error(f"❌ 통신 중 오류 발생: {e}")
 
 # ---------------------------------------------------------------------------
-# Main Capture Execution
+# Main Scraping Logic
 # ---------------------------------------------------------------------------
-def run_capture(target_start_date, target_end_date):
+def run():
+    # 수신 인자 또는 환경변수 날짜 계산
+    start_date = os.environ.get("START_DATE") or (sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else datetime.now().strftime('%Y/%m/%d'))
+    end_date = os.environ.get("END_DATE") or (sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else start_date)
+
+    start_date = start_date.replace('-', '/')
+    end_date = end_date.replace('-', '/')
+
+    start_date_hyphen = start_date.replace('/', '-')
+    end_date_hyphen = end_date.replace('/', '-')
+
+    logging.info("OMS 자동 수집 시작")
+    logging.info(f"조회 지정 기간: {start_date} ~ {end_date}")
+
     driver = None
     try:
-        logging.info(f"🚀 OMS 크롤링 시작 [조회 기간: {target_start_date} ~ {target_end_date}]")
-        
-        if not OMS_ID or not OMS_PW:
-            logging.error("❌ OMS_ID 또는 OMS_PW 환경 변수가 설정되지 않았습니다! GitHub Secrets를 확인해 주세요.")
-            sys.exit(1)
-
         driver = get_chrome_driver()
         wait = WebDriverWait(driver, 20)
 
@@ -147,16 +152,14 @@ def run_capture(target_start_date, target_end_date):
         time.sleep(2)
 
         if OMS_COMPANY_CODE:
-            for comp_sel in ["companyCode", "compCode", "corpCode"]:
+            for c_id in ["companyCode", "compCode", "corpCode"]:
                 try:
-                    comp_input = driver.find_element(By.ID, comp_sel)
-                    if comp_input:
-                        comp_input.clear()
-                        comp_input.send_keys(OMS_COMPANY_CODE)
-                        logging.info("🏢 회사코드 입력 완료")
+                    c_elem = driver.find_element(By.ID, c_id)
+                    if c_elem:
+                        c_elem.clear()
+                        c_elem.send_keys(OMS_COMPANY_CODE)
                         break
-                except Exception:
-                    pass
+                except Exception: pass
 
         id_input = wait.until(EC.presence_of_element_located((By.ID, "userId")))
         pw_input = driver.find_element(By.ID, "userPw")
@@ -167,61 +170,45 @@ def run_capture(target_start_date, target_end_date):
         pw_input.send_keys(OMS_PW)
         pw_input.send_keys(Keys.RETURN)
 
-        time.sleep(5)
-        
+        time.sleep(4)
+
         try:
             alert = driver.switch_to.alert
-            logging.warning(f"⚠️ 로그인 알림창 감지: {alert.text}")
             alert.accept()
             time.sleep(2)
-        except Exception:
-            pass
+        except Exception: pass
 
-        logging.info("✅ OMS 로그인 완료")
-
-        # 2. 주문 내역 페이지 이동
+        # 2. 주문 목록 이동
         driver.get(OMS_ORDER_LIST_URL)
-        time.sleep(5)
+        time.sleep(4)
 
-        # iframe 존재 시 프레임 이동
         iframes = driver.find_elements(By.TAG_NAME, "iframe")
         if iframes:
-            logging.info(f"🔍 iframe {len(iframes)}개 감지 - 첫 번째 프레임 전환")
             driver.switch_to.frame(0)
 
-        # 3. 🎯 정확한 ID (BOR111_startDt / BOR111_endDt)로 날짜 값 인젝션
-        logging.info(f"📅 날짜 설정 수행 [시작: {target_start_date} / 종료: {target_end_date}]")
-        js_set_dates = """
-            var s = document.getElementById('BOR111_startDt');
-            var e = document.getElementById('BOR111_endDt');
-            if (s) { s.value = arguments[0]; s.dispatchEvent(new Event('change')); }
-            if (e) { e.value = arguments[1]; e.dispatchEvent(new Event('change')); }
-            
-            // 혹시 다른 보조 날짜 필드가 있을 경우 백업 설정
-            var s2 = document.getElementById('startDate') || document.getElementsByName('startDt')[0];
-            var e2 = document.getElementById('endDate') || document.getElementsByName('endDt')[0];
-            if (s2) s2.value = arguments[0];
-            if (e2) e2.value = arguments[1];
+        # 3. 날짜 설정 (BOR111_startDt / BOR111_endDt 우선 세팅)
+        js_script = """
+            var s = document.getElementById('BOR111_startDt') || document.getElementById('startDate') || document.getElementsByName('startDt')[0];
+            var e = document.getElementById('BOR111_endDt') || document.getElementById('endDate') || document.getElementsByName('endDt')[0];
+            if(s) { s.value = arguments[0]; s.dispatchEvent(new Event('change')); }
+            if(e) { e.value = arguments[1]; e.dispatchEvent(new Event('change')); }
         """
-        driver.execute_script(js_set_dates, target_start_date, target_end_date)
+        driver.execute_script(js_script, start_date, end_date)
         time.sleep(1)
 
-        # 조회 실행 (JS 함수 또는 버튼 클릭)
+        # 조회 실행
         try:
             driver.execute_script("if(typeof fn_search === 'function') { fn_search(); } else if(typeof doSearch === 'function') { doSearch(); }")
-        except Exception:
-            pass
+        except Exception: pass
 
-        search_btn = None
         for s_sel in ["button.btn-search", "button#btnSearch", "input[value='조회']", "a.btn-search", ".btn_search"]:
             try:
-                search_btn = driver.find_element(By.CSS_SELECTOR, s_sel)
-                if search_btn:
-                    search_btn.click()
+                btn = driver.find_element(By.CSS_SELECTOR, s_sel)
+                if btn:
+                    btn.click()
                     break
             except Exception: pass
 
-        logging.info("🔍 조회 실행 - 데이터 응답 대기 중...")
         time.sleep(6)
 
         # 4. 엑셀 다운로드
@@ -234,16 +221,17 @@ def run_capture(target_start_date, target_end_date):
 
         records = []
         if excel_btn:
-            logging.info("📥 엑셀 다운로드 버튼 클릭")
             excel_btn.click()
             time.sleep(8)
-            
+
             download_dir = os.getcwd()
             files = [os.path.join(download_dir, f) for f in os.listdir(download_dir) if f.endswith('.xlsx') or f.endswith('.xls')]
             if files:
                 latest_file = max(files, key=os.path.getctime)
                 df = pd.read_excel(latest_file)
-                
+
+                logging.info(f"📥 수신된 원본 데이터: {len(df):,}행")
+
                 for _, row in df.iterrows():
                     center_val = clean_str(row.get("distribution_center") or row.get("물류센터") or row.get("배송센터") or row.get("센터명"))
                     records.append({
@@ -263,49 +251,20 @@ def run_capture(target_start_date, target_end_date):
                 try: os.remove(latest_file)
                 except Exception: pass
 
-        if not records:
-            logging.info("📄 화면 테이블 DOM 스크래핑 백업 수행")
-            rows = driver.find_elements(By.CSS_SELECTOR, "table.tb-list tbody tr, table tbody tr")
-            for r in rows:
-                cols = r.find_elements(By.TAG_NAME, "td")
-                if len(cols) >= 8:
-                    records.append({
-                        "store_code": clean_str(cols[0].text),
-                        "store_name": clean_str(cols[1].text),
-                        "brand_name": clean_str(cols[2].text),
-                        "distribution_center": clean_str(cols[3].text),
-                        "order_date": clean_str(cols[4].text),
-                        "delivery_date": clean_str(cols[5].text),
-                        "item_code": clean_str(cols[6].text),
-                        "item_name": clean_str(cols[7].text),
-                        "qty": clean_int(cols[8].text) if len(cols) > 8 else 0,
-                        "price": clean_int(cols[9].text) if len(cols) > 9 else 0,
-                        "total_amount": clean_int(cols[10].text) if len(cols) > 10 else 0,
-                        "created_at": datetime.now().isoformat()
-                    })
-
-        logging.info(f"📦 총 {len(records)}건 데이터 추출 완료")
-
+        # 5. 기존 레코드 삭제 후 새로 43,000여 건 전량 업로드
         if records:
-            upsert_to_supabase("oms_orders", records)
-            time.sleep(2)
-            refresh_materialized_views()
-            logging.info("✨ 모든 수집 및 뷰 동기화 성공!")
+            delete_existing_range(start_date_hyphen, end_date_hyphen)
+            time.sleep(1)
+            sync_to_supabase(records)
         else:
-            logging.warning("⚠️ 수집된 데이터가 없습니다.")
+            logging.warning("⚠️ 수집된 원본 데이터가 0행입니다.")
 
     except Exception as e:
-        logging.error(f"❌ 크롤링 오류 발생: {e}", exc_info=True)
+        logging.error(f"❌ 실행 중 에러 발생: {e}", exc_info=True)
         sys.exit(1)
     finally:
         if driver:
             driver.quit()
 
 if __name__ == "__main__":
-    start_date = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else datetime.now().strftime('%Y/%m/%d')
-    end_date = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else start_date
-
-    start_date = start_date.replace('-', '/')
-    end_date = end_date.replace('-', '/')
-
-    run_capture(start_date, end_date)
+    run()
