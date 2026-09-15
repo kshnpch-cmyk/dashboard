@@ -77,20 +77,21 @@
         .item-row-header { display: flex; justify-content: space-between; font-weight: 700; color: #0f172a; }
         .item-row-sub { display: flex; justify-content: space-between; color: #64748b; font-size: 11px; }
 
-        /* 📱 모바일 전용 페이지네이션 컨트롤 스타일 */
+        /* 📱 모바일 전용 페이지네이션 컨트롤 스타일 (직접 숫자 입력 지원) */
         .m-pagination-box {
             background: white; border-radius: 12px; padding: 12px; margin-top: 10px; margin-bottom: 15px;
             border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
             display: flex; flex-direction: column; gap: 10px;
         }
         .m-pagination-top { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 700; color: #475569; }
-        .m-pagination-btns { display: flex; justify-content: space-between; gap: 6px; }
+        .m-pagination-btns { display: flex; justify-content: space-between; gap: 4px; }
         .m-page-btn {
-            flex: 1; padding: 9px 0; font-size: 12px; font-weight: bold; background-color: #f8fafc;
+            flex: 1; padding: 8px 0; font-size: 12px; font-weight: bold; background-color: #f8fafc;
             border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; text-align: center; cursor: pointer;
         }
         .m-page-btn:active { background-color: #e2e8f0; }
         .m-page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .m-page-input { width: 45px; text-align: center; padding: 3px 4px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; font-weight: bold; }
 
         .bottom-sheet-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -121,7 +122,7 @@
     <div class="m-navbar">
         <div class="m-brand">
             <span>📱 더본 OMS 모바일</span>
-            <span class="m-version">v7.0 Paginated Engine</span>
+            <span class="m-version">v8.0 Custom Input Page</span>
         </div>
         <button class="btn-m btn-dark" style="width: auto; padding: 6px 10px; font-size: 11px;" onclick="openCalendarModal()">📅 캘린더</button>
     </div>
@@ -211,13 +212,17 @@
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <label>보기:</label>
                     <select id="m-rows-per-page" class="m-input" style="padding: 4px 8px; width: auto; font-size: 12px;" onchange="changeMobileRowsPerPage()">
-                        <option value="10">10개씩</option>
+                        <option value="10" selected>10개씩</option>
                         <option value="50">50개씩</option>
-                        <option value="100" selected>100개씩</option>
+                        <option value="100">100개씩</option>
                         <option value="1000">1000개씩</option>
                     </select>
                 </div>
-                <span id="m-page-info-text">1 / 1 페이지</span>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <input type="number" id="m-page-input-box" class="m-page-input" value="1" min="1" onkeydown="if(event.key==='Enter') handleMobilePageInput(this.value)" onblur="handleMobilePageInput(this.value)">
+                    <span>/ <b id="m-total-page-text">1</b> 페이지</span>
+                    <span style="font-weight:normal; color:#94a3b8; font-size:11px;" id="m-total-rows-text">(총 0건)</span>
+                </div>
             </div>
             <div class="m-pagination-btns">
                 <button class="m-page-btn" id="m-btn-first" onclick="goToMobilePage(1)">« 처음</button>
@@ -279,11 +284,11 @@
         let trendChart = null, allBrandList = [];
         let activeBrandTarget = 'chart';
 
-        /* 📱 모바일 전용 페이지네이션 상태 변수 */
+        /* 📱 모바일 전용 페이지네이션 상태 변수 (기본 10개씩 선택) */
         let mCurrentPage = 1;
-        let mRowsPerPage = 100;
+        let mRowsPerPage = 10;
         let mTotalPages = 1;
-        let activeFullOrders = []; // 현재 검색/필터링된 전체 품목 리스트
+        let activeFullOrders = []; 
 
         /* 💾 모바일 IndexedDB 로컬 캐시 */
         const DB_NAME = "OmsLocalCacheDB_Mobile";
@@ -503,13 +508,9 @@
             closeBrandModal();
         }
 
+        /* 🔧 [모바일 브랜드 필터 동작 보정] */
         function onDetailBrandChange(selectedBrands) {
-            if (!selectedBrands || selectedBrands.length === 0) {
-                filteredDetailOrders = rawDetailOrders;
-            } else {
-                filteredDetailOrders = rawDetailOrders.filter(r => selectedBrands.includes(r.brand_name));
-            }
-            renderStoreCardListFromSummary();
+            renderStoreCardListFromSummary(selectedBrands);
         }
 
         async function fetchChartData() {
@@ -623,18 +624,30 @@
             }
         }
 
-        function renderStoreCardListFromSummary() {
+        /* 🔧 [모바일 브랜드 필터 조율 함수] */
+        function renderStoreCardListFromSummary(selectedBrandsFilter = null) {
             const container = document.getElementById('store-card-list-container');
-            document.getElementById('mobile-pagination-container').style.display = 'none'; // 요약보기 상태에선 페이지네이션 숨김
+            document.getElementById('mobile-pagination-container').style.display = 'none'; 
 
-            if (!storeSummaryList || storeSummaryList.length === 0) {
+            let activeList = storeSummaryList;
+            if (selectedBrandsFilter && selectedBrandsFilter.length > 0) {
+                activeList = storeSummaryList.filter(r => selectedBrandsFilter.includes(r.brand_name));
+            } else {
+                const detailBrandVal = document.getElementById('detail-brand-input').value.trim();
+                if (detailBrandVal) {
+                    const bList = detailBrandVal.split(',').map(s => s.trim()).filter(Boolean);
+                    if (bList.length > 0) activeList = storeSummaryList.filter(r => bList.includes(r.brand_name));
+                }
+            }
+
+            if (!activeList || activeList.length === 0) {
                 container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">데이터가 없습니다.</div>';
                 return;
             }
 
-            const totalQty = storeSummaryList.reduce((sum, r) => sum + cleanNumber(r.total_qty), 0);
-            const totalAmt = storeSummaryList.reduce((sum, r) => sum + cleanNumber(r.total_amount), 0);
-            const totalOrders = storeSummaryList.reduce((sum, r) => sum + cleanNumber(r.order_count), 0);
+            const totalQty = activeList.reduce((sum, r) => sum + cleanNumber(r.total_qty), 0);
+            const totalAmt = activeList.reduce((sum, r) => sum + cleanNumber(r.total_amount), 0);
+            const totalOrders = activeList.reduce((sum, r) => sum + cleanNumber(r.order_count), 0);
 
             let html = `
                 <div class="store-card">
@@ -643,12 +656,12 @@
                         <span class="badge-cnt">${totalQty.toLocaleString()}개 / ${totalAmt.toLocaleString()}원 ▼</span>
                     </div>
                     <div class="item-detail-list open" id="store-card-body-total">
-                        <div style="text-align:center; color:#2563eb; padding:10px;">⚡ 초고속 데이터 렌더링 준비 완료 (검색 시 즉시 분할 표출)</div>
+                        <div style="text-align:center; color:#2563eb; padding:10px;">⚡ 데이터 렌더링 준비 완료 (검색 시 분할 표출)</div>
                     </div>
                 </div>
             `;
 
-            storeSummaryList.forEach((s, idx) => {
+            activeList.forEach((s, idx) => {
                 html += `
                     <div class="store-card">
                         <div class="store-card-header" onclick="toggleAndLoadStoreCard('${s.store_name}', ${idx})">
@@ -775,13 +788,28 @@
             updateMobilePaginationUI(totalItems);
         }
 
+        /* 📱 모바일 UI 컨트롤 및 숫자 직접 입력 핸들링 */
         function updateMobilePaginationUI(totalItems) {
-            document.getElementById('m-page-info-text').innerText = `${mCurrentPage} / ${mTotalPages} 페이지 (총 ${totalItems.toLocaleString()}건)`;
-            
+            document.getElementById('m-page-input-box').value = mCurrentPage;
+            document.getElementById('m-total-page-text').innerText = mTotalPages;
+            document.getElementById('m-total-rows-text').innerText = `(총 ${totalItems.toLocaleString()}건)`;
+
             document.getElementById('m-btn-first').disabled = (mCurrentPage === 1);
             document.getElementById('m-btn-prev').disabled = (mCurrentPage === 1);
             document.getElementById('m-btn-next').disabled = (mCurrentPage === mTotalPages || mTotalPages === 0);
             document.getElementById('m-btn-last').disabled = (mCurrentPage === mTotalPages || mTotalPages === 0);
+        }
+
+        /* 🔢 숫자를 직접 입력해 특정 페이지로 이동하는 이벤트 */
+        function handleMobilePageInput(val) {
+            let page = parseInt(val, 10);
+            if (isNaN(page)) page = 1;
+            if (page < 1) page = 1;
+            if (page > mTotalPages) page = mTotalPages;
+            
+            mCurrentPage = page;
+            renderPaginatedMobileList();
+            window.scrollTo({ top: 300, behavior: 'smooth' });
         }
 
         function goToMobilePage(page) {
@@ -837,7 +865,7 @@
                 });
 
                 if (res.ok) {
-                    alert(`✅ [${targetVal}] 동기화 요청 완료! (약 35초 후 자동 갱신됩니다.)`);
+                    alert(`✅ [${targetVal}] 동기화 요청 완료!`);
                     setTimeout(async () => { 
                         try {
                             const db = await openIndexedDB();
