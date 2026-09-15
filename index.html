@@ -173,7 +173,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v14.0 Real-time % Loader</span>
+            <span class="version-tag">v15.0 Targeted Progress</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -267,18 +267,19 @@
                 </div>
             </div>
 
+            <!-- 1번 반영: 상단 KPI는 기존처럼 깔끔하게 숫자로 표시 -->
             <div class="kpi-grid" style="margin-top: 15px;">
                 <div class="kpi-card">
                     <div class="kpi-title">기간 내 총 주문수량</div>
-                    <div class="kpi-value" id="kpi-total-qty">⏳ 로딩중 (0%)</div>
+                    <div class="kpi-value" id="kpi-total-qty">0 건</div>
                 </div>
                 <div class="kpi-card green">
                     <div class="kpi-title">기간 내 취급 품목수</div>
-                    <div class="kpi-value" id="kpi-total-items">⏳ 로딩중 (0%)</div>
+                    <div class="kpi-value" id="kpi-total-items">0 종</div>
                 </div>
                 <div class="kpi-card purple">
                     <div class="kpi-title">기간 내 총 주문금액</div>
-                    <div class="kpi-value" id="kpi-total-amount">⏳ 로딩중 (0%)</div>
+                    <div class="kpi-value" id="kpi-total-amount">0 원</div>
                 </div>
             </div>
 
@@ -299,7 +300,7 @@
                     <button class="btn btn-query" onclick="filterStoreList()">검색</button>
                 </div>
                 <div id="brand-summary" style="margin-bottom: 10px; font-size: 12px; color: #64748b;">
-                    점포수: <b id="brand-store-count">⏳ 로딩중 (0%)</b> | 품목수: <b id="brand-item-count">-</b>
+                    점포수: <b id="brand-store-count">0개</b> | 품목수: <b id="brand-item-count">-</b>
                 </div>
                 <ul class="store-list" id="store-list"></ul>
             </div>
@@ -309,9 +310,9 @@
                     <span id="selected-store-title">🛒 기간 내 주문 상세</span>
                     <div class="summary-badge-group">
                         <button class="btn btn-excel" onclick="exportToExcel()">📥 엑셀 저장</button>
-                        <!-- 실시간 퍼센트 로더 바인딩 -->
-                        <span class="summary-badge">수량합계: <b id="list-total-qty">⏳ 로딩중 (0%)</b></span>
-                        <span class="summary-badge">금액합계: <b id="list-total-amount">⏳ 로딩중 (0%)</b></span>
+                        <!-- 2번 반영: 상세 수량/금액 수신 시에만 실시간 로딩 % 표출 -->
+                        <span class="summary-badge">수량합계: <b id="list-total-qty">0개</b></span>
+                        <span class="summary-badge">금액합계: <b id="list-total-amount">0원</b></span>
                     </div>
                 </div>
                 
@@ -676,19 +677,16 @@
             }
         }
 
-        /* 🚀 상단 기간 설정으로 차트 및 하단 상세 내역 통합 조회 */
+        /* 🚀 대시보드 종합 조회 */
         async function fetchAllDashboardData() {
-            updateLoadingPercent(0);
+            // 하단 수량/금액 뱃지만 0% 진행률로 초기화
+            updateBadgePercent(0);
             await Promise.all([fetchChartData(), fetchDetailDataForRange()]);
         }
 
-        /* ⚡ 실시간 % 퍼센트 로딩 가시기 */
-        function updateLoadingPercent(percent) {
+        /* ⚡ 2번 반영: 하단 상세 뱃지에만 실시간 % 로딩 표출 */
+        function updateBadgePercent(percent) {
             const pText = `⏳ 로딩중 (${percent}%)`;
-            document.getElementById('kpi-total-qty').innerText = pText;
-            document.getElementById('kpi-total-items').innerText = pText;
-            document.getElementById('kpi-total-amount').innerText = pText;
-            document.getElementById('brand-store-count').innerText = pText;
             document.getElementById('list-total-qty').innerText = pText;
             document.getElementById('list-total-amount').innerText = pText;
             document.getElementById('order-detail-table').innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#2563eb;">⚡ 데이터를 로딩 중입니다 (${percent}%)...</td></tr>`;
@@ -752,6 +750,7 @@
                 dailyMap[dateKey].amount += amt;
             });
 
+            /* 1번 반영: 상단 KPI는 깨끗하게 원래 수치 포맷으로 표시 */
             document.getElementById('kpi-total-qty').innerText = `${totalQty.toLocaleString()} 건`;
             document.getElementById('kpi-total-items').innerText = `${uniqueItems.size.toLocaleString()} 종`;
             document.getElementById('kpi-total-amount').innerText = `${totalAmount.toLocaleString()} 원`;
@@ -785,7 +784,7 @@
             });
         }
 
-        /* 🛒 기간 기반 하단 상세 내역 불러오기 (실시간 % 바인딩) */
+        /* 🛒 기간 기반 하단 상세 내역 불러오기 */
         async function fetchDetailDataForRange() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -810,7 +809,6 @@
             let hasMore = true;
             rawDetailOrders = [];
 
-            // 총 전체 예상 건수 파악용 헤더 호출
             let totalExpectedRows = 5000;
             try {
                 const headRes = await fetch(`${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=id`, {
@@ -832,9 +830,9 @@
                         rawDetailOrders = rawDetailOrders.concat(chunk);
                         filteredDetailOrders = rawDetailOrders;
 
-                        // ⚡ % 퍼센티지 실시간 업데이트 계산
+                        /* 2번 반영: 하단 배지에서만 % 진행률 표시 */
                         let currentPercent = Math.min(99, Math.round((rawDetailOrders.length / totalExpectedRows) * 100));
-                        updateLoadingPercent(currentPercent);
+                        updateBadgePercent(currentPercent);
 
                         const activeStore = document.querySelector('#store-list .active');
                         if (activeStore && activeStore.innerText.includes('전체 점포 합산')) {
@@ -844,7 +842,6 @@
 
                         if (chunk.length < limit) {
                             hasMore = false;
-                            updateLoadingPercent(100);
                         } else offset += limit;
                     } else { hasMore = false; }
                 } catch(e) { hasMore = false; }
@@ -968,6 +965,7 @@
                 sumAmount += (cleanNumber(row.total_amount) || (q * p));
             });
 
+            /* 완성 후 실제 합계 수치 정돈 표출 */
             document.getElementById('list-total-qty').innerText = `${sumQty.toLocaleString()}개`;
             document.getElementById('list-total-amount').innerText = `${sumAmount.toLocaleString()}원`;
 
