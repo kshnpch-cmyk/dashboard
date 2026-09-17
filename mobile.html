@@ -265,6 +265,9 @@
         const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co"; 
         const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN"; 
 
+        // 🌤️ 공공데이터포털 기상청 ASOS API 인증키
+        const KMA_SERVICE_KEY = "IRKAZhuS0MH4uNOeZqsYHKyxVKkjaI1zY8u53Wwq6QfLT9LgddbegGnyDnB7VfRJEFro7AC%2F%2BrmpWbaB31VgFg%3D%3D";
+
         const githubId = 'kshnpch-cmyk'; 
         const repoName = 'dashboard'; 
 
@@ -375,7 +378,7 @@
         }
 
         function cleanNumber(val) {
-            if (!val) return 0;
+            if (!val && val !== 0) return 0;
             return parseFloat(String(val).replace(/[^0-9.-]/g, '')) || 0;
         }
 
@@ -539,35 +542,43 @@
             renderStoreCardListFromSummary(selectedBrands);
         }
 
-        /* 🌤️ 대한민국(전국 대표) 일자별 기상 데이터 조회 함수 (Open-Meteo Open API) */
+        /* 🌤️ 공공데이터포털 기상청 ASOS API 연동 (서울/108 지점 기준) */
         async function fetchKoreaWeatherData(startDate, endDate) {
             try {
-                const url = `https://archive-api.open-meteo.com/v1/archive?latitude=37.5665&longitude=126.9780&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_sum,snowfall_sum&timezone=Asia%2FSeoul`;
+                const startStr = startDate.replace(/-/g, '');
+                const endStr = endDate.replace(/-/g, '');
                 
+                const url = `https://apis.data.go.kr/1360000/AsosDalyInfoService/getWthrDataList?serviceKey=${KMA_SERVICE_KEY}&pageNo=1&numOfRows=999&dataType=JSON&dataCd=ASOS&dateCd=DAY&startDt=${startStr}&endDt=${endStr}&stnIds=108`;
+
                 const res = await fetch(url);
                 if (!res.ok) return {};
-                const data = await res.json();
+                const resultData = await res.json();
                 
                 const weatherMap = {};
-                if (data && data.daily && data.daily.time) {
-                    data.daily.time.forEach((dateStr, idx) => {
-                        const formattedDate = dateStr.replace(/-/g, '/');
-                        const maxTemp = Math.round(data.daily.temperature_2m_max[idx]);
-                        const minTemp = Math.round(data.daily.temperature_2m_min[idx]);
-                        const wCode = data.daily.weather_code[idx];
-                        const precip = data.daily.precipitation_sum[idx] || 0;
-                        const snow = data.daily.snowfall_sum[idx] || 0;
+                const items = resultData?.response?.body?.items?.item;
+
+                if (items && Array.isArray(items)) {
+                    items.forEach(r => {
+                        const dateRaw = r.tm;
+                        if (!dateRaw) return;
+                        
+                        const formattedDate = dateRaw.replace(/-/g, '/');
+                        const minTemp = r.minTa !== "" && r.minTa !== undefined ? Math.round(parseFloat(r.minTa)) : '-';
+                        const maxTemp = r.maxTa !== "" && r.maxTa !== undefined ? Math.round(parseFloat(r.maxTa)) : '-';
+                        const sumRn = parseFloat(r.sumRn || 0);
+                        const ddMefs = parseFloat(r.ddMefs || 0);
+                        const avgTca = parseFloat(r.avgTca || 0);
 
                         let statusIcon = "☀️";
                         let statusText = "맑음";
 
-                        if (snow > 0 || [71, 73, 75, 77, 85, 86].includes(wCode)) {
+                        if (ddMefs > 0) {
                             statusIcon = "❄️";
                             statusText = "눈";
-                        } else if (precip > 0 || [51, 53, 55, 61, 63, 65, 80, 81, 82].includes(wCode)) {
+                        } else if (sumRn > 0) {
                             statusIcon = "🌧️";
                             statusText = "비";
-                        } else if ([1, 2, 3, 45, 48].includes(wCode)) {
+                        } else if (avgTca >= 6.0) {
                             statusIcon = "⛅";
                             statusText = "흐림";
                         }
@@ -583,7 +594,7 @@
                 }
                 return weatherMap;
             } catch (e) {
-                console.error("날씨 데이터 로드 오류:", e);
+                console.error("기상청 API 날씨 데이터 로드 오류:", e);
                 return {};
             }
         }
@@ -658,7 +669,7 @@
 
             const labelsWithWeather = labels.map(dateStr => {
                 const w = weatherMap[dateStr];
-                if (w) return [dateStr, w.displayLabel];
+                if (w && w.minTemp !== '-') return [dateStr, w.displayLabel];
                 return dateStr;
             });
 
@@ -685,7 +696,7 @@
                                 title: function(tooltipItems) {
                                     const rawLabel = labels[tooltipItems[0].dataIndex];
                                     const w = weatherMap[rawLabel];
-                                    if (w) {
+                                    if (w && w.minTemp !== '-') {
                                         return `📅 ${rawLabel} (${w.statusText} ${w.statusIcon} | 최저: ${w.minTemp}°C / 최고: ${w.maxTemp}°C)`;
                                     }
                                     return `📅 ${rawLabel}`;
