@@ -420,20 +420,24 @@
             const endDateStr = formatDate(new Date(year, month, 0));
 
             const grid = document.getElementById('calendar-grid');
-            grid.innerHTML = '<div style="grid-column: span 7; text-align:center; padding:20px; color:#2563eb;">⚡ 실시간 수량 집계 중...</div>';
+            grid.innerHTML = '<div style="grid-column: span 7; text-align:center; padding:20px; color:#2563eb;">⚡ 데이터 존재 현황 로딩 중...</div>';
 
-            const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date,qty`;
+            const queryUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date,total_qty`;
 
             let dateQtyMap = {}, availableDates = [];
             try {
                 const res = await fetch(queryUrl, {
-                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                    headers: { 
+                        'apikey': SUPABASE_ANON_KEY, 
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Cache-Control': 'no-cache'
+                    }
                 });
                 if (res.ok) {
                     const rows = await res.json();
                     rows.forEach(r => {
                         let dKey = formatDisplayDate(r.delivery_date).replace(/\//g, '-');
-                        let q = cleanNumber(r.qty);
+                        let q = cleanNumber(r.total_qty || r.order_count || r.qty);
                         dateQtyMap[dKey] = (dateQtyMap[dKey] || 0) + q;
                         if (q > 0) availableDates.push(dKey);
                     });
