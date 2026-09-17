@@ -1,57 +1,45 @@
-name: Run OMS Screenshot and Sync Bot
+name: OMS Order Capture Bot
 
 on:
   workflow_dispatch:
     inputs:
       start_date:
-        description: '시작일자 (YYYY/MM/DD)'
+        description: '시작일 (YYYY/MM/DD)'
         required: false
         default: ''
       end_date:
-        description: '종료일자 (YYYY/MM/DD)'
+        description: '종료일 (YYYY/MM/DD)'
         required: false
         default: ''
-  schedule:
-    - cron: '0 22 * * *'
+  repository_dispatch:
+    types: [trigger-oms-sync]
 
 jobs:
-  build:
+  capture-and-sync:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out repository
+      - name: 저장소 코드 체체크아웃
         uses: actions/checkout@v3
 
-      - name: Set up Python
+      - name: Python 환경 설정
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: Install dependencies & Selenium Chrome Driver
+      - name: 의존성 패키지 설치
         run: |
           python -m pip install --upgrade pip
-          pip install pandas requests openpyxl selenium
+          pip install playwright supabase requests pandas openpyxl
+          playwright install chromium
 
-      - name: Run Python Screenshot Bot
+      - name: OMS 크롤링 및 Supabase 동기화 실행
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-          OMS_COMPANY_CODE: ${{ secrets.OMS_COMPANY_CODE }}
-          OMS_ID: ${{ secrets.OMS_ID }}
-          OMS_PW: ${{ secrets.OMS_PW }}
-          START_DATE: ${{ github.event.inputs.start_date }}
-          END_DATE: ${{ github.event.inputs.end_date }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          THEBORN_OMS_ID: ${{ secrets.THEBORN_OMS_ID }}
+          THEBORN_OMS_PW: ${{ secrets.THEBORN_OMS_PW }}
+          INPUT_START_DATE: ${{ github.event.inputs.start_date || github.event.client_payload.start_date }}
+          INPUT_END_DATE: ${{ github.event.inputs.end_date || github.event.client_payload.end_date }}
         run: |
-          python -u screenshot.py
-
-      - name: Supabase 구체화 뷰(MATERIALIZED VIEW) 자동 갱신
-        run: |
-          curl -X POST "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/refresh_daily_summary" \
-            -H "apikey: ${{ secrets.SUPABASE_SECRET_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_SECRET_KEY }}"
-          
-          curl -X POST "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/refresh_store_summary" \
-            -H "apikey: ${{ secrets.SUPABASE_SECRET_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_SECRET_KEY }}"
-          
-          echo "✅ Supabase 구체화 뷰 리프레시 완료"
+          python main.py
