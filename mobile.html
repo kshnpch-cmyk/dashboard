@@ -147,7 +147,6 @@
             <div class="input-group">
                 <label>조회 기간</label>
                 <div style="display: flex; gap: 6px; align-items: center;">
-                    <!-- 🚀 모바일 날짜 선택 변경 즉시 제어 및 검증 -->
                     <input type="date" id="chart-start-date" class="m-input" onchange="validateMobileDates('start')">
                     <span>~</span>
                     <input type="date" id="chart-end-date" class="m-input" onchange="validateMobileDates('end')">
@@ -387,7 +386,6 @@
             return str || '-';
         }
 
-        /* 🚨 모바일 날짜 유효성 검증 함수 (종료일 < 시작일 방지, 동일날짜 허용) */
         function validateMobileDates(type) {
             const startDateEl = document.getElementById('chart-start-date');
             const endDateEl = document.getElementById('chart-end-date');
@@ -421,18 +419,22 @@
             const startDateStr = formatDate(new Date(year, month - 1, 1));
             const endDateStr = formatDate(new Date(year, month, 0));
 
-            const queryUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date,total_qty`;
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = '<div style="grid-column: span 7; text-align:center; padding:20px; color:#2563eb;">⚡ 실시간 수량 집계 중...</div>';
+
+            // 원본 oms_orders 테이블에서 수량을 직접 조회하여 오차 방지
+            const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date,qty`;
 
             let dateQtyMap = {}, availableDates = [];
             try {
-                const res = await fetchWithUltraCache(queryUrl, {
+                const res = await fetch(queryUrl, {
                     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
                 });
                 if (res.ok) {
                     const rows = await res.json();
                     rows.forEach(r => {
                         let dKey = formatDisplayDate(r.delivery_date).replace(/\//g, '-');
-                        let q = cleanNumber(r.total_qty);
+                        let q = cleanNumber(r.qty);
                         dateQtyMap[dKey] = (dateQtyMap[dKey] || 0) + q;
                         if (q > 0) availableDates.push(dKey);
                     });
