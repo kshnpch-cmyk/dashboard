@@ -55,7 +55,7 @@
         .kpi-mini-title { font-size: 12px; font-weight: 600; color: #64748b; }
         .kpi-mini-val { font-size: 17px; font-weight: 800; color: #0f172a; }
 
-        .chart-wrapper { position: relative; height: 210px; width: 100%; }
+        .chart-wrapper { position: relative; height: 230px; width: 100%; }
 
         .store-card {
             background: white; border-radius: 10px; border: 1px solid #e2e8f0;
@@ -422,7 +422,6 @@
             const grid = document.getElementById('calendar-grid');
             grid.innerHTML = '<div style="grid-column: span 7; text-align:center; padding:20px; color:#2563eb;">⚡ 실시간 수량 집계 중...</div>';
 
-            // 원본 oms_orders 테이블에서 수량을 직접 조회하여 오차 방지
             const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date,qty`;
 
             let dateQtyMap = {}, availableDates = [];
@@ -536,6 +535,55 @@
             renderStoreCardListFromSummary(selectedBrands);
         }
 
+        /* 🌤️ 대한민국(전국 대표) 일자별 기상 데이터 조회 함수 (Open-Meteo Open API) */
+        async function fetchKoreaWeatherData(startDate, endDate) {
+            try {
+                const url = `https://archive-api.open-meteo.com/v1/archive?latitude=37.5665&longitude=126.9780&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_sum,snowfall_sum&timezone=Asia%2FSeoul`;
+                
+                const res = await fetch(url);
+                if (!res.ok) return {};
+                const data = await res.json();
+                
+                const weatherMap = {};
+                if (data && data.daily && data.daily.time) {
+                    data.daily.time.forEach((dateStr, idx) => {
+                        const formattedDate = dateStr.replace(/-/g, '/');
+                        const maxTemp = Math.round(data.daily.temperature_2m_max[idx]);
+                        const minTemp = Math.round(data.daily.temperature_2m_min[idx]);
+                        const wCode = data.daily.weather_code[idx];
+                        const precip = data.daily.precipitation_sum[idx] || 0;
+                        const snow = data.daily.snowfall_sum[idx] || 0;
+
+                        let statusIcon = "☀️";
+                        let statusText = "맑음";
+
+                        if (snow > 0 || [71, 73, 75, 77, 85, 86].includes(wCode)) {
+                            statusIcon = "❄️";
+                            statusText = "눈";
+                        } else if (precip > 0 || [51, 53, 55, 61, 63, 65, 80, 81, 82].includes(wCode)) {
+                            statusIcon = "🌧️";
+                            statusText = "비";
+                        } else if ([1, 2, 3, 45, 48].includes(wCode)) {
+                            statusIcon = "⛅";
+                            statusText = "흐림";
+                        }
+
+                        weatherMap[formattedDate] = {
+                            minTemp,
+                            maxTemp,
+                            statusIcon,
+                            statusText,
+                            displayLabel: `${minTemp}°/${maxTemp}° ${statusIcon}`
+                        };
+                    });
+                }
+                return weatherMap;
+            } catch (e) {
+                console.error("날씨 데이터 로드 오류:", e);
+                return {};
+            }
+        }
+
         /* 🚀 모바일 통합 데이터 로드 */
         async function fetchAllDashboardData() {
             if (!validateMobileDates('start')) return;
@@ -572,7 +620,7 @@
             } catch (e) {}
         }
 
-        function renderChartAndKPI(data) {
+        async function renderChartAndKPI(data) {
             if (!data || !Array.isArray(data) || data.length === 0) {
                 document.getElementById('kpi-total-qty').innerText = "0 건";
                 document.getElementById('kpi-total-items').innerText = "0 종";
@@ -598,6 +646,18 @@
             document.getElementById('kpi-total-amount').innerText = `${amt.toLocaleString()} 원`;
 
             const labels = Object.keys(dailyMap).sort();
+            
+            // 🌤️ 모바일 날씨 데이터 연동
+            const startDate = document.getElementById('chart-start-date').value;
+            const endDate = document.getElementById('chart-end-date').value;
+            const weatherMap = await fetchKoreaWeatherData(startDate, endDate);
+
+            const labelsWithWeather = labels.map(dateStr => {
+                const w = weatherMap[dateStr];
+                if (w) return [dateStr, w.displayLabel];
+                return dateStr;
+            });
+
             const canvas = document.getElementById('dailyTrendChart');
             if (!canvas) return;
 
@@ -607,7 +667,7 @@
             trendChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: labels,
+                    labels: labelsWithWeather,
                     datasets: [
                         { label: '수량', data: labels.map(k => dailyMap[k].qty), backgroundColor: 'rgba(37, 99, 235, 0.6)', yAxisID: 'y1' },
                         { label: '금액', data: labels.map(k => dailyMap[k].amt), type: 'line', borderColor: '#8b5cf6', borderWidth: 2, yAxisID: 'y2' }
@@ -615,7 +675,22 @@
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                title: function(tooltipItems) {
+                                    const rawLabel = labels[tooltipItems[0].dataIndex];
+                                    const w = weatherMap[rawLabel];
+                                    if (w) {
+                                        return `📅 ${rawLabel} (${w.statusText} ${w.statusIcon} | 최저: ${w.minTemp}°C / 최고: ${w.maxTemp}°C)`;
+                                    }
+                                    return `📅 ${rawLabel}`;
+                                }
+                            }
+                        }
+                    },
                     scales: {
+                        x: { ticks: { font: { size: 10, weight: 'bold' } } },
                         y1: { type: 'linear', position: 'left', beginAtZero: true },
                         y2: { type: 'linear', position: 'right', beginAtZero: true, grid: { drawOnChartArea: false } }
                     }
