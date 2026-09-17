@@ -121,7 +121,7 @@
     <div class="m-navbar">
         <div class="m-brand">
             <span>📱 더본 OMS 모바일</span>
-            <span class="m-version">v18.0 Fully Synchronized</span>
+            <span class="m-version">v20.0 Fully Synchronized</span>
         </div>
         <button class="btn-m btn-dark" style="width: auto; padding: 6px 10px; font-size: 11px;" onclick="openCalendarModal()">📅 캘린더</button>
     </div>
@@ -265,7 +265,6 @@
         const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co"; 
         const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN"; 
 
-        // 🌤️ 공공데이터포털 기상청 ASOS API 인증키
         const KMA_SERVICE_KEY = "IRKAZhuS0MH4uNOeZqsYHKyxVKkjaI1zY8u53Wwq6QfLT9LgddbegGnyDnB7VfRJEFro7AC%2F%2BrmpWbaB31VgFg%3D%3D";
 
         const githubId = 'kshnpch-cmyk'; 
@@ -542,61 +541,106 @@
             renderStoreCardListFromSummary(selectedBrands);
         }
 
-        /* 🌤️ 공공데이터포털 기상청 ASOS API 연동 (서울/108 지점 기준) */
+        /* 🌤️ 이중 백업 기상 데이터 연동 함수 */
         async function fetchKoreaWeatherData(startDate, endDate) {
-            try {
-                const startStr = startDate.replace(/-/g, '');
-                const endStr = endDate.replace(/-/g, '');
-                
-                const url = `https://apis.data.go.kr/1360000/AsosDalyInfoService/getWthrDataList?serviceKey=${KMA_SERVICE_KEY}&pageNo=1&numOfRows=999&dataType=JSON&dataCd=ASOS&dateCd=DAY&startDt=${startStr}&endDt=${endStr}&stnIds=108`;
+            const weatherMap = {};
+            const startStr = startDate.replace(/-/g, '');
+            const endStr = endDate.replace(/-/g, '');
 
-                const res = await fetch(url);
-                if (!res.ok) return {};
-                const resultData = await res.json();
-                
-                const weatherMap = {};
-                const items = resultData?.response?.body?.items?.item;
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = formatDate(yesterday);
 
-                if (items && Array.isArray(items)) {
-                    items.forEach(r => {
-                        const dateRaw = r.tm;
-                        if (!dateRaw) return;
-                        
-                        const formattedDate = dateRaw.replace(/-/g, '/');
-                        const minTemp = r.minTa !== "" && r.minTa !== undefined ? Math.round(parseFloat(r.minTa)) : '-';
-                        const maxTemp = r.maxTa !== "" && r.maxTa !== undefined ? Math.round(parseFloat(r.maxTa)) : '-';
-                        const sumRn = parseFloat(r.sumRn || 0);
-                        const ddMefs = parseFloat(r.ddMefs || 0);
-                        const avgTca = parseFloat(r.avgTca || 0);
-
-                        let statusIcon = "☀️";
-                        let statusText = "맑음";
-
-                        if (ddMefs > 0) {
-                            statusIcon = "❄️";
-                            statusText = "눈";
-                        } else if (sumRn > 0) {
-                            statusIcon = "🌧️";
-                            statusText = "비";
-                        } else if (avgTca >= 6.0) {
-                            statusIcon = "⛅";
-                            statusText = "흐림";
-                        }
-
-                        weatherMap[formattedDate] = {
-                            minTemp,
-                            maxTemp,
-                            statusIcon,
-                            statusText,
-                            displayLabel: `${minTemp}°/${maxTemp}° ${statusIcon}`
-                        };
-                    });
-                }
-                return weatherMap;
-            } catch (e) {
-                console.error("기상청 API 날씨 데이터 로드 오류:", e);
-                return {};
+            let kmaEndDt = endDate;
+            if (kmaEndDt > yesterdayStr) {
+                kmaEndDt = yesterdayStr;
             }
+
+            if (startDate <= kmaEndDt) {
+                try {
+                    const startRaw = startDate.replace(/-/g, '');
+                    const endRaw = kmaEndDt.replace(/-/g, '');
+                    const decodedKey = decodeURIComponent(KMA_SERVICE_KEY);
+                    const url = `https://apis.data.go.kr/1360000/AsosDalyInfoService/getWthrDataList?serviceKey=${encodeURIComponent(decodedKey)}&pageNo=1&numOfRows=999&dataType=JSON&dataCd=ASOS&dateCd=DAY&startDt=${startRaw}&endDt=${endRaw}&stnIds=108`;
+
+                    const res = await fetch(url);
+                    if (res.ok) {
+                        const resultData = await res.json();
+                        const items = resultData?.response?.body?.items?.item;
+
+                        if (items && Array.isArray(items)) {
+                            items.forEach(r => {
+                                const dateRaw = r.tm;
+                                if (!dateRaw) return;
+                                
+                                const formattedDate = dateRaw.replace(/-/g, '/');
+                                const minTemp = r.minTa !== "" && r.minTa !== undefined ? Math.round(parseFloat(r.minTa)) : '-';
+                                const maxTemp = r.maxTa !== "" && r.maxTa !== undefined ? Math.round(parseFloat(r.maxTa)) : '-';
+                                const sumRn = parseFloat(r.sumRn || 0);
+                                const ddMefs = parseFloat(r.ddMefs || 0);
+                                const avgTca = parseFloat(r.avgTca || 0);
+
+                                let statusIcon = "☀️";
+                                let statusText = "맑음";
+
+                                if (ddMefs > 0) { statusIcon = "❄️"; statusText = "눈"; }
+                                else if (sumRn > 0) { statusIcon = "🌧️"; statusText = "비"; }
+                                else if (avgTca >= 6.0) { statusIcon = "⛅"; statusText = "흐림"; }
+
+                                weatherMap[formattedDate] = {
+                                    minTemp, maxTemp, statusIcon, statusText,
+                                    displayLabel: `${minTemp}°/${maxTemp}° ${statusIcon}`
+                                };
+                            });
+                        }
+                    }
+                } catch (e) {}
+            }
+
+            try {
+                const openMeteoUrl = `https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_sum,snowfall_sum&timezone=Asia%2FSeoul`;
+                let res = await fetch(openMeteoUrl);
+                if (!res.ok) {
+                    const archiveUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=37.5665&longitude=126.9780&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_sum,snowfall_sum&timezone=Asia%2FSeoul`;
+                    res = await fetch(archiveUrl);
+                }
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.daily && data.daily.time) {
+                        data.daily.time.forEach((dateStr, idx) => {
+                            const formattedDate = dateStr.replace(/-/g, '/');
+                            
+                            if (!weatherMap[formattedDate]) {
+                                const maxTempVal = data.daily.temperature_2m_max[idx];
+                                const minTempVal = data.daily.temperature_2m_min[idx];
+                                
+                                if (maxTempVal === null || maxTempVal === undefined || isNaN(maxTempVal)) return;
+
+                                const maxTemp = Math.round(maxTempVal);
+                                const minTemp = Math.round(minTempVal);
+                                const wCode = data.daily.weather_code[idx];
+                                const precip = data.daily.precipitation_sum[idx] || 0;
+                                const snow = data.daily.snowfall_sum[idx] || 0;
+
+                                let statusIcon = "☀️";
+                                let statusText = "맑음";
+
+                                if (snow > 0 || [71, 73, 75, 77, 85, 86].includes(wCode)) { statusIcon = "❄️"; statusText = "눈"; }
+                                else if (precip > 0 || [51, 53, 55, 61, 63, 65, 80, 81, 82].includes(wCode)) { statusIcon = "🌧️"; statusText = "비"; }
+                                else if ([1, 2, 3, 45, 48].includes(wCode)) { statusIcon = "⛅"; statusText = "흐림"; }
+
+                                weatherMap[formattedDate] = {
+                                    minTemp, maxTemp, statusIcon, statusText,
+                                    displayLabel: `${minTemp}°/${maxTemp}° ${statusIcon}`
+                                };
+                            }
+                        });
+                    }
+                }
+            } catch (e) {}
+
+            return weatherMap;
         }
 
         /* 🚀 모바일 통합 데이터 로드 */
