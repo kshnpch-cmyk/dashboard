@@ -173,7 +173,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 실시간 대시보드</h1>
-            <span class="version-tag">v22.0 Fully Synchronized</span>
+            <span class="version-tag">v25.0 Fully Synchronized</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -381,7 +381,6 @@
         const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co"; 
         const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN"; 
 
-        // 🌤️ 공공데이터포털 기상청 ASOS API 인증키
         const KMA_SERVICE_KEY = "IRKAZhuS0MH4uNOeZqsYHKyxVKkjaI1zY8u53Wwq6QfLT9LgddbegGnyDnB7VfRJEFro7AC%2F%2BrmpWbaB31VgFg%3D%3D";
 
         const githubId = 'kshnpch-cmyk'; 
@@ -730,61 +729,113 @@
             }
         }
 
-        /* 🌤️ 공공데이터포털 기상청 ASOS API 연동 (서울/108 지점 기준) */
+        /* 🌤️ 기상청 ASOS D-1 제약 조건 대응 + Open-Meteo 하이브리드 수신 함수 */
         async function fetchKoreaWeatherData(startDate, endDate) {
-            try {
-                const startStr = startDate.replace(/-/g, '');
-                const endStr = endDate.replace(/-/g, '');
-                
-                const url = `https://apis.data.go.kr/1360000/AsosDalyInfoService/getWthrDataList?serviceKey=${KMA_SERVICE_KEY}&pageNo=1&numOfRows=999&dataType=JSON&dataCd=ASOS&dateCd=DAY&startDt=${startStr}&endDt=${endStr}&stnIds=108`;
+            const weatherMap = {};
 
-                const res = await fetch(url);
-                if (!res.ok) return {};
-                const resultData = await res.json();
-                
-                const weatherMap = {};
-                const items = resultData?.response?.body?.items?.item;
+            // 어제(D-1) 날짜 계산
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = formatDate(yesterday);
 
-                if (items && Array.isArray(items)) {
-                    items.forEach(r => {
-                        const dateRaw = r.tm; // YYYY-MM-DD
-                        if (!dateRaw) return;
-                        
-                        const formattedDate = dateRaw.replace(/-/g, '/');
-                        const minTemp = r.minTa !== "" && r.minTa !== undefined ? Math.round(parseFloat(r.minTa)) : '-';
-                        const maxTemp = r.maxTa !== "" && r.maxTa !== undefined ? Math.round(parseFloat(r.maxTa)) : '-';
-                        const sumRn = parseFloat(r.sumRn || 0); // 강수량(mm)
-                        const ddMefs = parseFloat(r.ddMefs || 0); // 눈/적설(cm)
-                        const avgTca = parseFloat(r.avgTca || 0); // 평균 전운량(10분위)
-
-                        let statusIcon = "☀️";
-                        let statusText = "맑음";
-
-                        if (ddMefs > 0) {
-                            statusIcon = "❄️";
-                            statusText = "눈";
-                        } else if (sumRn > 0) {
-                            statusIcon = "🌧️";
-                            statusText = "비";
-                        } else if (avgTca >= 6.0) {
-                            statusIcon = "⛅";
-                            statusText = "흐림";
-                        }
-
-                        weatherMap[formattedDate] = {
-                            minTemp,
-                            maxTemp,
-                            statusIcon,
-                            statusText,
-                            displayLabel: `${minTemp}°/${maxTemp}° ${statusIcon}`
-                        };
-                    });
-                }
-                return weatherMap;
-            } catch (e) {
-                console.error("기상청 API 날씨 데이터 로드 오류:", e);
-                return {};
+            // 기상청 API용 endDt (조회 종료일이 어제보다 미래면 어제로 제한)
+            let kmaEndDt = endDate;
+            if (kmaEndDt > yesterdayStr) {
+                kmaEndDt = yesterdayStr;
             }
+
+            // 1. D-1 이전 과거 데이터: 기상청 공식 ASOS API 사용
+            if (startDate <= kmaEndDt) {
+                try {
+                    const startStr = startDate.replace(/-/g, '');
+                    const endStr = kmaEndDt.replace(/-/g, '');
+                    const decodedKey = decodeURIComponent(KMA_SERVICE_KEY);
+                    const url = `https://apis.data.go.kr/1360000/AsosDalyInfoService/getWthrDataList?serviceKey=${encodeURIComponent(decodedKey)}&pageNo=1&numOfRows=999&dataType=JSON&dataCd=ASOS&dateCd=DAY&startDt=${startStr}&endDt=${endStr}&stnIds=108`;
+
+                    const res = await fetch(url);
+                    if (res.ok) {
+                        const resultData = await res.json();
+                        const items = resultData?.response?.body?.items?.item;
+
+                        if (items && Array.isArray(items)) {
+                            items.forEach(r => {
+                                const dateRaw = r.tm;
+                                if (!dateRaw) return;
+                                
+                                const formattedDate = dateRaw.replace(/-/g, '/');
+                                const minTemp = r.minTa !== "" && r.minTa !== undefined ? Math.round(parseFloat(r.minTa)) : '-';
+                                const maxTemp = r.maxTa !== "" && r.maxTa !== undefined ? Math.round(parseFloat(r.maxTa)) : '-';
+                                const sumRn = parseFloat(r.sumRn || 0);
+                                const ddMefs = parseFloat(r.ddMefs || 0);
+                                const avgTca = parseFloat(r.avgTca || 0);
+
+                                let statusIcon = "☀️";
+                                let statusText = "맑음";
+
+                                if (ddMefs > 0) { statusIcon = "❄️"; statusText = "눈"; }
+                                else if (sumRn > 0) { statusIcon = "🌧️"; statusText = "비"; }
+                                else if (avgTca >= 6.0) { statusIcon = "⛅"; statusText = "흐림"; }
+
+                                weatherMap[formattedDate] = {
+                                    minTemp, maxTemp, statusIcon, statusText,
+                                    displayLabel: `${minTemp}°/${maxTemp}° ${statusIcon}`
+                                };
+                            });
+                        }
+                    }
+                } catch (e) {
+                    console.warn("기상청 API 오류, Open-Meteo 백업 사용");
+                }
+            }
+
+            // 2. 당일(D-0) 및 미래 날짜 또는 기상청 누락 데이터: Open-Meteo API 수신
+            try {
+                const openMeteoUrl = `https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_sum,snowfall_sum&timezone=Asia%2FSeoul`;
+                let res = await fetch(openMeteoUrl);
+                if (!res.ok) {
+                    const archiveUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=37.5665&longitude=126.9780&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_sum,snowfall_sum&timezone=Asia%2FSeoul`;
+                    res = await fetch(archiveUrl);
+                }
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.daily && data.daily.time) {
+                        data.daily.time.forEach((dateStr, idx) => {
+                            const formattedDate = dateStr.replace(/-/g, '/');
+                            
+                            // 기상청 데이터가 없을 때만 보충
+                            if (!weatherMap[formattedDate]) {
+                                const maxTempVal = data.daily.temperature_2m_max[idx];
+                                const minTempVal = data.daily.temperature_2m_min[idx];
+                                
+                                if (maxTempVal === null || maxTempVal === undefined || isNaN(maxTempVal)) return;
+
+                                const maxTemp = Math.round(maxTempVal);
+                                const minTemp = Math.round(minTempVal);
+                                const wCode = data.daily.weather_code[idx];
+                                const precip = data.daily.precipitation_sum[idx] || 0;
+                                const snow = data.daily.snowfall_sum[idx] || 0;
+
+                                let statusIcon = "☀️";
+                                let statusText = "맑음";
+
+                                if (snow > 0 || [71, 73, 75, 77, 85, 86].includes(wCode)) { statusIcon = "❄️"; statusText = "눈"; }
+                                else if (precip > 0 || [51, 53, 55, 61, 63, 65, 80, 81, 82].includes(wCode)) { statusIcon = "🌧️"; statusText = "비"; }
+                                else if ([1, 2, 3, 45, 48].includes(wCode)) { statusIcon = "⛅"; statusText = "흐림"; }
+
+                                weatherMap[formattedDate] = {
+                                    minTemp, maxTemp, statusIcon, statusText,
+                                    displayLabel: `${minTemp}°/${maxTemp}° ${statusIcon}`
+                                };
+                            }
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error("날씨 통합 API 로드 실패:", e);
+            }
+
+            return weatherMap;
         }
 
         /* 🚀 대시보드 종합 조회 */
@@ -843,7 +894,7 @@
             } catch (err) {}
         }
 
-        /* 📊 대시보드 차트 및 KPI 표출 (기상청 API 연동) */
+        /* 📊 대시보드 차트 및 KPI 표출 (날씨 연동) */
         async function renderChartAndKPI(data) {
             if (!data || !Array.isArray(data) || data.length === 0) {
                 document.getElementById('kpi-total-qty').innerText = "0 건";
@@ -880,7 +931,7 @@
             const qtyData = labels.map(k => dailyMap[k].qty);
             const amtData = labels.map(k => dailyMap[k].amount);
 
-            // 🌤️ 기상청 공공 API 날씨 데이터 수신
+            // 🌤️ 날씨 데이터 연동
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
             const weatherMap = await fetchKoreaWeatherData(startDate, endDate);
