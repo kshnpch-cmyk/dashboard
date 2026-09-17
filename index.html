@@ -224,7 +224,7 @@
         </div>
     </div>
 
-    <!-- 🔍 품목 다중 선택 모달 -->
+    <!-- 📦 품목 다중 선택 모달 -->
     <div class="modal-overlay" id="item-modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -254,7 +254,6 @@
                 <div class="filter-row" style="margin-bottom: 0; padding: 0; background: transparent; border: none;">
                     <div class="filter-group">
                         <label>조회 기간:</label>
-                        <!-- 🚀 onchange 이벤트로 날짜 선택 즉시 제어 및 검증 -->
                         <input type="date" id="chart-start-date" class="input-box" onchange="validateDates('start')">
                         <span>~</span>
                         <input type="date" id="chart-end-date" class="input-box" onchange="validateDates('end')">
@@ -506,7 +505,6 @@
             return str || '-';
         }
 
-        /* 🚨 날짜 유효성 검증 함수 (종료일 < 시작일 방지, 동일날짜 허용) */
         function validateDates(type) {
             const startDateEl = document.getElementById('chart-start-date');
             const endDateEl = document.getElementById('chart-end-date');
@@ -514,7 +512,6 @@
             const eDate = endDateEl.value;
 
             if (sDate && eDate) {
-                // 시작일에 따라 종료일의 선택 가능 min 범위 자동 설정
                 endDateEl.min = sDate;
 
                 if (sDate > eDate) {
@@ -653,7 +650,7 @@
             closeItemModal();
         }
 
-        /* 📅 캘린더 모달 */
+        /* 📅 캘린더 모달 (🚀 원본 DB 실시간 수량 집계 로직 적용) */
         function openCalendarModal() { document.getElementById('calendar-modal').style.display = 'flex'; loadCalendarData(); }
         function closeCalendarModal() { document.getElementById('calendar-modal').style.display = 'none'; }
 
@@ -664,18 +661,22 @@
             const startDateStr = formatDate(new Date(year, month - 1, 1));
             const endDateStr = formatDate(new Date(year, month, 0));
 
-            const queryUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date,total_qty`;
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = '<div style="grid-column: span 7; text-align:center; padding:20px; color:#2563eb;">⚡ 실시간 수량 집계 중...</div>';
+
+            // 원본 oms_orders 테이블에서 수량을 직접 로딩하여 수치 오차 및 캐시 지연 해결
+            const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDateStr}&delivery_date=lte.${endDateStr}&select=delivery_date,qty`;
 
             let dateQtyMap = {}, availableDates = [];
             try {
-                const res = await fetchWithUltraCache(queryUrl, {
+                const res = await fetch(queryUrl, {
                     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
                 });
                 if (res.ok) {
                     const rows = await res.json();
                     rows.forEach(r => {
                         let dKey = formatDisplayDate(r.delivery_date).replace(/\//g, '-');
-                        let q = cleanNumber(r.total_qty);
+                        let q = cleanNumber(r.qty);
                         dateQtyMap[dKey] = (dateQtyMap[dKey] || 0) + q;
                         if (q > 0) availableDates.push(dKey);
                     });
@@ -1130,7 +1131,6 @@
             document.getElementById('chart-start-date').value = initialStartDate;
             document.getElementById('chart-end-date').value = initialEndDate;
             
-            // 날짜 선택 범위 제어 바인딩
             validateDates('start');
 
             document.getElementById('sync-target-date').value = formatDate(today);
