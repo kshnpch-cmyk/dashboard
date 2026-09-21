@@ -76,8 +76,22 @@
             display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
             background-color: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 15px;
         }
-        .filter-group { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #475569; }
+        .filter-group { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #475569; position: relative; }
         .input-box { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none; }
+
+        /* 🔍 실시간 연관 검색어 드롭다운 스타일 */
+        .autocomplete-dropdown {
+            position: absolute; top: 100%; left: 0; width: 100%; max-height: 220px;
+            overflow-y: auto; background: #ffffff; border: 1px solid #cbd5e1;
+            border-radius: 6px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            z-index: 1000; display: none; margin-top: 4px;
+        }
+        .autocomplete-item {
+            padding: 8px 12px; font-size: 12.5px; cursor: pointer; border-bottom: 1px solid #f1f5f9;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .autocomplete-item:hover { background-color: #eff6ff; color: #2563eb; font-weight: bold; }
+        .autocomplete-item:last-child { border-bottom: none; }
 
         .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 15px; }
         .kpi-card { background: #f8fafc; padding: 15px 20px; border-radius: 8px; border-left: 5px solid #2563eb; }
@@ -260,15 +274,17 @@
                     </div>
                     <div class="filter-group">
                         <label>브랜드:</label>
-                        <!-- 🚀 브랜드 입력창 키보드 커서 및 타이핑 활성화 -->
-                        <input type="text" id="chart-brand-input" class="input-box" placeholder="브랜드 선택/검색" style="width: 140px;" oninput="safeSetStorage('cached_brand_input', this.value)">
+                        <!-- 🚀 브랜드 입력 및 실시간 연관 검색어 목록 연동 -->
+                        <input type="text" id="chart-brand-input" class="input-box" placeholder="브랜드 선택/검색" style="width: 140px;" oninput="handleBrandInput(this.value)" onfocus="handleBrandInput(this.value)">
                         <button class="btn-search-icon" onclick="openBrandModal('chart')" title="브랜드 다중 선택">🔍</button>
+                        <div id="brand-autocomplete-list" class="autocomplete-dropdown"></div>
                     </div>
                     <div class="filter-group">
                         <label>품목코드/명:</label>
-                        <!-- 🚀 품목 입력창 키보드 커서 및 타이핑 활성화 -->
-                        <input type="text" id="chart-item-input" class="input-box" placeholder="품목 선택/검색" style="width: 150px;" oninput="safeSetStorage('cached_item_input', this.value)">
+                        <!-- 🚀 품목 입력 및 실시간 연관 검색어 목록 연동 -->
+                        <input type="text" id="chart-item-input" class="input-box" placeholder="품목 선택/검색" style="width: 150px;" oninput="handleItemInput(this.value)" onfocus="handleItemInput(this.value)">
                         <button class="btn-search-icon" onclick="openItemModal()" title="품목 다중 선택 모달 열기">🔍</button>
+                        <div id="item-autocomplete-list" class="autocomplete-dropdown"></div>
                     </div>
                     <button class="btn btn-query" onclick="fetchAllDashboardData()">🔍 대시보드 종합 조회</button>
                 </div>
@@ -297,7 +313,7 @@
         <div class="dashboard-layout">
             <div class="panel">
                 <div class="panel-title"><span>🏢 브랜드 필터</span></div>
-                <div style="display: flex; gap: 4px; margin-bottom: 12px;">
+                <div style="display: flex; gap: 4px; margin-bottom: 12px; position: relative;">
                     <input type="text" id="detail-brand-input" class="input-box" style="flex:1;" placeholder="브랜드 선택..." oninput="safeSetStorage('cached_brand_input', this.value)">
                     <button class="btn-search-icon" onclick="openBrandModal('detail')">🔍</button>
                 </div>
@@ -531,24 +547,110 @@
             return true;
         }
 
+        /* 🚀 초기 데이터 데이터셋 로드 (자동완성 기능용) */
+        async function loadMasterLists() {
+            try {
+                const res = await fetchWithUltraCache(`${SUPABASE_URL}/rest/v1/daily_order_summary?select=brand_name,item_code,item_name`, {
+                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    
+                    // 브랜드 목록 수집
+                    allBrandList = [...new Set(data.map(r => r.brand_name))].filter(Boolean).sort();
+                    
+                    // 품목 목록 수집
+                    const map = new Map();
+                    data.forEach(r => {
+                        if (r.item_code || r.item_name) {
+                            map.set(`${cleanCode(r.item_code)}__${r.item_name}`, { code: cleanCode(r.item_code), name: r.item_name || '' });
+                        }
+                    });
+                    allItemList = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+                }
+            } catch (err) {}
+        }
+
+        /* 🔍 실시간 브랜드 자동완성 처리 */
+        function handleBrandInput(val) {
+            safeSetStorage('cached_brand_input', val);
+            const dropEl = document.getElementById('brand-autocomplete-list');
+            const keyword = val.toLowerCase().trim();
+
+            if (!keyword || allBrandList.length === 0) {
+                dropEl.style.display = 'none';
+                return;
+            }
+
+            const matched = allBrandList.filter(b => b.toLowerCase().includes(keyword)).slice(0, 8);
+            if (matched.length === 0) {
+                dropEl.style.display = 'none';
+                return;
+            }
+
+            dropEl.innerHTML = matched.map(b => `
+                <div class="autocomplete-item" onclick="selectAutocompleteBrand('${b}')">
+                    <span>${b}</span>
+                </div>
+            `).join('');
+            dropEl.style.display = 'block';
+        }
+
+        function selectAutocompleteBrand(brandName) {
+            document.getElementById('chart-brand-input').value = brandName;
+            safeSetStorage('cached_brand_input', brandName);
+            document.getElementById('brand-autocomplete-list').style.display = 'none';
+        }
+
+        /* 🔍 실시간 품목 자동완성 처리 */
+        function handleItemInput(val) {
+            safeSetStorage('cached_item_input', val);
+            const dropEl = document.getElementById('item-autocomplete-list');
+            const keyword = val.toLowerCase().trim();
+
+            if (!keyword || allItemList.length === 0) {
+                dropEl.style.display = 'none';
+                return;
+            }
+
+            const matched = allItemList.filter(i => i.code.toLowerCase().includes(keyword) || i.name.toLowerCase().includes(keyword)).slice(0, 8);
+            if (matched.length === 0) {
+                dropEl.style.display = 'none';
+                return;
+            }
+
+            dropEl.innerHTML = matched.map(i => `
+                <div class="autocomplete-item" onclick="selectAutocompleteItem('${i.name}')">
+                    <span><b>${i.name}</b></span>
+                    <span class="code-tag">[${i.code}]</span>
+                </div>
+            `).join('');
+            dropEl.style.display = 'block';
+        }
+
+        function selectAutocompleteItem(itemName) {
+            document.getElementById('chart-item-input').value = itemName;
+            safeSetStorage('cached_item_input', itemName);
+            document.getElementById('item-autocomplete-list').style.display = 'none';
+        }
+
+        // 외부 영역 클릭 시 자동완성 드롭다운 닫기
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#chart-brand-input') && !e.target.closest('#brand-autocomplete-list')) {
+                const drop = document.getElementById('brand-autocomplete-list');
+                if (drop) drop.style.display = 'none';
+            }
+            if (!e.target.closest('#chart-item-input') && !e.target.closest('#item-autocomplete-list')) {
+                const drop = document.getElementById('item-autocomplete-list');
+                if (drop) drop.style.display = 'none';
+            }
+        });
+
         /* 🏢 브랜드 선택 모달 */
         async function openBrandModal(target = 'chart') {
             activeBrandTarget = target;
             document.getElementById('brand-modal').style.display = 'flex';
-            const listEl = document.getElementById('brand-modal-list');
-            
-            if (allBrandList.length === 0) {
-                listEl.innerHTML = '<div style="text-align:center; padding:15px; color:#2563eb;">⚡ 브랜드 목록 로드 중...</div>';
-                try {
-                    const res = await fetchWithUltraCache(`${SUPABASE_URL}/rest/v1/daily_order_summary?select=brand_name`, {
-                        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
-                    });
-                    if (res.ok) {
-                        const data = await res.json();
-                        allBrandList = [...new Set(data.map(r => r.brand_name))].filter(Boolean).sort();
-                    }
-                } catch (err) {}
-            }
+            if (allBrandList.length === 0) await loadMasterLists();
             renderBrandModalList();
         }
 
@@ -600,23 +702,7 @@
         /* 📦 품목 모달 */
         async function openItemModal() {
             document.getElementById('item-modal').style.display = 'flex';
-            const listEl = document.getElementById('item-modal-list');
-            if (allItemList.length === 0) {
-                listEl.innerHTML = '<div style="text-align:center; padding:15px; color:#2563eb;">⚡ 품목 목록 로드 중...</div>';
-                try {
-                    const res = await fetchWithUltraCache(`${SUPABASE_URL}/rest/v1/daily_order_summary?select=item_code,item_name`, {
-                        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
-                    });
-                    if (res.ok) {
-                        const data = await res.json();
-                        const map = new Map();
-                        data.forEach(r => {
-                            if (r.item_code || r.item_name) map.set(`${cleanCode(r.item_code)}__${r.item_name}`, { code: cleanCode(r.item_code), name: r.item_name || '' });
-                        });
-                        allItemList = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-                    }
-                } catch (err) {}
-            }
+            if (allItemList.length === 0) await loadMasterLists();
             renderItemModalList();
         }
 
@@ -1197,11 +1283,8 @@
             });
 
             if (currentMaxPercent >= 100) {
-                // 💡 하단 상세 영역의 합계만 고정 업데이트
                 document.getElementById('list-total-qty').innerText = `${sumQty.toLocaleString()}개`;
                 document.getElementById('list-total-amount').innerText = `${sumAmount.toLocaleString()}원`;
-                
-                // 🚀 [수정 완료] 로딩 100% 시 상단 KPI 카드를 강제로 덮어씌우던 이전 오류 코드 완벽 제거!
             }
 
             const totalItems = currentDetailOrders.length;
@@ -1287,7 +1370,7 @@
         }
 
         /* ⚡ 초기 실행 */
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             const today = new Date();
             const past7 = new Date(); past7.setDate(today.getDate() - 7);
 
@@ -1307,6 +1390,9 @@
 
             const cachedLastUpdated = localStorage.getItem('cached_last_updated');
             if (cachedLastUpdated) document.getElementById('last-updated-text').innerText = `🕒 최신 배송일자: ${cachedLastUpdated}`;
+
+            // 마스터 브랜드/품목 데이터 사전 로드 (자동완성 기능용)
+            await loadMasterLists();
 
             loadCalendarData();
             fetchAllDashboardData();
