@@ -93,12 +93,34 @@
         .autocomplete-item:hover { background-color: #eff6ff; color: #2563eb; font-weight: bold; }
         .autocomplete-item:last-child { border-bottom: none; }
 
-        .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 15px; }
-        .kpi-card { background: #f8fafc; padding: 15px 20px; border-radius: 8px; border-left: 5px solid #2563eb; }
+        /* 🚀 KPI 그리드를 4열로 확장 + 호버 툴팁 스타일 */
+        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 15px; }
+        .kpi-card { 
+            background: #f8fafc; padding: 15px 20px; border-radius: 8px; 
+            border-left: 5px solid #2563eb; position: relative; cursor: default; 
+        }
         .kpi-card.green { border-left-color: #10b981; }
+        .kpi-card.orange { border-left-color: #f59e0b; }
         .kpi-card.purple { border-left-color: #8b5cf6; }
-        .kpi-title { font-size: 13px; color: #64748b; font-weight: 600; }
+        .kpi-title { font-size: 13px; color: #64748b; font-weight: 600; display: flex; align-items: center; gap: 4px; }
         .kpi-value { font-size: 22px; font-weight: 800; margin-top: 4px; color: #0f172a; }
+
+        /* 💡 브랜드별 점포 수 호버 툴팁 스타일 */
+        .brand-tooltip {
+            visibility: hidden; opacity: 0; position: absolute; top: 105%; left: 0;
+            width: 260px; max-height: 300px; overflow-y: auto; background-color: #0f172a;
+            color: #ffffff; border-radius: 8px; padding: 12px; font-size: 12px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); z-index: 100;
+            transition: opacity 0.2s ease, visibility 0.2s ease; pointer-events: none;
+        }
+        .brand-tooltip::after {
+            content: ""; position: absolute; bottom: 100%; left: 20px;
+            border-width: 6px; border-style: solid; border-color: transparent transparent #0f172a transparent;
+        }
+        .kpi-card:hover .brand-tooltip { visibility: visible; opacity: 1; }
+        .tooltip-title { font-weight: 700; color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 6px; margin-bottom: 6px; }
+        .tooltip-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px dashed #1e293b; }
+        .tooltip-row b { color: #f59e0b; }
 
         .chart-container { position: relative; height: 280px; width: 100%; }
 
@@ -274,14 +296,12 @@
                     </div>
                     <div class="filter-group">
                         <label>브랜드:</label>
-                        <!-- 🚀 브랜드 입력 및 실시간 연관 검색어 목록 연동 -->
                         <input type="text" id="chart-brand-input" class="input-box" placeholder="브랜드 선택/검색" style="width: 140px;" oninput="handleBrandInput(this.value)" onfocus="handleBrandInput(this.value)">
                         <button class="btn-search-icon" onclick="openBrandModal('chart')" title="브랜드 다중 선택">🔍</button>
                         <div id="brand-autocomplete-list" class="autocomplete-dropdown"></div>
                     </div>
                     <div class="filter-group">
                         <label>품목코드/명:</label>
-                        <!-- 🚀 품목 입력 및 실시간 연관 검색어 목록 연동 -->
                         <input type="text" id="chart-item-input" class="input-box" placeholder="품목 선택/검색" style="width: 150px;" oninput="handleItemInput(this.value)" onfocus="handleItemInput(this.value)">
                         <button class="btn-search-icon" onclick="openItemModal()" title="품목 다중 선택 모달 열기">🔍</button>
                         <div id="item-autocomplete-list" class="autocomplete-dropdown"></div>
@@ -290,6 +310,7 @@
                 </div>
             </div>
 
+            <!-- 🚀 4개 KPI 카드 구성 (주문점포수 카드 및 브랜드별 툴팁 포함) -->
             <div class="kpi-grid" style="margin-top: 15px;">
                 <div class="kpi-card">
                     <div class="kpi-title">기간 내 총 주문수량</div>
@@ -298,6 +319,15 @@
                 <div class="kpi-card green">
                     <div class="kpi-title">기간 내 취급 품목수</div>
                     <div class="kpi-value" id="kpi-total-items">0 종</div>
+                </div>
+                <!-- 🚀 신규 추가: 기간 내 주문 점포수 카드 (마우스 호버 툴팁 지원) -->
+                <div class="kpi-card orange">
+                    <div class="kpi-title">기간 내 주문 점포수 ℹ️</div>
+                    <div class="kpi-value" id="kpi-total-stores">0 개점</div>
+                    <div class="brand-tooltip" id="brand-stores-tooltip">
+                        <div class="tooltip-title">🏢 브랜드별 주문 점포수</div>
+                        <div id="brand-stores-tooltip-body">데이터 로딩 중...</div>
+                    </div>
                 </div>
                 <div class="kpi-card purple">
                     <div class="kpi-title">기간 내 총 주문금액</div>
@@ -547,7 +577,7 @@
             return true;
         }
 
-        /* 🚀 초기 데이터 데이터셋 로드 (자동완성 기능용) */
+        /* 🚀 초기 데이터 마스터 목록 로드 */
         async function loadMasterLists() {
             try {
                 const res = await fetchWithUltraCache(`${SUPABASE_URL}/rest/v1/daily_order_summary?select=brand_name,item_code,item_name`, {
@@ -555,11 +585,8 @@
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    
-                    // 브랜드 목록 수집
                     allBrandList = [...new Set(data.map(r => r.brand_name))].filter(Boolean).sort();
                     
-                    // 품목 목록 수집
                     const map = new Map();
                     data.forEach(r => {
                         if (r.item_code || r.item_name) {
@@ -571,7 +598,7 @@
             } catch (err) {}
         }
 
-        /* 🔍 실시간 브랜드 자동완성 처리 */
+        /* 🔍 브랜드 자동완성 처리 */
         function handleBrandInput(val) {
             safeSetStorage('cached_brand_input', val);
             const dropEl = document.getElementById('brand-autocomplete-list');
@@ -602,7 +629,7 @@
             document.getElementById('brand-autocomplete-list').style.display = 'none';
         }
 
-        /* 🔍 실시간 품목 자동완성 처리 */
+        /* 🔍 품목 자동완성 처리 */
         function handleItemInput(val) {
             safeSetStorage('cached_item_input', val);
             const dropEl = document.getElementById('item-autocomplete-list');
@@ -634,7 +661,6 @@
             document.getElementById('item-autocomplete-list').style.display = 'none';
         }
 
-        // 외부 영역 클릭 시 자동완성 드롭다운 닫기
         document.addEventListener('click', (e) => {
             if (!e.target.closest('#chart-brand-input') && !e.target.closest('#brand-autocomplete-list')) {
                 const drop = document.getElementById('brand-autocomplete-list');
@@ -646,7 +672,7 @@
             }
         });
 
-        /* 🏢 브랜드 선택 모달 */
+        /* 🏢 브랜드 모달 */
         async function openBrandModal(target = 'chart') {
             activeBrandTarget = target;
             document.getElementById('brand-modal').style.display = 'flex';
@@ -820,7 +846,7 @@
             }
         }
 
-        /* 🌤️ 기상청 ASOS D-1 제약 조건 대응 + Open-Meteo 하이브리드 수신 함수 */
+        /* 🌤️ 날씨 수신 함수 */
         async function fetchKoreaWeatherData(startDate, endDate) {
             const weatherMap = {};
 
@@ -946,7 +972,7 @@
             }
         }
 
-        /* 🚀 차트 데이터 호출 함수 */
+        /* 🚀 차트 데이터 호출 (점포명, 브랜드명 포함 로드) */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -958,7 +984,7 @@
             safeSetStorage('cached_chart_start_date', startDate);
             safeSetStorage('cached_chart_end_date', endDate);
 
-            let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,qty,price,total_amount,item_name,brand_name`;
+            let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,qty,price,total_amount,item_name,brand_name,store_name`;
 
             if (brandInputValue) {
                 const brandList = brandInputValue.split(',').map(b => b.trim()).filter(Boolean);
@@ -983,17 +1009,21 @@
             }
         }
 
-        /* 📊 대시보드 차트 및 KPI 표출 */
+        /* 📊 대시보드 차트 및 KPI 표출 (주문 점포수 + 브랜드별 툴팁 생성) */
         async function renderChartAndKPI(data) {
             if (!data || !Array.isArray(data) || data.length === 0) {
                 document.getElementById('kpi-total-qty').innerText = "0 건";
                 document.getElementById('kpi-total-items').innerText = "0 종";
+                document.getElementById('kpi-total-stores').innerText = "0 개점";
                 document.getElementById('kpi-total-amount').innerText = "0 원";
+                document.getElementById('brand-stores-tooltip-body').innerHTML = "주문 데이터가 없습니다.";
                 return;
             }
 
             let totalQty = 0, totalAmount = 0;
             const uniqueItems = new Set();
+            const uniqueStores = new Set();
+            const brandStoreMap = {}; // 브랜드별 점포 Set 맵
             const dailyMap = {};
 
             data.forEach(r => {
@@ -1004,6 +1034,14 @@
                 totalAmount += amt;
                 if (r.item_name) uniqueItems.add(r.item_name);
 
+                // 🚀 점포 및 브랜드별 점포 집계
+                if (r.store_name) {
+                    uniqueStores.add(r.store_name);
+                    const bName = r.brand_name || '미지정 브랜드';
+                    if (!brandStoreMap[bName]) brandStoreMap[bName] = new Set();
+                    brandStoreMap[bName].add(r.store_name);
+                }
+
                 let dateKey = formatDisplayDate(r.delivery_date);
                 if (!dateKey || dateKey === '-') return;
 
@@ -1012,9 +1050,25 @@
                 dailyMap[dateKey].amount += amt;
             });
 
+            // 💡 KPI 상단 카드 수치 업데이트
             document.getElementById('kpi-total-qty').innerText = `${totalQty.toLocaleString()} 건`;
             document.getElementById('kpi-total-items').innerText = `${uniqueItems.size.toLocaleString()} 종`;
+            document.getElementById('kpi-total-stores').innerText = `${uniqueStores.size.toLocaleString()} 개점`;
             document.getElementById('kpi-total-amount').innerText = `${totalAmount.toLocaleString()} 원`;
+
+            // 💡 브랜드별 점포수 툴팁 내용 구성
+            const sortedBrands = Object.keys(brandStoreMap).sort((a, b) => brandStoreMap[b].size - brandStoreMap[a].size);
+            if (sortedBrands.length > 0) {
+                const tooltipHtml = sortedBrands.map(b => `
+                    <div class="tooltip-row">
+                        <span>${b}</span>
+                        <b>${brandStoreMap[b].size.toLocaleString()} 개점</b>
+                    </div>
+                `).join('');
+                document.getElementById('brand-stores-tooltip-body').innerHTML = tooltipHtml;
+            } else {
+                document.getElementById('brand-stores-tooltip-body').innerHTML = "브랜드 정보 없음";
+            }
 
             const labels = Object.keys(dailyMap).sort();
             const qtyData = labels.map(k => dailyMap[k].qty);
@@ -1110,6 +1164,7 @@
             } catch (err) {}
         }
 
+        /* 🚀 누락 방지 청크 수집 함수 */
         async function fetchAllOrdersInChunksForRange(startDate, endDate) {
             const currentToken = activeFetchToken;
             let offset = 0;
@@ -1122,11 +1177,16 @@
             while (hasMore) {
                 if (currentToken !== activeFetchToken) return;
 
-                const chunkUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_code,store_name,distribution_center,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=store_name.asc&limit=${limit}&offset=${offset}`;
+                const chunkUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_code,store_name,distribution_center,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name&order=delivery_date.asc,store_code.asc,item_code.asc&limit=${limit}&offset=${offset}`;
                 try {
                     const res = await fetchWithUltraCache(chunkUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                     if (res.ok) {
                         const chunk = await res.json();
+                        if (!chunk || chunk.length === 0) {
+                            hasMore = false;
+                            break;
+                        }
+
                         chunk.forEach(r => { r.center_name = r.distribution_center || r.center_name || '-'; });
 
                         rawDetailOrders = rawDetailOrders.concat(chunk);
@@ -1391,7 +1451,6 @@
             const cachedLastUpdated = localStorage.getItem('cached_last_updated');
             if (cachedLastUpdated) document.getElementById('last-updated-text').innerText = `🕒 최신 배송일자: ${cachedLastUpdated}`;
 
-            // 마스터 브랜드/품목 데이터 사전 로드 (자동완성 기능용)
             await loadMasterLists();
 
             loadCalendarData();
