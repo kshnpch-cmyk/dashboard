@@ -173,7 +173,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 대시보드</h1>
-            <span class="version-tag">v25.0 Fully Synchronized</span>
+            <span class="version-tag">v26.0 Fully Synchronized</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -260,13 +260,14 @@
                     </div>
                     <div class="filter-group">
                         <label>브랜드:</label>
-                        <input type="text" id="chart-brand-input" class="input-box" placeholder="브랜드 선택/검색" style="width: 140px;" readonly onclick="openBrandModal('chart')">
+                        <input type="text" id="chart-brand-input" class="input-box" placeholder="브랜드 선택/검색" style="width: 140px;" oninput="safeSetStorage('cached_brand_input', this.value)">
                         <button class="btn-search-icon" onclick="openBrandModal('chart')" title="브랜드 다중 선택">🔍</button>
                     </div>
                     <div class="filter-group">
                         <label>품목코드/명:</label>
-                        <input type="text" id="chart-item-input" class="input-box" placeholder="품목 선택/검색" style="width: 150px;" readonly onclick="openItemModal()">
-                        <button class="btn-search-icon" onclick="openItemModal()" title="품목 다중 선택">🔍</button>
+                        <!-- 🚀 직접 타이핑, 백스페이스, 커서 이동 가능하도록 readonly 및 onclick 제거 -->
+                        <input type="text" id="chart-item-input" class="input-box" placeholder="품목 선택/검색" style="width: 150px;" oninput="safeSetStorage('cached_item_input', this.value)">
+                        <button class="btn-search-icon" onclick="openItemModal()" title="품목 다중 선택 모달 열기">🔍</button>
                     </div>
                     <button class="btn btn-query" onclick="fetchAllDashboardData()">🔍 대시보드 종합 조회</button>
                 </div>
@@ -296,7 +297,7 @@
             <div class="panel">
                 <div class="panel-title"><span>🏢 브랜드 필터</span></div>
                 <div style="display: flex; gap: 4px; margin-bottom: 12px;">
-                    <input type="text" id="detail-brand-input" class="input-box" style="flex:1;" placeholder="브랜드 선택..." readonly onclick="openBrandModal('detail')">
+                    <input type="text" id="detail-brand-input" class="input-box" style="flex:1;" placeholder="브랜드 선택..." oninput="safeSetStorage('cached_brand_input', this.value)">
                     <button class="btn-search-icon" onclick="openBrandModal('detail')">🔍</button>
                 </div>
                 <div style="display: flex; gap: 4px; margin-bottom: 12px;">
@@ -647,8 +648,11 @@
         function applyItemSelection() {
             const checkedVals = Array.from(document.querySelectorAll('.item-modal-chk:checked')).map(c => c.value);
             const itemStr = checkedVals.join(', ');
-            document.getElementById('chart-item-input').value = itemStr;
+            
+            const itemInput = document.getElementById('chart-item-input');
+            itemInput.value = itemStr;
             safeSetStorage('cached_item_input', itemStr);
+            
             closeItemModal();
         }
 
@@ -733,18 +737,15 @@
         async function fetchKoreaWeatherData(startDate, endDate) {
             const weatherMap = {};
 
-            // 어제(D-1) 날짜 계산
             const yesterday = new Date();
             yesterday.setDate(yesterday.getDate() - 1);
             const yesterdayStr = formatDate(yesterday);
 
-            // 기상청 API용 endDt (조회 종료일이 어제보다 미래면 어제로 제한)
             let kmaEndDt = endDate;
             if (kmaEndDt > yesterdayStr) {
                 kmaEndDt = yesterdayStr;
             }
 
-            // 1. D-1 이전 과거 데이터: 기상청 공식 ASOS API 사용
             if (startDate <= kmaEndDt) {
                 try {
                     const startStr = startDate.replace(/-/g, '');
@@ -788,7 +789,6 @@
                 }
             }
 
-            // 2. 당일(D-0) 및 미래 날짜 또는 기상청 누락 데이터: Open-Meteo API 수신
             try {
                 const openMeteoUrl = `https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_sum,snowfall_sum&timezone=Asia%2FSeoul`;
                 let res = await fetch(openMeteoUrl);
@@ -803,7 +803,6 @@
                         data.daily.time.forEach((dateStr, idx) => {
                             const formattedDate = dateStr.replace(/-/g, '/');
                             
-                            // 기상청 데이터가 없을 때만 보충
                             if (!weatherMap[formattedDate]) {
                                 const maxTempVal = data.daily.temperature_2m_max[idx];
                                 const minTempVal = data.daily.temperature_2m_min[idx];
@@ -860,155 +859,151 @@
             }
         }
 
-        /* 🚀 차트 데이터 호출 함수 보정 */
-async function fetchChartData() {
-    const startDate = document.getElementById('chart-start-date').value;
-    const endDate = document.getElementById('chart-end-date').value;
-    const brandInputValue = document.getElementById('chart-brand-input').value.trim();
-    const itemKeyword = document.getElementById('chart-item-input').value.trim();
+        /* 🚀 차트 데이터 호출 함수 */
+        async function fetchChartData() {
+            const startDate = document.getElementById('chart-start-date').value;
+            const endDate = document.getElementById('chart-end-date').value;
+            const brandInputValue = document.getElementById('chart-brand-input').value.trim();
+            const itemKeyword = document.getElementById('chart-item-input').value.trim();
 
-    if (!startDate || !endDate) return alert("조회 기간을 선택하세요.");
+            if (!startDate || !endDate) return alert("조회 기간을 선택하세요.");
 
-    safeSetStorage('cached_chart_start_date', startDate);
-    safeSetStorage('cached_chart_end_date', endDate);
+            safeSetStorage('cached_chart_start_date', startDate);
+            safeSetStorage('cached_chart_end_date', endDate);
 
-    // 💡 OMS 원본 oms_orders 테이블에서 기간 내 전체 수량을 오차 없이 로드
-    let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,qty,price,total_amount,item_name,brand_name`;
+            let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,qty,price,total_amount,item_name,brand_name`;
 
-    if (brandInputValue) {
-        const brandList = brandInputValue.split(',').map(b => b.trim()).filter(Boolean);
-        if (brandList.length === 1) queryUrl += `&brand_name=ilike.*${encodeURIComponent(brandList[0])}*`;
-        else if (brandList.length > 1) queryUrl += `&or=(${brandList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`;
-    }
+            if (brandInputValue) {
+                const brandList = brandInputValue.split(',').map(b => b.trim()).filter(Boolean);
+                if (brandList.length === 1) queryUrl += `&brand_name=ilike.*${encodeURIComponent(brandList[0])}*`;
+                else if (brandList.length > 1) queryUrl += `&or=(${brandList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`;
+            }
 
-    if (itemKeyword) {
-        const itemList = itemKeyword.split(',').map(i => i.trim()).filter(Boolean);
-        if (itemList.length === 1) queryUrl += `&or=(item_code.ilike.*${encodeURIComponent(itemList[0])}*,item_name.ilike.*${encodeURIComponent(itemList[0])}*)`;
-        else if (itemList.length > 1) queryUrl += `&or=(${itemList.map(i => `item_code.ilike.*${encodeURIComponent(i)}*,item_name.ilike.*${encodeURIComponent(i)}*`).join(',')})`;
-    }
+            if (itemKeyword) {
+                const itemList = itemKeyword.split(',').map(i => i.trim()).filter(Boolean);
+                if (itemList.length === 1) queryUrl += `&or=(item_code.ilike.*${encodeURIComponent(itemList[0])}*,item_name.ilike.*${encodeURIComponent(itemList[0])}*)`;
+                else if (itemList.length > 1) queryUrl += `&or=(${itemList.map(i => `item_code.ilike.*${encodeURIComponent(i)}*,item_name.ilike.*${encodeURIComponent(i)}*`).join(',')})`;
+            }
 
-    try {
-        const res = await fetchWithUltraCache(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
-        if (res.ok) {
-            const data = await res.json();
-            renderChartAndKPI(data);
+            try {
+                const res = await fetchWithUltraCache(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                if (res.ok) {
+                    const data = await res.json();
+                    renderChartAndKPI(data);
+                }
+            } catch (err) {
+                console.error("차트 데이터 로드 오류:", err);
+            }
         }
-    } catch (err) {
-        console.error("차트 데이터 로드 오류:", err);
-    }
-}
 
-/* 📊 대시보드 차트 및 KPI 표출 (수량 93,663건 완벽 일치 + Y축 비율 정상화 + 날씨 유지) */
-async function renderChartAndKPI(data) {
-    if (!data || !Array.isArray(data) || data.length === 0) {
-        document.getElementById('kpi-total-qty').innerText = "0 건";
-        document.getElementById('kpi-total-items').innerText = "0 종";
-        document.getElementById('kpi-total-amount').innerText = "0 원";
-        return;
-    }
+        /* 📊 대시보드 차트 및 KPI 표출 */
+        async function renderChartAndKPI(data) {
+            if (!data || !Array.isArray(data) || data.length === 0) {
+                document.getElementById('kpi-total-qty').innerText = "0 건";
+                document.getElementById('kpi-total-items').innerText = "0 종";
+                document.getElementById('kpi-total-amount').innerText = "0 원";
+                return;
+            }
 
-    let totalQty = 0, totalAmount = 0;
-    const uniqueItems = new Set();
-    const dailyMap = {};
+            let totalQty = 0, totalAmount = 0;
+            const uniqueItems = new Set();
+            const dailyMap = {};
 
-    data.forEach(r => {
-        const q = cleanNumber(r.qty || r.total_qty);
-        const amt = cleanNumber(r.total_amount || (q * cleanNumber(r.price)));
+            data.forEach(r => {
+                const q = cleanNumber(r.qty || r.total_qty);
+                const amt = cleanNumber(r.total_amount || (q * cleanNumber(r.price)));
 
-        totalQty += q;
-        totalAmount += amt;
-        if (r.item_name) uniqueItems.add(r.item_name);
+                totalQty += q;
+                totalAmount += amt;
+                if (r.item_name) uniqueItems.add(r.item_name);
 
-        let dateKey = formatDisplayDate(r.delivery_date);
-        if (!dateKey || dateKey === '-') return;
+                let dateKey = formatDisplayDate(r.delivery_date);
+                if (!dateKey || dateKey === '-') return;
 
-        // 🚀 일자별 수량/금액 누적 합산 (15,558이 아닌 93,663으로 합산됨)
-        if (!dailyMap[dateKey]) dailyMap[dateKey] = { qty: 0, amount: 0 };
-        dailyMap[dateKey].qty += q;
-        dailyMap[dateKey].amount += amt;
-    });
+                if (!dailyMap[dateKey]) dailyMap[dateKey] = { qty: 0, amount: 0 };
+                dailyMap[dateKey].qty += q;
+                dailyMap[dateKey].amount += amt;
+            });
 
-    // 💡 KPI 상단 카드의 93,663 건
-    document.getElementById('kpi-total-qty').innerText = `${totalQty.toLocaleString()} 건`;
-    document.getElementById('kpi-total-items').innerText = `${uniqueItems.size.toLocaleString()} 종`;
-    document.getElementById('kpi-total-amount').innerText = `${totalAmount.toLocaleString()} 원`;
+            document.getElementById('kpi-total-qty').innerText = `${totalQty.toLocaleString()} 건`;
+            document.getElementById('kpi-total-items').innerText = `${uniqueItems.size.toLocaleString()} 종`;
+            document.getElementById('kpi-total-amount').innerText = `${totalAmount.toLocaleString()} 원`;
 
-    const labels = Object.keys(dailyMap).sort();
-    const qtyData = labels.map(k => dailyMap[k].qty);
-    const amtData = labels.map(k => dailyMap[k].amount);
+            const labels = Object.keys(dailyMap).sort();
+            const qtyData = labels.map(k => dailyMap[k].qty);
+            const amtData = labels.map(k => dailyMap[k].amount);
 
-    // 🌤️ 날씨 데이터 연동 (기존 날씨 로직 100% 보존)
-    const startDate = document.getElementById('chart-start-date').value;
-    const endDate = document.getElementById('chart-end-date').value;
-    const weatherMap = await fetchKoreaWeatherData(startDate, endDate);
+            const startDate = document.getElementById('chart-start-date').value;
+            const endDate = document.getElementById('chart-end-date').value;
+            const weatherMap = await fetchKoreaWeatherData(startDate, endDate);
 
-    const labelsWithWeather = labels.map(dateStr => {
-        const w = weatherMap[dateStr];
-        if (w && w.minTemp !== '-') return [dateStr, w.displayLabel];
-        return dateStr;
-    });
+            const labelsWithWeather = labels.map(dateStr => {
+                const w = weatherMap[dateStr];
+                if (w && w.minTemp !== '-') return [dateStr, w.displayLabel];
+                return dateStr;
+            });
 
-    const canvas = document.getElementById('dailyTrendChart');
-    if (!canvas) return;
+            const canvas = document.getElementById('dailyTrendChart');
+            if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
-    if (trendChart) trendChart.destroy();
+            const ctx = canvas.getContext('2d');
+            if (trendChart) trendChart.destroy();
 
-    trendChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labelsWithWeather,
-            datasets: [
-                { label: '주문수량', data: qtyData, backgroundColor: 'rgba(37, 99, 235, 0.6)', yAxisID: 'y1' },
-                { label: '주문금액', data: amtData, type: 'line', borderColor: '#8b5cf6', borderWidth: 2, yAxisID: 'y2' }
-            ]
-        },
-        options: {
-            responsive: true, 
-            maintainAspectRatio: false,
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        title: function(tooltipItems) {
-                            const rawLabel = labels[tooltipItems[0].dataIndex];
-                            const w = weatherMap[rawLabel];
-                            if (w && w.minTemp !== '-') {
-                                return `📅 ${rawLabel} (${w.statusText} ${w.statusIcon} | 최저: ${w.minTemp}°C / 최고: ${w.maxTemp}°C)`;
+            trendChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labelsWithWeather,
+                    datasets: [
+                        { label: '주문수량', data: qtyData, backgroundColor: 'rgba(37, 99, 235, 0.6)', yAxisID: 'y1' },
+                        { label: '주문금액', data: amtData, type: 'line', borderColor: '#8b5cf6', borderWidth: 2, yAxisID: 'y2' }
+                    ]
+                },
+                options: {
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                title: function(tooltipItems) {
+                                    const rawLabel = labels[tooltipItems[0].dataIndex];
+                                    const w = weatherMap[rawLabel];
+                                    if (w && w.minTemp !== '-') {
+                                        return `📅 ${rawLabel} (${w.statusText} ${w.statusIcon} | 최저: ${w.minTemp}°C / 최고: ${w.maxTemp}°C)`;
+                                    }
+                                    return `📅 ${rawLabel}`;
+                                },
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) label += ': ';
+                                    if (context.parsed.y !== null) {
+                                        label += context.parsed.y.toLocaleString() + (context.dataset.yAxisID === 'y1' ? ' 건' : ' 원');
+                                    }
+                                    return label;
+                                }
                             }
-                            return `📅 ${rawLabel}`;
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { font: { size: 11, weight: 'bold' } }
                         },
-                        label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) label += ': ';
-                            if (context.parsed.y !== null) {
-                                label += context.parsed.y.toLocaleString() + (context.dataset.yAxisID === 'y1' ? ' 건' : ' 원');
-                            }
-                            return label;
+                        y1: { 
+                            type: 'linear', 
+                            position: 'left', 
+                            beginAtZero: true,
+                            grace: '20%'
+                        },
+                        y2: { 
+                            type: 'linear', 
+                            position: 'right', 
+                            beginAtZero: true, 
+                            grid: { drawOnChartArea: false },
+                            grace: '20%'
                         }
                     }
                 }
-            },
-            scales: {
-                x: {
-                    ticks: { font: { size: 11, weight: 'bold' } }
-                },
-                y1: { 
-                    type: 'linear', 
-                    position: 'left', 
-                    beginAtZero: true,
-                    grace: '20%' // 🚀 Y축 최대 눈금을 93,663 이상으로 자동 확장하여 막대 찌그러짐 방지
-                },
-                y2: { 
-                    type: 'linear', 
-                    position: 'right', 
-                    beginAtZero: true, 
-                    grid: { drawOnChartArea: false },
-                    grace: '20%'
-                }
-            }
+            });
         }
-    });
-}
 
         async function fetchDetailDataForRange() {
             const startDate = document.getElementById('chart-start-date').value;
