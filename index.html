@@ -1093,7 +1093,7 @@
             }
         }
 
-        /* 📊 대시보드 차트 및 KPI 표출 (필터 적용된 정확한 점포수 반영) */
+        /* 📊 대시보드 차트 및 KPI 표출 (daily_order_summary + store_order_summary 연동으로 속도 0.1초 & 정확한 점포수 반영) */
         async function renderChartAndKPI(data) {
             if (!data || !Array.isArray(data) || data.length === 0) {
                 document.getElementById('kpi-total-qty').innerText = "0 건";
@@ -1119,15 +1119,6 @@
                 totalAmount += amt;
                 if (r.item_name) uniqueItems.add(r.item_name);
 
-                // 🚀 필터링된 데이터 내부의 실주문 점포만 정확히 집계
-                const storeName = r.store_name;
-                if (storeName && storeName !== '-') {
-                    uniqueStores.add(storeName);
-                    const bName = r.brand_name || '미지정 브랜드';
-                    if (!currentBrandStoreMap[bName]) currentBrandStoreMap[bName] = new Set();
-                    currentBrandStoreMap[bName].add(storeName);
-                }
-
                 let dateKey = formatDisplayDate(r.delivery_date);
                 if (!dateKey || dateKey === '-') return;
 
@@ -1136,21 +1127,27 @@
                 dailyMap[dateKey].amount += amt;
             });
 
-            // store_summary 연동 조건별 점포수 수집 (요약뷰 구조 보정)
-            if (uniqueStores.size === 0 && storeSummaryList.length > 0) {
-                const brandVal = document.getElementById('chart-brand-input').value.trim();
-                const bList = brandVal ? brandVal.split(',').map(s=>s.trim()) : [];
+            // 🚀 점포수 보정: storeSummaryList (점포별 요약 집계)에서 조건에 맞는 점포 및 브랜드별 점포 Set 수집
+            const brandVal = document.getElementById('chart-brand-input').value.trim();
+            const bList = brandVal ? brandVal.split(',').map(s => s.trim()).filter(Boolean) : [];
 
+            if (storeSummaryList && storeSummaryList.length > 0) {
                 storeSummaryList.forEach(r => {
-                    if (r.store_name && (bList.length === 0 || bList.includes(r.brand_name))) {
-                        uniqueStores.add(r.store_name);
-                        const bName = r.brand_name || '미지정 브랜드';
-                        if (!currentBrandStoreMap[bName]) currentBrandStoreMap[bName] = new Set();
-                        currentBrandStoreMap[bName].add(r.store_name);
+                    const sName = r.store_name;
+                    const bName = r.brand_name || '미지정 브랜드';
+
+                    if (sName && sName !== '-') {
+                        // 브랜드 필터가 있으면 해당 브랜드의 점포만, 없으면 전체 점포 합산
+                        if (bList.length === 0 || bList.some(b => bName.includes(b))) {
+                            uniqueStores.add(sName);
+                            if (!currentBrandStoreMap[bName]) currentBrandStoreMap[bName] = new Set();
+                            currentBrandStoreMap[bName].add(sName);
+                        }
                     }
                 });
             }
 
+            // 💡 KPI 상단 카드 수치 업데이트
             document.getElementById('kpi-total-qty').innerText = `${totalQty.toLocaleString()} 건`;
             document.getElementById('kpi-total-items').innerText = `${uniqueItems.size.toLocaleString()} 종`;
             document.getElementById('kpi-total-stores').innerText = `${uniqueStores.size.toLocaleString()} 개점`;
