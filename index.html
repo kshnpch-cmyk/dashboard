@@ -260,12 +260,13 @@
                     </div>
                     <div class="filter-group">
                         <label>브랜드:</label>
+                        <!-- 🚀 브랜드 입력창 키보드 커서 및 타이핑 활성화 -->
                         <input type="text" id="chart-brand-input" class="input-box" placeholder="브랜드 선택/검색" style="width: 140px;" oninput="safeSetStorage('cached_brand_input', this.value)">
                         <button class="btn-search-icon" onclick="openBrandModal('chart')" title="브랜드 다중 선택">🔍</button>
                     </div>
                     <div class="filter-group">
                         <label>품목코드/명:</label>
-                        <!-- 🚀 직접 타이핑, 백스페이스, 커서 이동 가능하도록 readonly 및 onclick 제거 -->
+                        <!-- 🚀 품목 입력창 키보드 커서 및 타이핑 활성화 -->
                         <input type="text" id="chart-item-input" class="input-box" placeholder="품목 선택/검색" style="width: 150px;" oninput="safeSetStorage('cached_item_input', this.value)">
                         <button class="btn-search-icon" onclick="openItemModal()" title="품목 다중 선택 모달 열기">🔍</button>
                     </div>
@@ -1196,13 +1197,11 @@
             });
 
             if (currentMaxPercent >= 100) {
+                // 💡 하단 상세 영역의 합계만 고정 업데이트
                 document.getElementById('list-total-qty').innerText = `${sumQty.toLocaleString()}개`;
                 document.getElementById('list-total-amount').innerText = `${sumAmount.toLocaleString()}원`;
                 
-                if (baseDetailOrders === filteredDetailOrders) {
-                    document.getElementById('kpi-total-qty').innerText = `${sumQty.toLocaleString()} 건`;
-                    document.getElementById('kpi-total-amount').innerText = `${sumAmount.toLocaleString()} 원`;
-                }
+                // 🚀 [수정 완료] 로딩 100% 시 상단 KPI 카드를 강제로 덮어씌우던 이전 오류 코드 완벽 제거!
             }
 
             const totalItems = currentDetailOrders.length;
