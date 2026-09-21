@@ -860,7 +860,43 @@
             }
         }
 
-        fetchChartData
+        /* 🚀 차트 데이터 호출 함수 보정 */
+async function fetchChartData() {
+    const startDate = document.getElementById('chart-start-date').value;
+    const endDate = document.getElementById('chart-end-date').value;
+    const brandInputValue = document.getElementById('chart-brand-input').value.trim();
+    const itemKeyword = document.getElementById('chart-item-input').value.trim();
+
+    if (!startDate || !endDate) return alert("조회 기간을 선택하세요.");
+
+    safeSetStorage('cached_chart_start_date', startDate);
+    safeSetStorage('cached_chart_end_date', endDate);
+
+    // 💡 OMS 원본 oms_orders 테이블에서 기간 내 전체 수량을 오차 없이 로드
+    let queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,qty,price,total_amount,item_name,brand_name`;
+
+    if (brandInputValue) {
+        const brandList = brandInputValue.split(',').map(b => b.trim()).filter(Boolean);
+        if (brandList.length === 1) queryUrl += `&brand_name=ilike.*${encodeURIComponent(brandList[0])}*`;
+        else if (brandList.length > 1) queryUrl += `&or=(${brandList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`;
+    }
+
+    if (itemKeyword) {
+        const itemList = itemKeyword.split(',').map(i => i.trim()).filter(Boolean);
+        if (itemList.length === 1) queryUrl += `&or=(item_code.ilike.*${encodeURIComponent(itemList[0])}*,item_name.ilike.*${encodeURIComponent(itemList[0])}*)`;
+        else if (itemList.length > 1) queryUrl += `&or=(${itemList.map(i => `item_code.ilike.*${encodeURIComponent(i)}*,item_name.ilike.*${encodeURIComponent(i)}*`).join(',')})`;
+    }
+
+    try {
+        const res = await fetchWithUltraCache(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+        if (res.ok) {
+            const data = await res.json();
+            renderChartAndKPI(data);
+        }
+    } catch (err) {
+        console.error("차트 데이터 로드 오류:", err);
+    }
+}
 
 /* 📊 대시보드 차트 및 KPI 표출 (수량 93,663건 완벽 일치 + Y축 비율 정상화 + 날씨 유지) */
 async function renderChartAndKPI(data) {
