@@ -894,95 +894,118 @@
             } catch (err) {}
         }
 
-        /* 📊 대시보드 차트 및 KPI 표출 (날씨 연동) */
-        async function renderChartAndKPI(data) {
-            if (!data || !Array.isArray(data) || data.length === 0) {
-                document.getElementById('kpi-total-qty').innerText = "0 건";
-                document.getElementById('kpi-total-items').innerText = "0 종";
-                document.getElementById('kpi-total-amount').innerText = "0 원";
-                return;
-            }
+        /* 📊 대시보드 차트 및 KPI 표출 (중복 수량 합산 및 Y축 스케일 정상화) */
+async function renderChartAndKPI(data) {
+    if (!data || !Array.isArray(data) || data.length === 0) {
+        document.getElementById('kpi-total-qty').innerText = "0 건";
+        document.getElementById('kpi-total-items').innerText = "0 종";
+        document.getElementById('kpi-total-amount').innerText = "0 원";
+        return;
+    }
 
-            let totalQty = 0, totalAmount = 0;
-            const uniqueItems = new Set();
-            const dailyMap = {};
+    let totalQty = 0, totalAmount = 0;
+    const uniqueItems = new Set();
+    const dailyMap = {};
 
-            data.forEach(r => {
-                const q = cleanNumber(r.total_qty);
-                const amt = cleanNumber(r.total_amount);
+    data.forEach(r => {
+        // 🚀 r.total_qty가 없으면 r.qty에서 수량을 챙겨오도록 예외 처리
+        const q = cleanNumber(r.total_qty || r.qty);
+        const amt = cleanNumber(r.total_amount || (q * cleanNumber(r.price)));
 
-                totalQty += q;
-                totalAmount += amt;
-                if (r.item_name) uniqueItems.add(r.item_name);
+        totalQty += q;
+        totalAmount += amt;
+        if (r.item_name) uniqueItems.add(r.item_name);
 
-                let dateKey = formatDisplayDate(r.delivery_date);
-                if (!dateKey || dateKey === '-') return;
+        let dateKey = formatDisplayDate(r.delivery_date);
+        if (!dateKey || dateKey === '-') return;
 
-                if (!dailyMap[dateKey]) dailyMap[dateKey] = { qty: 0, amount: 0 };
-                dailyMap[dateKey].qty += q;
-                dailyMap[dateKey].amount += amt;
-            });
+        // 🚀 동일 일자의 수량/금액이 덮어씌워지지 않고 누적 합산되도록 보정
+        if (!dailyMap[dateKey]) dailyMap[dateKey] = { qty: 0, amount: 0 };
+        dailyMap[dateKey].qty += q;
+        dailyMap[dateKey].amount += amt;
+    });
 
-            document.getElementById('kpi-total-qty').innerText = `${totalQty.toLocaleString()} 건`;
-            document.getElementById('kpi-total-items').innerText = `${uniqueItems.size.toLocaleString()} 종`;
-            document.getElementById('kpi-total-amount').innerText = `${totalAmount.toLocaleString()} 원`;
+    // 💡 KPI 상단 카드 수치
+    document.getElementById('kpi-total-qty').innerText = `${totalQty.toLocaleString()} 건`;
+    document.getElementById('kpi-total-items').innerText = `${uniqueItems.size.toLocaleString()} 종`;
+    document.getElementById('kpi-total-amount').innerText = `${totalAmount.toLocaleString()} 원`;
 
-            const labels = Object.keys(dailyMap).sort();
-            const qtyData = labels.map(k => dailyMap[k].qty);
-            const amtData = labels.map(k => dailyMap[k].amount);
+    const labels = Object.keys(dailyMap).sort();
+    const qtyData = labels.map(k => dailyMap[k].qty);
+    const amtData = labels.map(k => dailyMap[k].amount);
 
-            // 🌤️ 날씨 데이터 연동
-            const startDate = document.getElementById('chart-start-date').value;
-            const endDate = document.getElementById('chart-end-date').value;
-            const weatherMap = await fetchKoreaWeatherData(startDate, endDate);
+    // 🌤️ 기상청/백업 날씨 데이터 연동
+    const startDate = document.getElementById('chart-start-date').value;
+    const endDate = document.getElementById('chart-end-date').value;
+    const weatherMap = await fetchKoreaWeatherData(startDate, endDate);
 
-            const labelsWithWeather = labels.map(dateStr => {
-                const w = weatherMap[dateStr];
-                if (w && w.minTemp !== '-') return [dateStr, w.displayLabel];
-                return dateStr;
-            });
+    const labelsWithWeather = labels.map(dateStr => {
+        const w = weatherMap[dateStr];
+        if (w && w.minTemp !== '-') return [dateStr, w.displayLabel];
+        return dateStr;
+    });
 
-            const canvas = document.getElementById('dailyTrendChart');
-            if (!canvas) return;
+    const canvas = document.getElementById('dailyTrendChart');
+    if (!canvas) return;
 
-            const ctx = canvas.getContext('2d');
-            if (trendChart) trendChart.destroy();
+    const ctx = canvas.getContext('2d');
+    if (trendChart) trendChart.destroy();
 
-            trendChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labelsWithWeather,
-                    datasets: [
-                        { label: '주문수량', data: qtyData, backgroundColor: 'rgba(37, 99, 235, 0.6)', yAxisID: 'y1' },
-                        { label: '주문금액', data: amtData, type: 'line', borderColor: '#8b5cf6', borderWidth: 2, yAxisID: 'y2' }
-                    ]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: {
-                        tooltip: {
-                            callbacks: {
-                                title: function(tooltipItems) {
-                                    const rawLabel = labels[tooltipItems[0].dataIndex];
-                                    const w = weatherMap[rawLabel];
-                                    if (w && w.minTemp !== '-') {
-                                        return `📅 ${rawLabel} (${w.statusText} ${w.statusIcon} | 최저: ${w.minTemp}°C / 최고: ${w.maxTemp}°C)`;
-                                    }
-                                    return `📅 ${rawLabel}`;
-                                }
+    trendChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labelsWithWeather,
+            datasets: [
+                { label: '주문수량', data: qtyData, backgroundColor: 'rgba(37, 99, 235, 0.6)', yAxisID: 'y1' },
+                { label: '주문금액', data: amtData, type: 'line', borderColor: '#8b5cf6', borderWidth: 2, yAxisID: 'y2' }
+            ]
+        },
+        options: {
+            responsive: true, 
+            maintainAspectRatio: false,
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        title: function(tooltipItems) {
+                            const rawLabel = labels[tooltipItems[0].dataIndex];
+                            const w = weatherMap[rawLabel];
+                            if (w && w.minTemp !== '-') {
+                                return `📅 ${rawLabel} (${w.statusText} ${w.statusIcon} | 최저: ${w.minTemp}°C / 최고: ${w.maxTemp}°C)`;
                             }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            ticks: { font: { size: 11, weight: 'bold' } }
+                            return `📅 ${rawLabel}`;
                         },
-                        y1: { type: 'linear', position: 'left', beginAtZero: true },
-                        y2: { type: 'linear', position: 'right', beginAtZero: true, grid: { drawOnChartArea: false } }
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) label += ': ';
+                            if (context.parsed.y !== null) {
+                                label += context.parsed.y.toLocaleString() + (context.dataset.yAxisID === 'y1' ? ' 건' : ' 원');
+                            }
+                            return label;
+                        }
                     }
                 }
-            });
+            },
+            scales: {
+                x: {
+                    ticks: { font: { size: 11, weight: 'bold' } }
+                },
+                y1: { 
+                    type: 'linear', 
+                    position: 'left', 
+                    beginAtZero: true,
+                    grace: '15%' // 🚀 Y축 상단 여유 공간 추가 (막대 천장 뚫림 방지)
+                },
+                y2: { 
+                    type: 'linear', 
+                    position: 'right', 
+                    beginAtZero: true, 
+                    grid: { drawOnChartArea: false },
+                    grace: '15%'
+                }
+            }
         }
+    });
+}
 
         async function fetchDetailDataForRange() {
             const startDate = document.getElementById('chart-start-date').value;
