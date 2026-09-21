@@ -1059,7 +1059,7 @@
             safeSetStorage('cached_chart_start_date', startDate);
             safeSetStorage('cached_chart_end_date', endDate);
 
-            // ⚡ 원본 수십만 건 테이블 대신 요약 집계 테이블(daily_order_summary) 사용으로 속도 100배 향상
+            // ⚡ daily_order_summary 요약 집계 테이블 사용으로 속도 최적화
             let queryUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
 
             if (brandInputValue) {
@@ -1093,7 +1093,7 @@
             }
         }
 
-        /* 📊 대시보드 차트 및 KPI 표출 */
+        /* 📊 대시보드 차트 및 KPI 표출 (필터 적용된 정확한 점포수 반영) */
         async function renderChartAndKPI(data) {
             if (!data || !Array.isArray(data) || data.length === 0) {
                 document.getElementById('kpi-total-qty').innerText = "0 건";
@@ -1119,11 +1119,13 @@
                 totalAmount += amt;
                 if (r.item_name) uniqueItems.add(r.item_name);
 
-                if (r.store_name) {
-                    uniqueStores.add(r.store_name);
+                // 🚀 필터링된 데이터 내부의 실주문 점포만 정확히 집계
+                const storeName = r.store_name;
+                if (storeName && storeName !== '-') {
+                    uniqueStores.add(storeName);
                     const bName = r.brand_name || '미지정 브랜드';
                     if (!currentBrandStoreMap[bName]) currentBrandStoreMap[bName] = new Set();
-                    currentBrandStoreMap[bName].add(r.store_name);
+                    currentBrandStoreMap[bName].add(storeName);
                 }
 
                 let dateKey = formatDisplayDate(r.delivery_date);
@@ -1134,10 +1136,13 @@
                 dailyMap[dateKey].amount += amt;
             });
 
-            // store_summary 연동 점포 수 보정
+            // store_summary 연동 조건별 점포수 수집 (요약뷰 구조 보정)
             if (uniqueStores.size === 0 && storeSummaryList.length > 0) {
+                const brandVal = document.getElementById('chart-brand-input').value.trim();
+                const bList = brandVal ? brandVal.split(',').map(s=>s.trim()) : [];
+
                 storeSummaryList.forEach(r => {
-                    if (r.store_name) {
+                    if (r.store_name && (bList.length === 0 || bList.includes(r.brand_name))) {
                         uniqueStores.add(r.store_name);
                         const bName = r.brand_name || '미지정 브랜드';
                         if (!currentBrandStoreMap[bName]) currentBrandStoreMap[bName] = new Set();
