@@ -137,7 +137,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>🔮 더본 OMS 발주 수요 예측 시스템</h1>
-            <span class="version-tag">Forecast v1.6 Ultra Accuracy Engine</span>
+            <span class="version-tag">Forecast v1.7 Median Precision Engine</span>
         </div>
         <div>
             <button class="btn" style="background-color: #334155;" onclick="window.close()">✕ 창 닫기</button>
@@ -259,7 +259,7 @@
                 <div class="kpi-card teal">
                     <div class="kpi-title">🎯 검증 기간 일치율(Accuracy)</div>
                     <div class="kpi-value" id="kpi-accuracy-percent" style="color:#0d9488;">-%</div>
-                    <div class="kpi-sub" id="kpi-accuracy-sub" style="color:#0d9488;">이상치 보정 WMAPE 엔진</div>
+                    <div class="kpi-sub" id="kpi-accuracy-sub" style="color:#0d9488;">중위수(Median) 보정 Engine</div>
                 </div>
                 <div class="kpi-card purple">
                     <div class="kpi-title">총 예상 발주 수량</div>
@@ -362,6 +362,14 @@
             let str = String(val).trim();
             if (str.endsWith('.0')) str = str.substring(0, str.length - 2);
             return str || '-';
+        }
+
+        /* 💡 중앙값(Median) 계산 함수 - 튀는 수치 완벽 방지 */
+        function getMedian(arr) {
+            if (!arr || arr.length === 0) return 0;
+            const sorted = [...arr].sort((a, b) => a - b);
+            const mid = Math.floor(sorted.length / 2);
+            return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
         }
 
         /* 🧹 입력창 지우기(✕) 기능 */
@@ -589,19 +597,7 @@
             return weatherMap;
         }
 
-        /* 💡 통계적 이상치(Outlier) 제거 - IQR / Z-Score 정제 함수 */
-        function filterOutliersIQR(arr) {
-            if (arr.length < 4) return arr;
-            const sorted = [...arr].sort((a, b) => a - b);
-            const q1 = sorted[Math.floor(sorted.length * 0.25)];
-            const q3 = sorted[Math.floor(sorted.length * 0.75)];
-            const iqr = q3 - q1;
-            const lowerBound = q1 - 1.5 * iqr;
-            const upperBound = q3 + 1.5 * iqr;
-            return arr.filter(x => x >= lowerBound && x <= upperBound);
-        }
-
-        /* 🔮 [고급 알고리즘 적용] Ultra Precision 발주 예측 시뮬레이션 메인 로직 */
+        /* 🔮 [중앙값 Median 보정 적용] 발주 예측 시뮬레이션 메인 로직 */
         async function runForecastSimulation() {
             const baseStartStr = document.getElementById('base-start-date').value;
             const baseEndStr = document.getElementById('base-end-date').value;
@@ -618,7 +614,6 @@
             if (baseStartStr > baseEndStr) return alert("과거 기반 시작일은 종료일보다 이전이어야 합니다.");
             if (startDate > endDate) return alert("예측 시작일은 종료일보다 이전이어야 합니다.");
 
-            // 1. 과거 기반 데이터 & 대상 기간 실제 내역 연동
             let pastUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${baseStartStr}&delivery_date=lte.${baseEndStr}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
             let targetActualUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
 
@@ -654,7 +649,6 @@
                 const storeData = resStores.ok ? await resStores.json() : [];
                 const actualData = resTargetActual.ok ? await resTargetActual.json() : [];
 
-                // 실제 존재 데이터 맵 구성 (일자별 합산 수량)
                 const actualDailyMap = {};
                 actualData.forEach(r => {
                     const dKey = formatDisplayDate(r.delivery_date);
@@ -665,7 +659,7 @@
                 const pastStoreSet = new Set(storeData.map(s => s.store_name).filter(Boolean));
                 const totalStoresCount = pastStoreSet.size || 0;
 
-                // 2. 🚀 [핵심 알고리즘 1] 과거 데이터를 일자별로 1차 정밀 그룹핑
+                // 과거 일자별 합산
                 const pastDailyAggMap = {};
                 let grandPastQty = 0;
                 let grandPastAmount = 0;
@@ -684,62 +678,33 @@
                     grandPastAmount += amt;
                 });
 
-                // 요일별(1:월~6:토) 수량 배열 수집 (일요일 0 제외)
+                // 요일별 수량 배열 (1:월 ~ 6:토)
                 const dayQtyArrays = [[], [], [], [], [], [], []];
-                
-                // 🚀 [핵심 알고리즘 2] 최근성 지수 가중치 (Exponential Decay) 적용을 위한 일자 정렬
-                const sortedPastDates = Object.keys(pastDailyAggMap).sort();
-                const totalPastDaysCount = sortedPastDates.length || 1;
-
-                sortedPastDates.forEach((dStr, idx) => {
+                Object.keys(pastDailyAggMap).forEach(dStr => {
                     const qVal = pastDailyAggMap[dStr];
                     const dayIdx = new Date(dStr.replace(/\//g, '-')).getDay();
                     if (dayIdx !== 0 && qVal > 0) {
-                        // 최근 날짜일수록 가중 부여
-                        const recencyWeight = 0.85 + (0.3 * (idx / totalPastDaysCount));
-                        dayQtyArrays[dayIdx].push(qVal * recencyWeight);
+                        dayQtyArrays[dayIdx].push(qVal);
                     }
                 });
 
-                // 🚀 [핵심 알고리즘 3] 이상치(Outlier) 필터링 후 요일별 평균 수량 산출
-                const dayAverages = [0, 0, 0, 0, 0, 0, 0];
-                let validPastTotalSum = 0;
-                let validPastTotalDays = 0;
+                // 💡 [핵심 보정] 중위수(Median) 기반으로 요일 대표값 산출 (폭주일로 인한 오버 예측 방지)
+                const dayMedians = [0, 0, 0, 0, 0, 0, 0];
+                const allDailyValues = Object.values(pastDailyAggMap).filter(v => v > 0);
+                const overallMedian = getMedian(allDailyValues);
 
                 for (let d = 1; d <= 6; d++) {
-                    const rawArr = dayQtyArrays[d];
-                    if (rawArr.length > 0) {
-                        const cleanedArr = filterOutliersIQR(rawArr);
-                        const avg = cleanedArr.reduce((a, b) => a + b, 0) / cleanedArr.length;
-                        dayAverages[d] = Math.round(avg);
-                        validPastTotalSum += Math.round(avg);
-                        validPastTotalDays++;
-                    }
+                    const arr = dayQtyArrays[d];
+                    dayMedians[d] = arr.length > 0 ? Math.round(getMedian(arr)) : Math.round(overallMedian);
                 }
 
-                // 영업일 전체 일평균
-                const baseDailyAvgQty = Math.round(validPastTotalSum / (validPastTotalDays || 1));
                 const totalPastPeriodDays = Math.max(1, Math.round((new Date(baseEndStr) - new Date(baseStartStr)) / (1000 * 60 * 60 * 24)) + 1);
+                const baseDailyAvgQty = Math.round(grandPastQty / totalPastPeriodDays);
                 const baseDailyAvgAmount = Math.round(grandPastAmount / totalPastPeriodDays);
 
-                // 요일 데이터가 빠진 날은 영업일 평균으로 보정
-                for (let d = 1; d <= 6; d++) {
-                    if (dayAverages[d] === 0) dayAverages[d] = baseDailyAvgQty;
-                }
-
-                // 🚀 [핵심 알고리즘 4] 추세 회귀 기울기 (Trend Slope) 계산
-                let trendSlope = 0;
-                if (sortedPastDates.length >= 4) {
-                    const firstHalfAvg = sortedPastDates.slice(0, Math.floor(sortedPastDates.length/2)).reduce((sum, k) => sum + pastDailyAggMap[k], 0) / (sortedPastDates.length/2);
-                    const secondHalfAvg = sortedPastDates.slice(Math.floor(sortedPastDates.length/2)).reduce((sum, k) => sum + pastDailyAggMap[k], 0) / (sortedPastDates.length/2);
-                    if (firstHalfAvg > 0) trendSlope = (secondHalfAvg - firstHalfAvg) / firstHalfAvg; // 추세 증감 비율
-                }
-                trendSlope = Math.max(-0.15, Math.min(0.20, trendSlope)); // 과도한 튐 방지 캡 적용(-15% ~ +20%)
-
-                // 3. 미래 예측 날씨 데이터 연동
+                // 미래 예측 날씨
                 const weatherMap = await fetchFutureWeatherData(startDate, endDate);
 
-                // 4. 미래 날짜별 예측 및 실제 수치 대조 산출
                 const futureRows = [];
                 const dailyChartMap = {};
                 let totalBaseQty = 0, totalBoostedQty = 0;
@@ -761,7 +726,7 @@
                     const wInfo = weatherMap[dispDate] || { displayLabel: "☀️ 맑음", statusText: "맑음" };
 
                     let weatherFactor = 1.0;
-                    if (wInfo.statusText === '비') weatherFactor = 0.93;
+                    if (wInfo.statusText === '비') weatherFactor = 0.94;
 
                     let baseQty = 0;
                     let boostedQty = 0;
@@ -769,18 +734,14 @@
                     let boostedAmt = 0;
 
                     if (!isSunday) {
-                        // 요일 평균 x 날씨 보정 x 추세 보정 (Trend Factor)
-                        const trendFactor = 1.0 + (trendSlope * 0.5);
-                        baseQty = Math.round((dayAverages[dayIdx] || baseDailyAvgQty) * weatherFactor * trendFactor);
+                        baseQty = Math.round((dayMedians[dayIdx] || overallMedian) * weatherFactor);
                         boostedQty = Math.round(baseQty * boostMultiplier);
                         addedQty = boostedQty - baseQty;
                         boostedAmt = Math.round(boostedQty * avgUnitPrice);
                     }
 
-                    // 실제 주문 데이터 매칭
                     const actualQty = (actualDailyMap[dispDate] !== undefined) ? actualDailyMap[dispDate] : null;
 
-                    // WMAPE 기반 백테스팅 일치율 집계 (일요일 제외, 실제 오더 존재하는 날만)
                     if (!isSunday && actualQty !== null) {
                         totalOverlapActual += actualQty;
                         totalOverlapError += Math.abs(actualQty - boostedQty);
@@ -807,7 +768,7 @@
 
                 currentForecastRows = futureRows;
 
-                // 🎯 정밀 일치율(Accuracy %) 최종 계산 (WMAPE)
+                // WMAPE 오차율
                 let accuracyText = "비교 데이터 없음";
                 let accuracySubText = "구간 내 실제 실적 없음";
                 if (overlapDaysCount > 0 && totalOverlapActual > 0) {
@@ -820,7 +781,6 @@
                 document.getElementById('kpi-accuracy-percent').innerText = accuracyText;
                 document.getElementById('kpi-accuracy-sub').innerText = accuracySubText;
 
-                // 5. KPI 수치 업데이트
                 document.getElementById('kpi-base-daily-avg').innerText = `${baseDailyAvgQty.toLocaleString()} 건`;
                 document.getElementById('kpi-sub-daily-avg-amount').innerText = `일평균 금액: ${baseDailyAvgAmount.toLocaleString()} 원`;
 
@@ -835,7 +795,6 @@
 
                 document.getElementById('kpi-forecast-stores').innerText = `${totalStoresCount.toLocaleString()} 개점`;
 
-                // 6. 예측 차트 및 상세 표 그리기
                 renderForecastChart(dailyChartMap, weatherMap);
                 renderForecastTable(futureRows);
 
@@ -845,7 +804,7 @@
             }
         }
 
-        /* 📊 실제 주문량과 예측량을 한 번에 보는 3개 막대 콤보 차트 */
+        /* 📊 차트 그리기 */
         function renderForecastChart(dailyChartMap, weatherMap) {
             const labels = Object.keys(dailyChartMap).sort();
             const actualData = labels.map(k => (dailyChartMap[k].isSunday || dailyChartMap[k].actualQty === null) ? 0 : dailyChartMap[k].actualQty);
@@ -891,22 +850,17 @@
                         }
                     },
                     scales: {
-                        x: {
-                            ticks: { font: { size: 11, weight: 'bold' } }
-                        },
+                        x: { ticks: { font: { size: 11, weight: 'bold' } } },
                         y: { 
-                            beginAtZero: true, 
-                            grace: '15%',
-                            ticks: {
-                                callback: function(value) { return value.toLocaleString() + ' 건'; }
-                            }
+                            beginAtZero: true, grace: '15%',
+                            ticks: { callback: function(value) { return value.toLocaleString() + ' 건'; } }
                         }
                     }
                 }
             });
         }
 
-        /* 📋 예측 상세 명세서 표 구성 */
+        /* 📋 상세 표 */
         function renderForecastTable(rows) {
             const tbody = document.getElementById('forecast-detail-table');
             if (!rows || rows.length === 0) {
@@ -951,7 +905,7 @@
             }).join('');
         }
 
-        /* 📥 예측 명세서 엑셀 저장 */
+        /* 📥 엑셀 저장 */
         function exportForecastToExcel() {
             if (!currentForecastRows || currentForecastRows.length === 0) return alert("저장할 예측 데이터가 없습니다.");
             const exportData = currentForecastRows.map(r => ({
@@ -966,7 +920,7 @@
             XLSX.writeFile(wb, `OMS미래발주예측비교_${document.getElementById('forecast-start-date').value}_${document.getElementById('forecast-end-date').value}.xlsx`);
         }
 
-        /* ⚡ 페이지 로드 시 초기 실행 */
+        /* ⚡ 초기 실행 */
         document.addEventListener('DOMContentLoaded', async () => {
             setQuickBasePeriod('thisMonth');
 
