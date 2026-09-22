@@ -1,290 +1,900 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>더본 OMS 발주 수요 예측 v4.0 Adaptive Ensemble</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <style>
-    *{box-sizing:border-box}
-    body{margin:0;padding:0;font-family:'Pretendard','Malgun Gothic',sans-serif;background:#f1f5f9;color:#1e293b}
-    .navbar{background:#0f172a;color:#fff;padding:15px 30px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 4px 6px rgba(0,0,0,.1);flex-wrap:wrap;gap:15px}
-    .brand-title{display:flex;align-items:center;gap:10px}.brand-title h1{margin:0;font-size:20px;font-weight:800}.version-tag{background:#2563eb;color:#fff;font-size:11px;font-weight:800;padding:3px 8px;border-radius:12px;letter-spacing:.4px}
-    .container{padding:20px;max-width:98%;margin:0 auto}.section-panel{background:#fff;padding:20px;border-radius:12px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
-    .panel-header{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #f1f5f9;padding-bottom:12px;margin-bottom:15px;flex-wrap:wrap;gap:10px}.panel-title-text{font-size:18px;font-weight:800;color:#0f172a}
-    .filter-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:#f8fafc;padding:15px;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:12px}.filter-group{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#475569;position:relative}.input-wrapper{position:relative;display:flex;align-items:center}.input-box{padding:7px 26px 7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;outline:none}.input-box:focus{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.1)}
-    .clear-btn{position:absolute;right:8px;cursor:pointer;color:#94a3b8;font-size:12px;font-weight:800;display:none;background:#e2e8f0;border-radius:50%;width:16px;height:16px;text-align:center;line-height:15px}.clear-btn:hover{background:#cbd5e1;color:#475569}
-    .autocomplete-dropdown{position:absolute;top:100%;left:0;width:100%;max-height:220px;overflow-y:auto;background:#fff;border:1px solid #cbd5e1;border-radius:6px;box-shadow:0 10px 15px -3px rgba(0,0,0,.1);z-index:1000;display:none;margin-top:4px}.autocomplete-item{padding:8px 12px;font-size:12.5px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center}.autocomplete-item:hover{background:#eff6ff;color:#2563eb;font-weight:700}.autocomplete-item:last-child{border-bottom:none}
-    .btn{background:#2563eb;color:#fff;border:none;padding:8px 14px;border-radius:6px;font-weight:800;cursor:pointer;font-size:13px}.btn:hover{background:#1d4ed8}.btn-quick{background:#475569;padding:6px 12px;font-size:12px}.btn-excel{background:#16a34a;padding:6px 12px;font-size:12px}.btn-search-icon{background:#475569;color:#fff;border:none;padding:6px 9px;border-radius:6px;cursor:pointer;font-size:12px;margin-left:-2px}.btn-search-icon:hover{background:#334155}.btn-forecast{background:#2563eb}.btn-forecast:hover{background:#1d4ed8}
-    .modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,.6);z-index:1001;justify-content:center;align-items:center}.modal-content{background:#fff;padding:20px;border-radius:12px;width:520px;max-width:90%;box-shadow:0 20px 25px -5px rgba(0,0,0,.1);max-height:85vh;display:flex;flex-direction:column}.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}.modal-title{font-size:16px;font-weight:800}.close-btn{cursor:pointer;font-size:18px;font-weight:800;color:#64748b}.modal-body-scroll{flex:1;overflow-y:auto;margin-top:10px;border:1px solid #e2e8f0;border-radius:8px;padding:10px}.search-list-item{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:13px;cursor:pointer}.search-list-item:hover{background:#eff6ff}.search-list-item label{cursor:pointer;width:100%;display:flex;align-items:center;gap:8px}
-    .kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:15px}.kpi-card{background:#f8fafc;padding:14px 16px;border-radius:8px;border-left:5px solid #2563eb;position:relative}.kpi-card.blue{border-left-color:#0284c7}.kpi-card.purple{border-left-color:#8b5cf6}.kpi-card.orange{border-left-color:#f59e0b}.kpi-card.green{border-left-color:#10b981}.kpi-card.teal{border-left-color:#0d9488}.kpi-card.slate{border-left-color:#64748b}.kpi-title{font-size:12px;color:#64748b;font-weight:700}.kpi-value{font-size:20px;font-weight:900;margin-top:4px;color:#0f172a}.kpi-sub{font-size:11px;color:#64748b;font-weight:700;margin-top:2px;line-height:1.35}.chart-container{position:relative;height:360px;width:100%}
-    .table-container{width:100%;overflow-x:auto;margin-top:10px}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{padding:9px 12px;text-align:left;border-bottom:1px solid #e2e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}th{background:#f8fafc;color:#475569;position:sticky;top:0;z-index:2}.text-right{text-align:right}.text-center{text-align:center}.code-tag{font-size:11px;color:#64748b;font-family:monospace}.badge-boost{background:#d1fae5;color:#065f46;padding:2px 6px;border-radius:4px;font-weight:800;font-size:11px}.badge-off{background:#f1f5f9;color:#94a3b8;padding:2px 6px;border-radius:4px;font-weight:800;font-size:11px}.badge-actual{background:#e0f2fe;color:#0369a1;padding:2px 6px;border-radius:4px;font-weight:800;font-size:11px}
-    .diagnostic-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:15px}.diag-card{border:1px solid #e2e8f0;border-radius:10px;background:#fff;padding:15px}.diag-title{font-weight:800;font-size:14px;margin-bottom:10px;color:#0f172a}.weight-row{display:grid;grid-template-columns:150px 1fr 65px 85px;gap:8px;align-items:center;margin:6px 0;font-size:12px}.bar-wrap{height:10px;background:#e2e8f0;border-radius:999px;overflow:hidden}.bar{height:100%;background:#2563eb;border-radius:999px}.status-line{font-size:12px;color:#64748b;line-height:1.5}.pill{display:inline-block;padding:3px 7px;border-radius:999px;background:#eef2ff;color:#3730a3;font-size:11px;font-weight:800;margin:2px}.warning{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;padding:10px;border-radius:8px;font-size:12px;line-height:1.5}.success{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;padding:10px;border-radius:8px;font-size:12px;line-height:1.5}
-    @media(max-width:1200px){.kpi-grid{grid-template-columns:repeat(3,1fr)}.diagnostic-grid{grid-template-columns:1fr}}@media(max-width:760px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.navbar{padding:12px}.container{padding:10px}}
-  </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>더본 OMS 발주 수요 예측 v4.1 Adaptive Ensemble</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; font-family: 'Pretendard', 'Malgun Gothic', sans-serif; background: #f1f5f9; color: #1e293b; }
+        .navbar { background: #0f172a; color: #fff; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,.1); flex-wrap: wrap; gap: 15px; }
+        .brand-title { display: flex; align-items: center; gap: 10px; }
+        .brand-title h1 { margin: 0; font-size: 20px; font-weight: 800; }
+        .version-tag { background: #2563eb; color: #fff; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 12px; letter-spacing: .4px; }
+        .container { padding: 20px; max-width: 98%; margin: 0 auto; }
+        .section-panel { background: #fff; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
+        .panel-title-text { font-size: 18px; font-weight: 800; color: #0f172a; }
+        
+        .filter-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 12px; }
+        .filter-group { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #475569; position: relative; }
+        .input-wrapper { position: relative; display: flex; align-items: center; }
+        .input-box { padding: 7px 26px 7px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none; }
+        .input-box:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.1); }
+        .clear-btn { position: absolute; right: 8px; cursor: pointer; color: #94a3b8; font-size: 12px; font-weight: 800; display: none; background: #e2e8f0; border-radius: 50%; width: 16px; height: 16px; text-align: center; line-height: 15px; }
+        .clear-btn:hover { background: #cbd5e1; color: #475569; }
+        
+        .autocomplete-dropdown { position: absolute; top: 100%; left: 0; width: 100%; max-height: 220px; overflow-y: auto; background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; box-shadow: 0 10px 15px -3px rgba(0,0,0,.1); z-index: 1000; display: none; margin-top: 4px; }
+        .autocomplete-item { padding: 8px 12px; font-size: 12.5px; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
+        .autocomplete-item:hover { background: #eff6ff; color: #2563eb; font-weight: 700; }
+        .autocomplete-item:last-child { border-bottom: none; }
+        
+        .btn { background: #2563eb; color: #fff; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 800; cursor: pointer; font-size: 13px; }
+        .btn:hover { background: #1d4ed8; }
+        .btn-quick { background: #475569; padding: 6px 12px; font-size: 12px; }
+        .btn-excel { background: #16a34a; padding: 6px 12px; font-size: 12px; }
+        .btn-search-icon { background: #475569; color: #fff; border: none; padding: 6px 9px; border-radius: 6px; cursor: pointer; font-size: 12px; margin-left: -2px; }
+        .btn-search-icon:hover { background: #334155; }
+        .btn-forecast { background: #10b981; }
+        .btn-forecast:hover { background: #059669; }
+        
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,.6); z-index: 1001; justify-content: center; align-items: center; }
+        .modal-content { background: #fff; padding: 20px; border-radius: 12px; width: 520px; max-width: 90%; box-shadow: 0 20px 25px -5px rgba(0,0,0,.1); max-height: 85vh; display: flex; flex-direction: column; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .modal-title { font-size: 16px; font-weight: 800; }
+        .close-btn { cursor: pointer; font-size: 18px; font-weight: 800; color: #64748b; }
+        .modal-body-scroll { flex: 1; overflow-y: auto; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; }
+        .search-list-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid #f1f5f9; font-size: 13px; cursor: pointer; }
+        .search-list-item:hover { background: #eff6ff; }
+        .search-list-item label { cursor: pointer; width: 100%; display: flex; align-items: center; gap: 8px; }
+        
+        /* 5개 컬럼 KPI 그리드 */
+        .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 15px; }
+        .kpi-card { background: #f8fafc; padding: 14px 16px; border-radius: 8px; border-left: 5px solid #2563eb; position: relative; }
+        .kpi-card.blue { border-left-color: #0284c7; }
+        .kpi-card.purple { border-left-color: #8b5cf6; }
+        .kpi-card.orange { border-left-color: #f59e0b; }
+        .kpi-card.green { border-left-color: #10b981; }
+        .kpi-card.teal { border-left-color: #0d9488; }
+        .kpi-title { font-size: 12px; color: #64748b; font-weight: 700; }
+        .kpi-value { font-size: 20px; font-weight: 900; margin-top: 4px; color: #0f172a; }
+        .kpi-sub { font-size: 11px; color: #64748b; font-weight: 700; margin-top: 2px; line-height: 1.35; }
+        
+        .chart-container { position: relative; height: 360px; width: 100%; }
+        .table-container { width: 100%; overflow-x: auto; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+        th { background: #f8fafc; color: #475569; position: sticky; top: 0; z-index: 2; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .code-tag { font-size: 11px; color: #64748b; font-family: monospace; }
+        .badge-boost { background: #d1fae5; color: #065f46; padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 11px; }
+        .badge-off { background: #f1f5f9; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 11px; }
+        .badge-actual { background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 11px; }
+        
+        .diagnostic-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 15px; }
+        .diag-card { border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; padding: 15px; }
+        .diag-title { font-weight: 800; font-size: 14px; margin-bottom: 10px; color: #0f172a; }
+        .weight-row { display: grid; grid-template-columns: 150px 1fr 65px 85px; gap: 8px; align-items: center; margin: 6px 0; font-size: 12px; }
+        .bar-wrap { height: 10px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
+        .bar { height: 100%; background: #2563eb; border-radius: 999px; }
+        .status-line { font-size: 12px; color: #64748b; line-height: 1.5; }
+        .pill { display: inline-block; padding: 3px 7px; border-radius: 999px; background: #eef2ff; color: #3730a3; font-size: 11px; font-weight: 800; margin: 2px; }
+        .success { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; padding: 10px; border-radius: 8px; font-size: 12px; line-height: 1.5; }
+    </style>
 </head>
 <body>
-  <div class="navbar">
-    <div class="brand-title"><h1>🔮 더본 OMS 발주 수요 예측 시스템</h1><span class="version-tag">Forecast v4.0 Adaptive Ensemble / Rolling Backtest</span></div>
-    <div><button class="btn" style="background:#334155" onclick="window.close()">✕ 창 닫기</button></div>
-  </div>
 
-  <div class="modal-overlay" id="brand-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">🏢 브랜드 다중 선택</span><span class="close-btn" onclick="closeBrandModal()">✕</span></div><div style="display:flex;gap:8px;margin-bottom:8px"><input type="text" id="modal-brand-search" class="input-box" style="flex:1" placeholder="브랜드명 검색 (Enter)" onkeydown="if(event.key==='Enter')filterBrandModalList()"><button class="btn" onclick="filterBrandModalList()">검색</button><button class="btn" style="background:#475569" onclick="toggleAllBrandCheck(true)">전체선택</button><button class="btn" style="background:#64748b" onclick="toggleAllBrandCheck(false)">해제</button></div><div class="modal-body-scroll" id="brand-modal-list"></div><div style="margin-top:15px;text-align:right"><button class="btn" onclick="applyBrandSelection()">확인 적용</button></div></div></div>
-  <div class="modal-overlay" id="item-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">📦 품목 다중 선택</span><span class="close-btn" onclick="closeItemModal()">✕</span></div><div style="display:flex;gap:8px;margin-bottom:8px"><input type="text" id="modal-item-search" class="input-box" style="flex:1" placeholder="품목코드 또는 품목명 검색 (Enter)" onkeydown="if(event.key==='Enter')filterItemModalList()"><button class="btn" onclick="filterItemModalList()">검색</button><button class="btn" style="background:#475569" onclick="toggleAllItemCheck(true)">전체선택</button><button class="btn" style="background:#64748b" onclick="toggleAllItemCheck(false)">해제</button></div><div class="modal-body-scroll" id="item-modal-list"></div><div style="margin-top:15px;text-align:right"><button class="btn" onclick="applyItemSelection()">확인 적용</button></div></div></div>
-
-  <div class="container">
-    <div class="section-panel">
-      <div class="panel-header"><span class="panel-title-text">⚙️ 분석 기반 · 미래 예측 설정</span><span class="pill">누수 방지</span><span class="pill">자동 모델 선택</span><span class="pill">백테스트 기반 가중치</span></div>
-      <div class="filter-row">
-        <div class="filter-group"><label style="color:#2563eb">📌 분석 기반 과거기간:</label><input type="date" id="base-start-date" class="input-box" style="padding-right:10px"><span>~</span><input type="date" id="base-end-date" class="input-box" style="padding-right:10px"></div>
-        <div style="display:flex;gap:6px"><button class="btn btn-quick" onclick="setQuickBasePeriod('thisMonth')">📅 이번달 기준</button><button class="btn btn-quick" onclick="setQuickBasePeriod('last7days')">⚡ 직전 일주일</button><button class="btn btn-quick" onclick="setQuickBasePeriod('lastWeek')">📆 직전주 (월~일)</button></div>
-      </div>
-      <div class="filter-row" style="margin-bottom:15px">
-        <div class="filter-group"><label style="color:#10b981">🔮 예측/비교 대상 기간:</label><input type="date" id="forecast-start-date" class="input-box" style="padding-right:10px"><span>~</span><input type="date" id="forecast-end-date" class="input-box" style="padding-right:10px"></div>
-        <div class="filter-group"><label>브랜드:</label><div class="input-wrapper"><input type="text" id="forecast-brand-input" class="input-box" placeholder="브랜드 선택/검색" style="width:130px" oninput="handleBrandInput(this.value)" onfocus="handleBrandInput(this.value)" onkeydown="if(event.key==='Enter')runForecastSimulation()"><span class="clear-btn" id="btn-clear-brand" onclick="clearInputField('forecast-brand-input')">✕</span></div><button class="btn-search-icon" onclick="openBrandModal()">🔍</button><div id="brand-autocomplete-list" class="autocomplete-dropdown"></div></div>
-        <div class="filter-group"><label>품목코드/명:</label><div class="input-wrapper"><input type="text" id="forecast-item-input" class="input-box" placeholder="품목 선택/검색" style="width:140px" oninput="handleItemInput(this.value)" onfocus="handleItemInput(this.value)" onkeydown="if(event.key==='Enter')runForecastSimulation()"><span class="clear-btn" id="btn-clear-item" onclick="clearInputField('forecast-item-input')">✕</span></div><button class="btn-search-icon" onclick="openItemModal()">🔍</button><label style="font-size:12px;margin-left:6px;cursor:pointer;display:flex;align-items:center;gap:3px;color:#475569" title="체크 시 더 먼 미래까지 실제 마감 기준을 허용"><input type="checkbox" id="chk-d2-cutoff" onchange="runForecastSimulation()"><span>D-2 마감</span></label><div id="item-autocomplete-list" class="autocomplete-dropdown"></div></div>
-        <div class="filter-group" style="background:#d1fae5;padding:6px 12px;border-radius:6px;border:1px solid #a7f3d0"><label style="color:#065f46">🚀 신메뉴/행사 가중치:</label><input type="number" id="boost-percent-input" class="input-box" value="0" min="0" max="500" step="5" style="width:65px;text-align:center;font-weight:800;color:#065f46;padding-right:8px"><span style="color:#065f46">%</span></div>
-        <button class="btn btn-forecast" onclick="runForecastSimulation()">🔮 시뮬레이션 실행</button>
-      </div>
-      <div class="kpi-grid">
-        <div class="kpi-card blue"><div class="kpi-title">과거 일평균 발주량</div><div class="kpi-value" id="kpi-base-daily-avg">0 건</div><div class="kpi-sub" id="kpi-sub-daily-avg">실제 영업일 기준</div></div>
-        <div class="kpi-card teal"><div class="kpi-title">🎯 검증 구간 일치율</div><div class="kpi-value" id="kpi-accuracy-percent" style="color:#0d9488">-%</div><div class="kpi-sub" id="kpi-accuracy-sub">누수 방지 실제 겹침 구간</div></div>
-        <div class="kpi-card purple"><div class="kpi-title">총 예상 발주 수량</div><div class="kpi-value" id="kpi-forecast-qty">0 건</div><div class="kpi-sub" id="kpi-sub-qty">가중치 전: 0 건</div></div>
-        <div class="kpi-card orange"><div class="kpi-title">가중치 추가 수량</div><div class="kpi-value" id="kpi-boost-added-qty">+0 건</div><div class="kpi-sub" id="kpi-sub-boost-added">미래 남은기간만 반영</div></div>
-        <div class="kpi-card green"><div class="kpi-title">🔮 남은 기간 필요 수량</div><div class="kpi-value" id="kpi-remaining-qty" style="color:#10b981">0 건</div><div class="kpi-sub" id="kpi-sub-remaining">미래 미발생 일수 기준</div></div>
-        <div class="kpi-card slate"><div class="kpi-title">🧠 자동 모델 수</div><div class="kpi-value" id="kpi-model-count">0 개</div><div class="kpi-sub" id="kpi-model-score">백테스트 준비 전</div></div>
-      </div>
-      <div class="chart-container"><canvas id="forecastChart"></canvas></div>
+    <div class="navbar">
+        <div class="brand-title">
+            <h1>🔮 더본 OMS 발주 수요 예측 시스템</h1>
+            <span class="version-tag">Forecast v4.1 Adaptive Ensemble</span>
+        </div>
+        <div><button class="btn" style="background:#334155" onclick="window.close()">✕ 창 닫기</button></div>
     </div>
 
-    <div class="section-panel">
-      <div class="panel-header"><span class="panel-title-text">🧠 자동 모델 성능 · 가중치 진단</span><span id="diagnostic-status" class="status-line">시뮬레이션 실행 후 자동 산출</span></div>
-      <div class="diagnostic-grid">
-        <div class="diag-card"><div class="diag-title">백테스트 기준 모델 가중치</div><div id="model-weight-list" class="status-line">데이터를 계산 중입니다.</div></div>
-        <div class="diag-card"><div class="diag-title">자동 보정 및 사용 특성</div><div id="calibration-summary" class="status-line">대상 기간을 선택하고 실행하세요.</div></div>
-      </div>
+    <!-- 모달 창 -->
+    <div class="modal-overlay" id="brand-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">🏢 브랜드 다중 선택</span><span class="close-btn" onclick="closeBrandModal()">✕</span></div><div style="display:flex;gap:8px;margin-bottom:8px"><input type="text" id="modal-brand-search" class="input-box" style="flex:1" placeholder="브랜드명 검색 (Enter)" onkeydown="if(event.key==='Enter')filterBrandModalList()"><button class="btn" onclick="filterBrandModalList()">검색</button><button class="btn" style="background:#475569" onclick="toggleAllBrandCheck(true)">전체선택</button><button class="btn" style="background:#64748b" onclick="toggleAllBrandCheck(false)">해제</button></div><div class="modal-body-scroll" id="brand-modal-list"></div><div style="margin-top:15px;text-align:right"><button class="btn" onclick="applyBrandSelection()">확인 적용</button></div></div></div>
+    <div class="modal-overlay" id="item-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">📦 품목 다중 선택</span><span class="close-btn" onclick="closeItemModal()">✕</span></div><div style="display:flex;gap:8px;margin-bottom:8px"><input type="text" id="modal-item-search" class="input-box" style="flex:1" placeholder="품목코드 또는 품목명 검색 (Enter)" onkeydown="if(event.key==='Enter')filterItemModalList()"><button class="btn" onclick="filterItemModalList()">검색</button><button class="btn" style="background:#475569" onclick="toggleAllItemCheck(true)">전체선택</button><button class="btn" style="background:#64748b" onclick="toggleAllItemCheck(false)">해제</button></div><div class="modal-body-scroll" id="item-modal-list"></div><div style="margin-top:15px;text-align:right"><button class="btn" onclick="applyItemSelection()">확인 적용</button></div></div></div>
+
+    <div class="container">
+        
+        <!-- 설정 패널 -->
+        <div class="section-panel">
+            <div class="panel-header">
+                <span class="panel-title-text">⚙️ 분석 기반 · 미래 예측 설정</span>
+                <div>
+                    <span class="pill">데이터 누수 차단</span>
+                    <span class="pill">자동 모델 최적화</span>
+                    <span class="pill">D-2 Cutoff 제어</span>
+                </div>
+            </div>
+
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label style="color:#2563eb">📌 분석 기반 과거기간:</label>
+                    <input type="date" id="base-start-date" class="input-box" style="padding-right:10px">
+                    <span>~</span>
+                    <input type="date" id="base-end-date" class="input-box" style="padding-right:10px">
+                </div>
+                <div style="display:flex;gap:6px">
+                    <button class="btn btn-quick" onclick="setQuickBasePeriod('thisMonth')">📅 이번달 기준</button>
+                    <button class="btn btn-quick" onclick="setQuickBasePeriod('last7days')">⚡ 직전 일주일</button>
+                    <button class="btn btn-quick" onclick="setQuickBasePeriod('lastWeek')">📆 직전주 (월~일)</button>
+                </div>
+            </div>
+
+            <div class="filter-row" style="margin-bottom:15px">
+                <div class="filter-group">
+                    <label style="color:#10b981">🔮 예측/비교 대상 기간:</label>
+                    <input type="date" id="forecast-start-date" class="input-box" style="padding-right:10px">
+                    <span>~</span>
+                    <input type="date" id="forecast-end-date" class="input-box" style="padding-right:10px">
+                </div>
+
+                <div class="filter-group">
+                    <label>브랜드:</label>
+                    <div class="input-wrapper">
+                        <input type="text" id="forecast-brand-input" class="input-box" placeholder="브랜드 선택/검색" style="width:130px" oninput="handleBrandInput(this.value)" onfocus="handleBrandInput(this.value)" onkeydown="if(event.key==='Enter')runForecastSimulation()">
+                        <span class="clear-btn" id="btn-clear-brand" onclick="clearInputField('forecast-brand-input')">✕</span>
+                    </div>
+                    <button class="btn-search-icon" onclick="openBrandModal()">🔍</button>
+                    <div id="brand-autocomplete-list" class="autocomplete-dropdown"></div>
+                </div>
+
+                <div class="filter-group">
+                    <label>품목코드/명:</label>
+                    <div class="input-wrapper">
+                        <input type="text" id="forecast-item-input" class="input-box" placeholder="품목 선택/검색" style="width:140px" oninput="handleItemInput(this.value)" onfocus="handleItemInput(this.value)" onkeydown="if(event.key==='Enter')runForecastSimulation()">
+                        <span class="clear-btn" id="btn-clear-item" onclick="clearInputField('forecast-item-input')">✕</span>
+                    </div>
+                    <button class="btn-search-icon" onclick="openItemModal()">🔍</button>
+                    <label style="font-size:12px;margin-left:6px;cursor:pointer;display:flex;align-items:center;gap:3px;color:#475569" title="체크 시 D-2(모레) 마감 기준 적용 / 미체크 시 D-1(내일) 마감 기준 적용">
+                        <input type="checkbox" id="chk-d2-cutoff" onchange="runForecastSimulation()">
+                        <span>D-2 마감</span>
+                    </label>
+                    <div id="item-autocomplete-list" class="autocomplete-dropdown"></div>
+                </div>
+
+                <div class="filter-group" style="background:#d1fae5;padding:6px 12px;border-radius:6px;border:1px solid #a7f3d0">
+                    <label style="color:#065f46">🚀 신메뉴/행사 가중치:</label>
+                    <input type="number" id="boost-percent-input" class="input-box" value="0" min="0" max="500" step="5" style="width:65px;text-align:center;font-weight:800;color:#065f46;padding-right:8px">
+                    <span style="color:#065f46">%</span>
+                </div>
+
+                <button class="btn btn-forecast" onclick="runForecastSimulation()">🔮 시뮬레이션 실행</button>
+            </div>
+
+            <!-- KPI 카드 5개 (수량 및 일치율 전용) -->
+            <div class="kpi-grid">
+                <div class="kpi-card blue">
+                    <div class="kpi-title">과거 일평균 발주량</div>
+                    <div class="kpi-value" id="kpi-base-daily-avg">0 건</div>
+                    <div class="kpi-sub" id="kpi-sub-daily-avg" style="color:#0284c7">실제 영업일 기준</div>
+                </div>
+                <div class="kpi-card teal">
+                    <div class="kpi-title">🎯 검증 구간 일치율</div>
+                    <div class="kpi-value" id="kpi-accuracy-percent" style="color:#0d9488">-%</div>
+                    <div class="kpi-sub" id="kpi-accuracy-sub" style="color:#0d9488">유효 실적 구간 산출</div>
+                </div>
+                <div class="kpi-card purple">
+                    <div class="kpi-title">총 예상 발주 수량</div>
+                    <div class="kpi-value" id="kpi-forecast-qty">0 건</div>
+                    <div class="kpi-sub" id="kpi-sub-qty">가중치 미적용: 0 건</div>
+                </div>
+                <div class="kpi-card orange">
+                    <div class="kpi-title">가중치 추가 수량</div>
+                    <div class="kpi-value" id="kpi-boost-added-qty">+0 건</div>
+                    <div class="kpi-sub" id="kpi-sub-boost-added" style="color:#f59e0b">미래 남은기간 반영분</div>
+                </div>
+                <div class="kpi-card green">
+                    <div class="kpi-title">🔮 남은 기간 필요 수량</div>
+                    <div class="kpi-value" id="kpi-remaining-qty" style="color:#10b981">0 건</div>
+                    <div class="kpi-sub" id="kpi-sub-remaining" style="color:#10b981">미래 남은기간 필요 수량</div>
+                </div>
+            </div>
+
+            <div class="chart-container"><canvas id="forecastChart"></canvas></div>
+        </div>
+
+        <!-- 모델 성능 진단 영역 -->
+        <div class="section-panel">
+            <div class="panel-header">
+                <span class="panel-title-text">🧠 적응형 앙상블 모델 성능 · 기여도 진단</span>
+                <span id="diagnostic-status" class="status-line">시뮬레이션 실행 후 자동 산출</span>
+            </div>
+            <div class="diagnostic-grid">
+                <div class="diag-card">
+                    <div class="diag-title">백테스트 기반 모델 기여 가중치 (%)</div>
+                    <div id="model-weight-list" class="status-line">데이터를 계산 중입니다...</div>
+                </div>
+                <div class="diag-card">
+                    <div class="diag-title">자동 보정 및 학습 특성</div>
+                    <div id="calibration-summary" class="status-line">대상 기간을 선택하고 실행하세요.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 상세 비교 표 -->
+        <div class="section-panel">
+            <div class="panel-header">
+                <span class="panel-title-text">📋 일별 발주 예측 vs 실제 주문량 비교 명세서</span>
+                <button class="btn btn-excel" onclick="exportForecastToExcel()">📥 예측 명세서 엑셀 저장</button>
+            </div>
+            <div class="table-container">
+                <table>
+                    <colgroup>
+                        <col style="width:110px">
+                        <col style="width:120px">
+                        <col style="width:140px">
+                        <col style="width:210px">
+                        <col style="width:90px">
+                        <col style="width:110px">
+                        <col style="width:110px">
+                        <col style="width:110px">
+                        <col style="width:110px">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th class="text-center">배송일자</th>
+                            <th class="text-center">예상 날씨</th>
+                            <th>브랜드</th>
+                            <th>품목명</th>
+                            <th class="text-center">가중치</th>
+                            <th class="text-right">실제 주문량</th>
+                            <th class="text-right">기본 예상수량</th>
+                            <th class="text-right">최종 예상수량</th>
+                            <th class="text-right">추가 증감량</th>
+                        </tr>
+                    </thead>
+                    <tbody id="forecast-detail-table">
+                        <tr><td colspan="9" class="text-center" style="padding:30px;color:#94a3b8">시뮬레이션 실행 버튼을 누르면 계산됩니다.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </div>
 
-    <div class="section-panel">
-      <div class="panel-header"><span class="panel-title-text">📋 일별 발주 예측 vs 실제 주문량 비교 명세서</span><button class="btn btn-excel" onclick="exportForecastToExcel()">📥 예측 명세서 엑셀 저장</button></div>
-      <div class="table-container"><table><colgroup><col style="width:110px"><col style="width:120px"><col style="width:140px"><col style="width:210px"><col style="width:90px"><col style="width:110px"><col style="width:110px"><col style="width:110px"><col style="width:110px"></colgroup><thead><tr><th class="text-center">배송일자</th><th class="text-center">예상 날씨</th><th>브랜드</th><th>품목명</th><th class="text-center">가중치</th><th class="text-right">실제 주문량</th><th class="text-right">기본 예상수량</th><th class="text-right">최종 예상수량</th><th class="text-right">추가 증감량</th></tr></thead><tbody id="forecast-detail-table"><tr><td colspan="9" class="text-center" style="padding:30px;color:#94a3b8">시뮬레이션 실행 버튼을 누르면 계산됩니다.</td></tr></tbody></table></div>
-    </div>
-  </div>
+    <script>
+        const SUPABASE_URL = 'https://zbilhsgfgyfrolveaego.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN';
 
-<script>
-const SUPABASE_URL = 'https://zbilhsgfgyfrolveaego.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN';
+        const CFG = {
+            historyDays: 210,
+            backtestDays: 56,
+            minTrainDays: 35,
+            modelWeightShrink: 0.18,
+            weekdayWeightBlend: 0.25,
+            calibrationCap: [0.90, 1.10],
+            weekdayCalibrationCap: [0.94, 1.06],
+            weatherCalibrationCap: [0.96, 1.04],
+            calendarCalibrationCap: [0.97, 1.03],
+            maxRowsPerPage: 1000
+        };
 
-const CFG = {
-  historyDays: 210,
-  backtestDays: 56,
-  minTrainDays: 35,
-  modelWeightShrink: 0.18,
-  weekdayWeightBlend: 0.25,
-  calibrationCap: [0.90, 1.10],
-  weekdayCalibrationCap: [0.94, 1.06],
-  weatherCalibrationCap: [0.96, 1.04],
-  calendarCalibrationCap: [0.97, 1.03],
-  maxRowsPerPage: 1000
-};
+        let forecastChart = null;
+        let currentForecastRows = [];
+        let allBrandList = [], allItemList = [];
 
-let forecastChart = null;
-let currentForecastRows = [];
-let allBrandList = [], allItemList = [];
-let lastDiagnostics = null;
+        function formatDate(d) { const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); return `${y}-${m}-${day}`; }
+        function parseDate(s) { return new Date(`${s}T00:00:00`); }
+        function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
+        function formatDisplayDate(dateStr) { if (!dateStr) return '-'; return String(dateStr).split('T')[0].replace(/-/g, '/'); }
+        function cleanNumber(val) { return parseFloat(String(val ?? 0).replace(/[^0-9.-]/g, '')) || 0; }
+        function cleanCode(val) { if (!val && val !== 0) return '-'; let str = String(val).trim(); if (str.endsWith('.0')) str = str.slice(0, -2); return str || '-'; }
+        function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+        function mean(a) { return a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0; }
+        function median(a) { if (!a.length) return 0; const s = [...a].sort((x, y) => x - y); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+        function weightedAverage(values, weights) { let sw = 0, s = 0; for (let i = 0; i < values.length; i++) { const w = weights[i] ?? 1; s += values[i] * w; sw += w; } return sw ? s / sw : 0; }
+        function cleanArrayIQR(arr) { if (arr.length < 6) return arr.slice(); const s = [...arr].sort((a, b) => a - b); const q1 = s[Math.floor(s.length * 0.25)], q3 = s[Math.floor(s.length * 0.75)], iqr = q3 - q1; const lb = q1 - 1.5 * iqr, ub = q3 + 1.5 * iqr; const out = arr.filter(x => x >= lb && x <= ub); return out.length >= 3 ? out : arr.slice(); }
 
-function formatDate(d){const y=d.getFullYear();const m=String(d.getMonth()+1).padStart(2,'0');const day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`;}
-function parseDate(s){return new Date(`${s}T00:00:00`);}
-function addDays(date,n){const d=new Date(date);d.setDate(d.getDate()+n);return d;}
-function daysBetween(a,b){return Math.round((b-a)/86400000);}
-function formatDisplayDate(dateStr){if(!dateStr)return '-';return String(dateStr).split('T')[0].replace(/-/g,'/');}
-function cleanNumber(val){return parseFloat(String(val ?? 0).replace(/[^0-9.-]/g,''))||0;}
-function cleanCode(val){if(!val&&val!==0)return '-';let str=String(val).trim();if(str.endsWith('.0'))str=str.slice(0,-2);return str||'-';}
-function clamp(x,a,b){return Math.max(a,Math.min(b,x));}
-function mean(a){return a.length?a.reduce((s,x)=>s+x,0)/a.length:0;}
-function median(a){if(!a.length)return 0;const s=[...a].sort((x,y)=>x-y);const m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2;}
-function sumAbs(a){return a.reduce((s,x)=>s+Math.abs(x),0);}
-function weightedAverage(values,weights){let sw=0,s=0;for(let i=0;i<values.length;i++){const w=weights[i]??1;s+=values[i]*w;sw+=w;}return sw?s/sw:0;}
-function sigmoid(x){return 1/(1+Math.exp(-clamp(x,-30,30)));}
-function cleanArrayIQR(arr){if(arr.length<6)return arr.slice();const s=[...arr].sort((a,b)=>a-b);const q1=s[Math.floor(s.length*0.25)],q3=s[Math.floor(s.length*0.75)],iqr=q3-q1;const lb=q1-1.5*iqr,ub=q3+1.5*iqr;const out=arr.filter(x=>x>=lb&&x<=ub);return out.length>=3?out:arr.slice();}
+        /* Supabase Range 페이징 조회를 통한 500 에러 방지 */
+        async function fetchSupabaseAll(urlBase, extraHeaders = {}) {
+            const out = []; let start = 0;
+            while (true) {
+                const res = await fetch(urlBase, {
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Range': `${start}-${start + CFG.maxRowsPerPage - 1}`,
+                        'Prefer': 'count=exact',
+                        ...extraHeaders
+                    }
+                });
+                if (!res.ok) throw new Error(`Supabase ${res.status}`);
+                const page = await res.json();
+                out.push(...page);
+                if (page.length < CFG.maxRowsPerPage) break;
+                start += CFG.maxRowsPerPage;
+                if (start > 50000) break;
+            }
+            return out;
+        }
 
-async function fetchSupabaseAll(urlBase, extraHeaders={}){
-  const out=[];let start=0;
-  while(true){
-    const res=await fetch(urlBase,{headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':`Bearer ${SUPABASE_ANON_KEY}`,'Range':`${start}-${start+CFG.maxRowsPerPage-1}`,'Prefer':'count=exact',...extraHeaders}});
-    if(!res.ok)throw new Error(`Supabase ${res.status}`);
-    const page=await res.json();out.push(...page);
-    if(page.length<CFG.maxRowsPerPage)break;
-    start+=CFG.maxRowsPerPage;
-    if(start>50000)break;
-  }
-  return out;
-}
+        async function loadMasterLists() {
+            try {
+                const url = `${SUPABASE_URL}/rest/v1/daily_order_summary?select=brand_name,item_code,item_name&limit=1000`;
+                const data = await fetchSupabaseAll(url);
+                allBrandList = [...new Set(data.map(r => r.brand_name).filter(Boolean))].sort();
+                const map = new Map();
+                data.forEach(r => { if (r.item_code || r.item_name) map.set(`${cleanCode(r.item_code)}__${r.item_name}`, { code: cleanCode(r.item_code), name: r.item_name || '' }); });
+                allItemList = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+            } catch (err) { console.warn('마스터 목록 로드 실패', err); }
+        }
 
-async function loadMasterLists(){
-  try{
-    const url=`${SUPABASE_URL}/rest/v1/daily_order_summary?select=brand_name,item_code,item_name&limit=1000`;
-    const data=await fetchSupabaseAll(url);
-    allBrandList=[...new Set(data.map(r=>r.brand_name).filter(Boolean))].sort();
-    const map=new Map();data.forEach(r=>{if(r.item_code||r.item_name)map.set(`${cleanCode(r.item_code)}__${r.item_name}`,{code:cleanCode(r.item_code),name:r.item_name||''});});
-    allItemList=Array.from(map.values()).sort((a,b)=>a.name.localeCompare(b.name));
-  }catch(err){console.warn('마스터 목록 실패',err);}
-}
-function clearInputField(id){const el=document.getElementById(id);if(el){el.value='';toggleClearBtn(id);}}
-function toggleClearBtn(id){const el=document.getElementById(id);const btn=id==='forecast-brand-input'?document.getElementById('btn-clear-brand'):document.getElementById('btn-clear-item');if(btn&&el)btn.style.display=el.value.trim()?'block':'none';}
-function handleAutocompleteInput(val,type){const inputId=type==='brand'?'forecast-brand-input':'forecast-item-input';const dropId=type==='brand'?'brand-autocomplete-list':'item-autocomplete-list';const list=type==='brand'?allBrandList:allItemList;toggleClearBtn(inputId);const drop=document.getElementById(dropId);const key=String(val||'').toLowerCase().trim();if(!key||!list.length){drop.style.display='none';return;}const matched=type==='brand'?list.filter(b=>b.toLowerCase().includes(key)).slice(0,8):list.filter(i=>i.code.toLowerCase().includes(key)||i.name.toLowerCase().includes(key)).slice(0,8);if(!matched.length){drop.style.display='none';return;}drop.innerHTML=type==='brand'?matched.map(b=>`<div class="autocomplete-item" onclick="selectAutocomplete('${b.replace(/'/g,"\\'")}','brand')"><span>${b}</span></div>`).join(''):matched.map(i=>`<div class="autocomplete-item" onclick="selectAutocomplete('${i.name.replace(/'/g,"\\'")}','item')"><span><b>${i.name}</b></span><span class="code-tag">[${i.code}]</span></div>`).join('');drop.style.display='block';}
-function handleBrandInput(v){handleAutocompleteInput(v,'brand')}function handleItemInput(v){handleAutocompleteInput(v,'item')}
-function selectAutocomplete(v,type){const inputId=type==='brand'?'forecast-brand-input':'forecast-item-input';const dropId=type==='brand'?'brand-autocomplete-list':'item-autocomplete-list';document.getElementById(inputId).value=v;toggleClearBtn(inputId);document.getElementById(dropId).style.display='none';}
-document.addEventListener('click',e=>{['brand','item'].forEach(type=>{const inId=type==='brand'?'forecast-brand-input':'forecast-item-input';const dId=type==='brand'?'brand-autocomplete-list':'item-autocomplete-list';if(!e.target.closest('#'+inId)&&!e.target.closest('#'+dId))document.getElementById(dId).style.display='none';});});
-async function openBrandModal(){document.getElementById('brand-modal').style.display='flex';if(!allBrandList.length)await loadMasterLists();renderBrandModalList();}function closeBrandModal(){document.getElementById('brand-modal').style.display='none';}
-function renderBrandModalList(){const current=document.getElementById('forecast-brand-input').value.split(',').map(s=>s.trim()).filter(Boolean);const k=document.getElementById('modal-brand-search').value.toLowerCase().trim();const filtered=allBrandList.filter(b=>b.toLowerCase().includes(k));document.getElementById('brand-modal-list').innerHTML=filtered.length?filtered.map(b=>`<div class="search-list-item"><label><input type="checkbox" class="brand-modal-chk" value="${b.replace(/"/g,'&quot;')}" ${current.includes(b)?'checked':''}><span>${b}</span></label></div>`).join(''):'<div style="text-align:center;color:#94a3b8;padding:15px">검색 결과가 없습니다.</div>';}
-function filterBrandModalList(){renderBrandModalList()}function toggleAllBrandCheck(status){document.querySelectorAll('.brand-modal-chk').forEach(x=>x.checked=status)}function applyBrandSelection(){document.getElementById('forecast-brand-input').value=Array.from(document.querySelectorAll('.brand-modal-chk:checked')).map(x=>x.value).join(', ');toggleClearBtn('forecast-brand-input');closeBrandModal();}
-async function openItemModal(){document.getElementById('item-modal').style.display='flex';if(!allItemList.length)await loadMasterLists();renderItemModalList();}function closeItemModal(){document.getElementById('item-modal').style.display='none';}
-function renderItemModalList(){const current=document.getElementById('forecast-item-input').value.split(',').map(s=>s.trim()).filter(Boolean);const k=document.getElementById('modal-item-search').value.toLowerCase().trim();const filtered=allItemList.filter(i=>i.code.toLowerCase().includes(k)||i.name.toLowerCase().includes(k));document.getElementById('item-modal-list').innerHTML=filtered.length?filtered.map(i=>`<div class="search-list-item"><label><input type="checkbox" class="item-modal-chk" value="${i.name.replace(/"/g,'&quot;')}" ${current.includes(i.name)?'checked':''}><span><span class="code-tag">[${i.code}]</span> <b style="margin-left:4px">${i.name}</b></span></label></div>`).join(''):'<div style="text-align:center;color:#94a3b8;padding:15px">검색 결과가 없습니다.</div>';}
-function filterItemModalList(){renderItemModalList()}function toggleAllItemCheck(status){document.querySelectorAll('.item-modal-chk').forEach(x=>x.checked=status)}function applyItemSelection(){document.getElementById('forecast-item-input').value=Array.from(document.querySelectorAll('.item-modal-chk:checked')).map(x=>x.value).join(', ');toggleClearBtn('forecast-item-input');closeItemModal();}
-function setQuickBasePeriod(type){const today=new Date();let s=new Date(today),e=new Date(today);if(type==='thisMonth'){s=new Date(today.getFullYear(),today.getMonth(),1);}else if(type==='last7days'){s.setDate(today.getDate()-7);e.setDate(today.getDate()-1)}else if(type==='lastWeek'){const dow=today.getDay();const distance=(dow===0?6:dow-1)+7;s.setDate(today.getDate()-distance);e.setDate(s.getDate()+6);}document.getElementById('base-start-date').value=formatDate(s);document.getElementById('base-end-date').value=formatDate(e);}
+        function clearInputField(id) { const el = document.getElementById(id); if (el) { el.value = ''; toggleClearBtn(id); } }
+        function toggleClearBtn(id) { const el = document.getElementById(id); const btn = id === 'forecast-brand-input' ? document.getElementById('btn-clear-brand') : document.getElementById('btn-clear-item'); if (btn && el) btn.style.display = el.value.trim() ? 'block' : 'none'; }
+        
+        function handleAutocompleteInput(val, type) {
+            const inputId = type === 'brand' ? 'forecast-brand-input' : 'forecast-item-input';
+            const dropId = type === 'brand' ? 'brand-autocomplete-list' : 'item-autocomplete-list';
+            const list = type === 'brand' ? allBrandList : allItemList;
+            toggleClearBtn(inputId);
+            const drop = document.getElementById(dropId);
+            const key = String(val || '').toLowerCase().trim();
+            if (!key || !list.length) { drop.style.display = 'none'; return; }
+            const matched = type === 'brand' ? list.filter(b => b.toLowerCase().includes(key)).slice(0, 8) : list.filter(i => i.code.toLowerCase().includes(key) || i.name.toLowerCase().includes(key)).slice(0, 8);
+            if (!matched.length) { drop.style.display = 'none'; return; }
+            drop.innerHTML = type === 'brand' 
+                ? matched.map(b => `<div class="autocomplete-item" onclick="selectAutocomplete('${b.replace(/'/g, "\\'")}', 'brand')"><span>${b}</span></div>`).join('')
+                : matched.map(i => `<div class="autocomplete-item" onclick="selectAutocomplete('${i.name.replace(/'/g, "\\'")}', 'item')"><span><b>${i.name}</b></span><span class="code-tag">[${i.code}]</span></div>`).join('');
+            drop.style.display = 'block';
+        }
 
-async function fetchWeather(startDate,endDate,archive=false){
-  const endpoint=archive?'https://archive-api.open-meteo.com/v1/archive':'https://api.open-meteo.com/v1/forecast';
-  const url=`${endpoint}?latitude=37.5665&longitude=126.9780&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_sum,snowfall_sum&timezone=Asia%2FSeoul`;
-  const map={};
-  try{const r=await fetch(url);if(!r.ok)throw new Error(`weather ${r.status}`);const d=await r.json();if(d?.daily?.time)d.daily.time.forEach((ds,i)=>{const maxT=Math.round(d.daily.temperature_2m_max?.[i]??0),minT=Math.round(d.daily.temperature_2m_min?.[i]??0),wc=d.daily.weather_code?.[i]??0,prec=d.daily.precipitation_sum?.[i]??0,snow=d.daily.snowfall_sum?.[i]??0;let statusIcon='☀️',statusText='맑음',bucket='clear';if(snow>0||[71,73,75,77,85,86].includes(wc)){statusIcon='❄️';statusText='눈';bucket='snow';}else if(prec>0||[51,53,55,61,63,65,80,81,82].includes(wc)){statusIcon='🌧️';statusText='비';bucket='rain';}else if([1,2,3,45,48].includes(wc)){statusIcon='⛅';statusText='흐림';bucket='cloud';}else if(maxT>=32){bucket='hot';}else if(maxT<=0){bucket='cold';}map[ds]={minTemp:minT,maxTemp:maxT,statusIcon,statusText,bucket,displayLabel:`${statusIcon} ${minT}°/${maxT}°`};});}
-  catch(e){console.warn('날씨 조회 실패',e);}
-  return map;
-}
+        function handleBrandInput(v) { handleAutocompleteInput(v, 'brand'); }
+        function handleItemInput(v) { handleAutocompleteInput(v, 'item'); }
+        function selectAutocomplete(v, type) {
+            const inputId = type === 'brand' ? 'forecast-brand-input' : 'forecast-item-input';
+            const dropId = type === 'brand' ? 'brand-autocomplete-list' : 'item-autocomplete-list';
+            document.getElementById(inputId).value = v;
+            toggleClearBtn(inputId);
+            document.getElementById(dropId).style.display = 'none';
+        }
 
-function buildDailyMap(rows){
-  const sums={};let minDate=null,maxDate=null;
-  rows.forEach(r=>{if(!r.delivery_date)return;const ds=formatDate(parseDate(formatDisplayDate(r.delivery_date).replace(/\//g,'-')));const q=cleanNumber(r.total_qty??r.qty);sums[ds]=(sums[ds]||0)+q;minDate=minDate&&minDate<ds?minDate:ds;maxDate=maxDate&&maxDate>ds?maxDate:ds;});
-  const map={};if(!minDate||!maxDate)return map;let d=parseDate(minDate),e=parseDate(maxDate);while(d<=e){const ds=formatDate(d);map[ds]=sums[ds]??0;d=addDays(d,1);}return map;
-}
-function getPastDatesBefore(target,map){const out=[];let d=addDays(parseDate(target),-1);const guard=CFG.historyDays+60;for(let i=0;i<guard;i++){const ds=formatDate(d);if(map[ds]!==undefined)out.push(ds);d=addDays(d,-1);}return out;}
-function valsBefore(target,map,n=null){const dates=getPastDatesBefore(target,map);const use=n?dates.slice(0,n):dates;return use.reverse().map(ds=>map[ds]??0);}
-function sameWeekdayVals(target,map,n=8){const td=parseDate(target).getDay();const vals=[];let d=addDays(parseDate(target),-1);for(let i=0;i<CFG.historyDays+30&&vals.length<n;i++){if(d.getDay()===td){const ds=formatDate(d);if(map[ds]!==undefined)vals.push({date:ds,val:map[ds]});}d=addDays(d,-1);}return vals;}
-function robustMean(a){const c=cleanArrayIQR(a);return mean(c.length?c:a);}
-function ewma(a,alpha=.35){if(!a.length)return 0;let z=a[0];for(let i=1;i<a.length;i++)z=alpha*a[i]+(1-alpha)*z;return Math.max(0,z);}
-function holtDamped(a,alpha=.42,beta=.18,phi=.82){if(a.length===0)return 0;if(a.length===1)return a[0];let level=a[0],trend=a[1]-a[0];for(let i=1;i<a.length;i++){const prev=level;level=alpha*a[i]+(1-alpha)*(level+phi*trend);trend=beta*(level-prev)+(1-beta)*phi*trend;}return Math.max(0,level+phi*trend);}
-function linTrend(a,n=14,damp=.65){const y=a.slice(-n);if(y.length<3)return robustMean(a);const xm=(y.length-1)/2,ym=mean(y);let num=0,den=0;for(let i=0;i<y.length;i++){num+=(i-xm)*(y[i]-ym);den+=(i-xm)*(i-xm);}const slope=den?num/den:0;return Math.max(0,ym+damp*slope*(y.length));}
-function seasonalWeighted(target,map){const s=sameWeekdayVals(target,map,8);if(!s.length)return null;const v=s.map(x=>x.val),w=v.map((_,i)=>Math.pow(.72,i));return weightedAverage(v,w);}
-function lagSeasonal(target,map,lagWeeks=4){const td=parseDate(target);const vals=[];for(let k=1;k<=lagWeeks;k++){const ds=formatDate(addDays(td,-7*k));if(map[ds]!==undefined)vals.push({k,val:map[ds]});}if(!vals.length)return null;return weightedAverage(vals.map(x=>x.val),vals.map(x=>Math.pow(.70,x.k-1)));}
-function weekdayRatioForecast(target,map){const td=parseDate(target);const recent=valsBefore(target,map,28);if(!recent.length)return 0;const global=robustMean(recent);const same=sameWeekdayVals(target,map,8).map(x=>x.val);if(!same.length||global<=0)return global;const sameMean=robustMean(same);const ratio=clamp(sameMean/global,.75,1.30);return global*ratio;}
-function recentMedianForecast(target,map,n=14){const a=valsBefore(target,map,n);return median(cleanArrayIQR(a));}
-function recentMeanForecast(target,map,n=7){const a=valsBefore(target,map,n);return robustMean(a);}
-function weightedRecent(target,map,n=14){const a=valsBefore(target,map,n);if(!a.length)return 0;const w=a.map((_,i)=>Math.pow(.92,a.length-1-i));return weightedAverage(a,w);}
+        document.addEventListener('click', e => {
+            ['brand', 'item'].forEach(type => {
+                const inId = type === 'brand' ? 'forecast-brand-input' : 'forecast-item-input';
+                const dId = type === 'brand' ? 'brand-autocomplete-list' : 'item-autocomplete-list';
+                if (!e.target.closest('#' + inId) && !e.target.closest('#' + dId)) document.getElementById(dId).style.display = 'none';
+            });
+        });
 
-const MODELS=[
-  {id:'sameWeekday',name:'동요일 최근 8회',predict:(t,m)=>seasonalWeighted(t,m)},
-  {id:'lagSeasonal',name:'주간계절 Lag 앙상블',predict:(t,m)=>lagSeasonal(t,m,4)},
-  {id:'weekdayRatio',name:'요일비율 + 최근28일',predict:(t,m)=>weekdayRatioForecast(t,m)},
-  {id:'recent7',name:'최근 7일 Robust 평균',predict:(t,m)=>recentMeanForecast(t,m,7)},
-  {id:'recent14',name:'최근 14일 Robust 평균',predict:(t,m)=>recentMeanForecast(t,m,14)},
-  {id:'median14',name:'최근 14일 중앙값',predict:(t,m)=>recentMedianForecast(t,m,14)},
-  {id:'weighted14',name:'최근성 가중 평균',predict:(t,m)=>weightedRecent(t,m,14)},
-  {id:'ewma',name:'EWMA Level',predict:(t,m)=>ewma(valsBefore(t,m,28),.35)},
-  {id:'holt',name:'Holt Damped Trend',predict:(t,m)=>holtDamped(cleanArrayIQR(valsBefore(t,m,56)),.42,.18,.82)},
-  {id:'trend14',name:'Local Trend 14일',predict:(t,m)=>linTrend(cleanArrayIQR(valsBefore(t,m,21)),14,.65)},
-  {id:'trend28',name:'Local Trend 28일',predict:(t,m)=>linTrend(cleanArrayIQR(valsBefore(t,m,42)),28,.50)}
-];
+        async function openBrandModal() { document.getElementById('brand-modal').style.display = 'flex'; if (!allBrandList.length) await loadMasterLists(); renderBrandModalList(); }
+        function closeBrandModal() { document.getElementById('brand-modal').style.display = 'none'; }
+        function renderBrandModalList() {
+            const current = document.getElementById('forecast-brand-input').value.split(',').map(s => s.trim()).filter(Boolean);
+            const k = document.getElementById('modal-brand-search').value.toLowerCase().trim();
+            const filtered = allBrandList.filter(b => b.toLowerCase().includes(k));
+            document.getElementById('brand-modal-list').innerHTML = filtered.length ? filtered.map(b => `<div class="search-list-item"><label><input type="checkbox" class="brand-modal-chk" value="${b.replace(/"/g, '&quot;')}" ${current.includes(b) ? 'checked' : ''}><span>${b}</span></label></div>`).join('') : '<div style="text-align:center;color:#94a3b8;padding:15px">검색 결과가 없습니다.</div>';
+        }
+        function filterBrandModalList() { renderBrandModalList(); }
+        function toggleAllBrandCheck(status) { document.querySelectorAll('.brand-modal-chk').forEach(x => x.checked = status); }
+        function applyBrandSelection() { document.getElementById('forecast-brand-input').value = Array.from(document.querySelectorAll('.brand-modal-chk:checked')).map(x => x.value).join(', '); toggleClearBtn('forecast-brand-input'); closeBrandModal(); }
 
-function simplexProject(v){
-  const u=[...v].sort((a,b)=>b-a);let css=0,rho=-1;
-  for(let i=0;i<u.length;i++){css+=u[i];const t=(css-1)/(i+1);if(u[i]-t>0)rho=i;}
-  const theta=rho>=0?(u.slice(0,rho+1).reduce((s,x)=>s+x,0)-1)/(rho+1):0;
-  return v.map(x=>Math.max(0,x-theta));
-}
-function optimizeBlendWeights(matrix,actuals){
-  const m=MODELS.length;if(!matrix.length)return Array(m).fill(1/m);let w=Array(m).fill(1/m),lr=.04,reg=.015;
-  const scale=Math.max(1,median(actuals));
-  for(let it=0;it<700;it++){
-    const g=Array(m).fill(0);
-    for(let r=0;r<matrix.length;r++){
-      let pred=0;for(let j=0;j<m;j++)pred+=matrix[r][j]*w[j];
-      const denom=Math.max(scale,Math.abs(actuals[r]));const err=(pred-actuals[r])/denom;
-      for(let j=0;j<m;j++)g[j]+=2*matrix[r][j]*err/denom;
-    }
-    for(let j=0;j<m;j++)g[j]=g[j]/Math.max(1,matrix.length)+reg*(w[j]-1/m);
-    w=simplexProject(w.map((x,j)=>x-lr*g[j]));
-    if(it===250)lr=.02;if(it===500)lr=.01;
-  }
-  return w;
-}
-function modelMetrics(preds,actuals){
-  if(!actuals.length)return {wmape:999,smape:999,bias:999,score:999,n:0};let absErr=0,den=0,sm=0,sumAct=0,sumErr=0;for(let i=0;i<actuals.length;i++){const a=actuals[i],p=preds[i],ae=Math.abs(a-p);absErr+=ae;den+=Math.abs(a);sm+=2*ae/(Math.abs(a)+Math.abs(p)+1);sumAct+=Math.abs(a);sumErr+=p-a;}const wmape=den?100*absErr/den:100*mean(preds.map((p,i)=>Math.abs(p-actuals[i])));const smape=100*sm/actuals.length;const bias=100*Math.abs(sumErr)/Math.max(1,sumAct);const score=.52*wmape+.28*smape+.20*bias;return {wmape,smape,bias,score,n:actuals.length};}
-function inverseScoreWeights(metrics){const raw=metrics.map(x=>1/Math.max(.25,x.score));const s=sumAbs(raw);return raw.map(x=>x/s);}
-function mixWeights(a,b,wa=.72){return a.map((x,i)=>wa*x+(1-wa)*b[i]);}
+        async function openItemModal() { document.getElementById('item-modal').style.display = 'flex'; if (!allItemList.length) await loadMasterLists(); renderItemModalList(); }
+        function closeItemModal() { document.getElementById('item-modal').style.display = 'none'; }
+        function renderItemModalList() {
+            const current = document.getElementById('forecast-item-input').value.split(',').map(s => s.trim()).filter(Boolean);
+            const k = document.getElementById('modal-item-search').value.toLowerCase().trim();
+            const filtered = allItemList.filter(i => i.code.toLowerCase().includes(k) || i.name.toLowerCase().includes(k));
+            document.getElementById('item-modal-list').innerHTML = filtered.length ? filtered.map(i => `<div class="search-list-item"><label><input type="checkbox" class="item-modal-chk" value="${i.name.replace(/"/g, '&quot;')}" ${current.includes(i.name) ? 'checked' : ''}><span><span class="code-tag">[${i.code}]</span> <b style="margin-left:4px">${i.name}</b></span></label></div>`).join('') : '<div style="text-align:center;color:#94a3b8;padding:15px">검색 결과가 없습니다.</div>';
+        }
+        function filterItemModalList() { renderItemModalList(); }
+        function toggleAllItemCheck(status) { document.querySelectorAll('.item-modal-chk').forEach(x => x.checked = status); }
+        function applyItemSelection() { document.getElementById('forecast-item-input').value = Array.from(document.querySelectorAll('.item-modal-chk:checked')).map(x => x.value).join(', '); toggleClearBtn('forecast-item-input'); closeItemModal(); }
 
-function buildBacktest(map, trainStart, trainEnd){
-  let evalDates=[];let d=parseDate(trainEnd);const minEval=addDays(parseDate(trainEnd),-(CFG.backtestDays-1));for(;d>=parseDate(trainStart);d=addDays(d,-1)){const ds=formatDate(d);if(d.getDay()!==0&&map[ds]!==undefined)evalDates.push(ds);if(evalDates.length>=CFG.backtestDays)break;}evalDates=evalDates.reverse();
-  const perModel=MODELS.map(()=>({p:[],a:[]}));const matrix=[],actuals=[],meta=[];
-  for(const ds of evalDates){const a=map[ds];const row=[];for(let j=0;j<MODELS.length;j++){let p=MODELS[j].predict(ds,map);if(p===null||!Number.isFinite(p))p=recentMeanForecast(ds,map,7);p=Math.max(0,p);row.push(p);perModel[j].p.push(p);perModel[j].a.push(a);}matrix.push(row);actuals.push(a);meta.push({date:ds,row,actual:a});}
-  const metrics=perModel.map(x=>modelMetrics(x.p,x.a));const inverse=inverseScoreWeights(metrics);const optimized=optimizeBlendWeights(matrix,actuals);let globalWeights=mixWeights(optimized,inverse,.72);globalWeights=globalWeights.map((x)=>.82*x+.18/MODELS.length);globalWeights=globalWeights.map(x=>Math.max(0,x));const sw=globalWeights.reduce((s,x)=>s+x,0);globalWeights=globalWeights.map(x=>x/sw);
-  const weekdayWeights=Array.from({length:7},(_,wd)=>{const idx=[];meta.forEach((r)=>{if(parseDate(r.date).getDay()===wd)idx.push(r);});if(idx.length<3)return globalWeights.slice();const mat=idx.map(r=>r.row),acts=idx.map(r=>r.actual);const met=MODELS.map((_,j)=>modelMetrics(mat.map(r=>r[j]),acts));const inv=inverseScoreWeights(met);const blended=mixWeights(globalWeights,inv,.75);const s=blended.reduce((s,x)=>s+x,0);return blended.map(x=>x/s);});
-  const blendedPred=meta.map(r=>r.row.reduce((s,p,j)=>s+p*globalWeights[j],0));
-  let ratioNum=0,ratioDen=0,regNum=0,regDen=0;meta.forEach((r,i)=>{const p=blendedPred[i],a=r.actual;ratioNum+=a;ratioDen+=Math.max(.1,p);regNum+=a*p;regDen+=p*p;});const ratio=ratioDen?ratioNum/ratioDen:1;const slope=regDen?regNum/regDen:1;const globalCalib=clamp(.5*ratio+.5*slope,...CFG.calibrationCap);
-  const weekdayCalib=Array.from({length:7},(_,wd)=>{const rs=[];meta.forEach((r,i)=>{if(parseDate(r.date).getDay()===wd&&blendedPred[i]>0)rs.push(r.actual/blendedPred[i]);});return clamp(.65+(rs.length?mean(rs):1)*.35,.94,1.06);});
-  return {evalDates,meta,metrics,inverse,optimized,globalWeights,weekdayWeights,weekdayCalib,globalCalib};
-}
-function weatherBucketFor(dateStr,weatherMap){return weatherMap[dateStr]?.bucket||'unknown';}
-function learnResidualCalibrations(backtest,weatherMap){
-  const weather={};const calendar={};
-  backtest.meta.forEach(r=>{
-    const wd=parseDate(r.date).getDay();const p=r.row.reduce((s,x,j)=>s+x*backtest.globalWeights[j],0);if(p<=0)return;const ratio=clamp(r.actual/p,.75,1.25);const bucket=weatherBucketFor(r.date,weatherMap);if(!weather[bucket])weather[bucket]=[];weather[bucket].push(ratio);const d=parseDate(r.date);const day=d.getDate();const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();const cal=(day<=3?'start':day>=last-2?'end':'middle');const key=`${wd}_${cal}`;if(!calendar[key])calendar[key]=[];calendar[key].push(ratio);});
-  const weatherFactor={};Object.keys(weather).forEach(k=>weatherFactor[k]=weather[k].length>=3?clamp(.75*mean(weather[k])+.25, CFG.weatherCalibrationCap[0],CFG.weatherCalibrationCap[1]):1);
-  const calendarFactor={};Object.keys(calendar).forEach(k=>calendarFactor[k]=calendar[k].length>=3?clamp(.75*mean(calendar[k])+.25,CFG.calendarCalibrationCap[0],CFG.calendarCalibrationCap[1]):1);
-  return {weatherFactor,calendarFactor};
-}
-function getCalendarBucket(dateStr){const d=parseDate(dateStr);const day=d.getDate();const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();return day<=3?'start':day>=last-2?'end':'middle';}
-function chooseWeightsForDate(dateStr,bt){const wd=parseDate(dateStr).getDay();return bt.weekdayWeights?.[wd]||bt.globalWeights;}
-function volatilityBand(target,map){const same=sameWeekdayVals(target,map,8).map(x=>x.val).filter(x=>x>=0);const recent=valsBefore(target,map,28).filter(x=>x>=0);const m=Math.max(1,mean(recent));const sd=Math.sqrt(mean(recent.map(x=>(x-m)*(x-m))));const cv=sd/m;let lo=.58,hi=1.55;if(cv>.45){lo=.45;hi=1.80}else if(cv<.18){lo=.70;hi=1.35}const ref=Math.max(1,median(cleanArrayIQR(same.length?same:recent)));return {min:ref*lo,max:ref*hi,cv,ref};}
+        function setQuickBasePeriod(type) {
+            const today = new Date();
+            let s = new Date(today), e = new Date(today);
+            if (type === 'thisMonth') { s = new Date(today.getFullYear(), today.getMonth(), 1); }
+            else if (type === 'last7days') { s.setDate(today.getDate() - 7); e.setDate(today.getDate() - 1); }
+            else if (type === 'lastWeek') { const dow = today.getDay(); const distance = (dow === 0 ? 6 : dow - 1) + 7; s.setDate(today.getDate() - distance); e.setDate(s.getDate() + 6); }
+            document.getElementById('base-start-date').value = formatDate(s);
+            document.getElementById('base-end-date').value = formatDate(e);
+        }
 
-async function runForecastSimulation(){
-  const baseStart=document.getElementById('base-start-date').value,baseEnd=document.getElementById('base-end-date').value,startDate=document.getElementById('forecast-start-date').value,endDate=document.getElementById('forecast-end-date').value;
-  const brandVal=document.getElementById('forecast-brand-input').value.trim(),itemVal=document.getElementById('forecast-item-input').value.trim(),boostPercent=cleanNumber(document.getElementById('boost-percent-input').value),boostMultiplier=1+boostPercent/100,isD2=document.getElementById('chk-d2-cutoff').checked;
-  if(!baseStart||!baseEnd||!startDate||!endDate)return alert('기간을 모두 선택하세요.');if(baseStart>baseEnd)return alert('분석 기반 시작일은 종료일보다 이전이어야 합니다.');if(startDate>endDate)return alert('예측 시작일은 종료일보다 이전이어야 합니다.');
-  document.getElementById('diagnostic-status').innerText='📡 과거 데이터 / 날씨 / 백테스트를 계산하고 있습니다...';
-  try{
-    const now=new Date();const maxOffset=(now.getHours()>=11?1:0)+(isD2?1:0);const maxActualDate=formatDate(addDays(now,maxOffset));
-    const horizonHistoryStart=formatDate(addDays(parseDate(startDate),-CFG.historyDays));const fetchStart=trainStart<horizonHistoryStart?trainStart:horizonHistoryStart;const actualTrainEnd=baseEnd<formatDate(addDays(parseDate(startDate),-1))?baseEnd:formatDate(addDays(parseDate(startDate),-1));const trainStart=baseStart;
-    const orParts=[];if(brandVal){brandVal.split(',').map(s=>s.trim()).filter(Boolean).forEach(b=>orParts.push(`brand_name.ilike.*${encodeURIComponent(b)}*`));}
-    const itemParts=[];if(itemVal){itemVal.split(',').map(s=>s.trim()).filter(Boolean).forEach(i=>itemParts.push(`item_code.ilike.*${encodeURIComponent(i)}*,item_name.ilike.*${encodeURIComponent(i)}*`));}
-    let url=`${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${fetchStart}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,item_name,item_code,brand_name`;
-    if(orParts.length===1)url+=`&${orParts[0]}`;else if(orParts.length>1)url+=`&or=(${orParts.join(',')})`;
-    if(itemParts.length===1)url+=`&or=(${itemParts[0]})`;else if(itemParts.length>1)url+=`&or=(${itemParts.join(',')})`;
-    const [rows,futureWeather,historyWeather]=await Promise.all([fetchSupabaseAll(url),fetchWeather(startDate,endDate,false),fetchWeather(trainStart,actualTrainEnd,true)]);
-    const dailyMap=buildDailyMap(rows);const bt=buildBacktest(dailyMap,trainStart,actualTrainEnd);const residual=learnResidualCalibrations(bt,historyWeather||{});lastDiagnostics={bt,residual};
+        async function fetchWeather(startDate, endDate, archive = false) {
+            const endpoint = archive ? 'https://archive-api.open-meteo.com/v1/archive' : 'https://api.open-meteo.com/v1/forecast';
+            const url = `${endpoint}?latitude=37.5665&longitude=126.9780&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_sum,snowfall_sum&timezone=Asia%2FSeoul`;
+            const map = {};
+            try {
+                const r = await fetch(url);
+                if (!r.ok) throw new Error(`weather ${r.status}`);
+                const d = await r.json();
+                if (d?.daily?.time) d.daily.time.forEach((ds, i) => {
+                    const maxT = Math.round(d.daily.temperature_2m_max?.[i] ?? 0), minT = Math.round(d.daily.temperature_2m_min?.[i] ?? 0), wc = d.daily.weather_code?.[i] ?? 0, prec = d.daily.precipitation_sum?.[i] ?? 0, snow = d.daily.snowfall_sum?.[i] ?? 0;
+                    let statusIcon = '☀️', statusText = '맑음', bucket = 'clear';
+                    if (snow > 0 || [71, 73, 75, 77, 85, 86].includes(wc)) { statusIcon = '❄️'; statusText = '눈'; bucket = 'snow'; }
+                    else if (prec > 0 || [51, 53, 55, 61, 63, 65, 80, 81, 82].includes(wc)) { statusIcon = '🌧️'; statusText = '비'; bucket = 'rain'; }
+                    else if ([1, 2, 3, 45, 48].includes(wc)) { statusIcon = '⛅'; statusText = '흐림'; bucket = 'cloud'; }
+                    map[ds] = { minTemp: minT, maxTemp: maxT, statusIcon, statusText, bucket, displayLabel: `${statusIcon} ${minT}°/${maxT}°` };
+                });
+            } catch (e) { console.warn('날씨 조회 실패', e); }
+            return map;
+        }
 
-    let baseSum=0,baseDays=0;let grandSum=0;Object.entries(dailyMap).forEach(([ds,q])=>{if(ds>=trainStart&&ds<=actualTrainEnd&&parseDate(ds).getDay()!==0){baseSum+=q;baseDays++;}if(ds>=trainStart&&ds<=actualTrainEnd)grandSum+=q;});const baseAvg=Math.round(baseSum/Math.max(1,baseDays));
-    const rowsOut=[];const dailyChartMap={};let totalBase=0,totalBoosted=0,remaining=0,remainDays=0,boostAdd=0,totalActual=0,totalErr=0,overlapDays=0;
-    let cur=parseDate(startDate),end=parseDate(endDate);while(cur<=end){const ds=formatDate(cur),isSunday=cur.getDay()===0;const weather=futureWeather[ds]||{displayLabel:'☀️ 맑음',statusText:'맑음',bucket:'unknown'};let actual=(ds<=maxActualDate&&dailyMap[ds]!==undefined)?dailyMap[ds]:null;let baseQty=0,finalQty=0,added=0;
-      if(!isSunday){
-        const weights=chooseWeightsForDate(ds,bt);const candidates=MODELS.map(m=>Math.max(0,Number(m.predict(ds,dailyMap))||0));let ensemble=candidates.reduce((s,p,j)=>s+p*weights[j],0);
-        const wd=cur.getDay();const globalCal=bt.globalCalib||1;const wdCal=bt.weekdayCalib?.[wd]||1;const weatherCal=residual.weatherFactor?.[weather.bucket]||1;const dCal=residual.calendarFactor?.[`${wd}_${getCalendarBucket(ds)}`]||1;
-        ensemble*=globalCal*wdCal*weatherCal*dCal;
-        const reg=volatilityBand(ds,dailyMap);ensemble=clamp(ensemble,reg.min,reg.max);
-        baseQty=Math.max(0,Math.round(ensemble));
-        if(actual===null){finalQty=Math.round(baseQty*boostMultiplier);added=finalQty-baseQty;boostAdd+=added;remaining+=finalQty;remainDays++;}else{finalQty=baseQty;}
-        if(actual!==null){totalActual+=actual;totalErr+=Math.abs(actual-finalQty);overlapDays++;}
-      }
-      totalBase+=baseQty;totalBoosted+=finalQty;dailyChartMap[ds]={actualQty:actual,baseQty,boostedQty:finalQty,isSunday};rowsOut.push({date:formatDisplayDate(ds),weather:isSunday?'🏖️ 일요일 (입고휴무)':weather.displayLabel,brand:brandVal||'전체 브랜드',item:itemVal||'전체 품목 합산',boostPct:(isSunday||actual!==null)?'-':`+${boostPercent}%`,actualQty:actual,baseQty,boostedQty:finalQty,addedQty:added,isSunday});cur=addDays(cur,1);
-    }
-    currentForecastRows=rowsOut;
-    let accuracy='비교 데이터 없음',accSub='실제 실적 겹침 없음';if(overlapDays&&totalActual>0){const wmape=100*totalErr/totalActual;accuracy=`${clamp(100-wmape,0,100).toFixed(1)}%`;accSub=`실제 ${totalActual.toLocaleString()}건 대비 오차 ${Math.round(totalErr).toLocaleString()}건`}
-    document.getElementById('kpi-base-daily-avg').innerText=`${baseAvg.toLocaleString()} 건`;document.getElementById('kpi-accuracy-percent').innerText=accuracy;document.getElementById('kpi-accuracy-sub').innerText=accSub;document.getElementById('kpi-forecast-qty').innerText=`${totalBoosted.toLocaleString()} 건`;document.getElementById('kpi-sub-qty').innerText=`가중치 전: ${totalBase.toLocaleString()} 건`;document.getElementById('kpi-boost-added-qty').innerText=`+${boostAdd.toLocaleString()} 건`;document.getElementById('kpi-sub-boost-added').innerText='미래 미발생 일수만 적용';document.getElementById('kpi-remaining-qty').innerText=`${remaining.toLocaleString()} 건`;document.getElementById('kpi-sub-remaining').innerText=`남은 ${remainDays}일간 필요 수량`;document.getElementById('kpi-model-count').innerText=`${MODELS.length} 개`;document.getElementById('kpi-model-score').innerText=`검증 ${bt.evalDates.length}일 기준`;
-    renderForecastChart(dailyChartMap,futureWeather);renderForecastTable(rowsOut);renderDiagnostics(bt,residual);document.getElementById('diagnostic-status').innerText=`✅ ${bt.evalDates.length}개 과거 날짜의 롤링 백테스트로 가중치 자동 산출 완료`;
-  }catch(err){console.error(err);document.getElementById('diagnostic-status').innerText='❌ 계산 실패';alert(`예측 데이터 계산 중 오류가 발생했습니다.\n${err.message||err}`);}
-}
+        function buildDailyMap(rows) {
+            const sums = {}; let minDate = null, maxDate = null;
+            rows.forEach(r => {
+                if (!r.delivery_date) return;
+                const ds = formatDate(parseDate(formatDisplayDate(r.delivery_date).replace(/\//g, '-')));
+                const q = cleanNumber(r.total_qty ?? r.qty);
+                sums[ds] = (sums[ds] || 0) + q;
+                minDate = minDate && minDate < ds ? minDate : ds;
+                maxDate = maxDate && maxDate > ds ? maxDate : ds;
+            });
+            const map = {}; if (!minDate || !maxDate) return map;
+            let d = parseDate(minDate), e = parseDate(maxDate);
+            while (d <= e) { const ds = formatDate(d); map[ds] = sums[ds] ?? 0; d = addDays(d, 1); }
+            return map;
+        }
 
-function renderDiagnostics(bt,residual){
-  const best=bt.metrics.map((m,i)=>({m,i})).sort((a,b)=>a.m.score-b.m.score)[0];const wl=document.getElementById('model-weight-list');wl.innerHTML=bt.globalWeights.map((w,i)=>{const pct=(w*100).toFixed(1);const m=bt.metrics[i];return `<div class="weight-row"><div title="${MODELS[i].id}"><b>${MODELS[i].name}</b></div><div class="bar-wrap"><div class="bar" style="width:${Math.min(100,w*100*2.2)}%"></div></div><div style="text-align:right;font-weight:800">${pct}%</div><div style="text-align:right;color:#64748b">WAPE ${m.wmape.toFixed(1)}%</div></div>`;}).join('');
-  const wf=Object.entries(residual.weatherFactor||{}).filter(([k])=>k!=='unknown').map(([k,v])=>`${k}:${v.toFixed(3)}×`).join(' · ')||'학습 가능한 날씨 효과 부족';const cf=Object.entries(residual.calendarFactor||{}).map(([k,v])=>`${k}:${v.toFixed(3)}×`).slice(0,8).join(' · ')||'학습 데이터 부족';const w=bt.optimized.map((x,i)=>`${MODELS[i].name} ${x.toFixed(3)}`).join(', ');
-  document.getElementById('calibration-summary').innerHTML=`<div class="success"><b>최적화된 전역 보정:</b> ${bt.globalCalib.toFixed(3)}×<br><b>요일별 보정:</b> ${bt.weekdayCalib.map((x,i)=>`${['일','월','화','수','목','금','토'][i]} ${x.toFixed(3)}×`).join(' · ')}<br><b>날씨 보정:</b> ${wf}<br><b>캘린더 보정:</b> ${cf}<br><br><b>최저 백테스트 점수 모델:</b> ${MODELS[best.i].name} / WMAPE ${best.m.wmape.toFixed(1)}%<br><span style="color:#64748b">자동 최적화 원시 가중치: ${w}</span></div>`;
-}
-function renderForecastChart(map,weatherMap){const labels=Object.keys(map).sort();const actual=labels.map(k=>map[k].isSunday||map[k].actualQty===null?0:map[k].actualQty);const base=labels.map(k=>map[k].isSunday?0:map[k].baseQty);const boosted=labels.map(k=>map[k].isSunday?0:map[k].boostedQty);const xlabels=labels.map(k=>map[k].isSunday?[formatDisplayDate(k),'🏖️ 입고휴무']:(weatherMap[k]?[formatDisplayDate(k),weatherMap[k].displayLabel]:formatDisplayDate(k)));const ctx=document.getElementById('forecastChart').getContext('2d');if(forecastChart)forecastChart.destroy();forecastChart=new Chart(ctx,{type:'bar',data:{labels:xlabels,datasets:[{label:'📦 실제 주문량',data:actual,backgroundColor:'rgba(2,132,199,.82)',borderRadius:4},{label:'📊 기본 예측',data:base,backgroundColor:'rgba(148,163,184,.72)',borderRadius:4},{label:'🚀 최종 예측',data:boosted,backgroundColor:'rgba(16,185,129,.82)',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{tooltip:{callbacks:{label:c=>`${c.dataset.label||''}: ${(c.parsed.y??0).toLocaleString()} 건`}}},scales:{x:{ticks:{font:{size:11,weight:'bold'}}},y:{beginAtZero:true,grace:'15%',ticks:{callback:v=>v.toLocaleString()+' 건'}}}}});}
-function renderForecastTable(rows){const tbody=document.getElementById('forecast-detail-table');if(!rows.length){tbody.innerHTML='<tr><td colspan="9" class="text-center" style="padding:30px;color:#94a3b8">예측 데이터가 없습니다.</td></tr>';return;}tbody.innerHTML=rows.map(r=>r.isSunday?`<tr style="background:#f8fafc;color:#94a3b8"><td class="text-center"><b>${r.date}</b></td><td class="text-center">${r.weather}</td><td>${r.brand}</td><td><b>${r.item}</b></td><td class="text-center"><span class="badge-off">휴무</span></td><td class="text-right">-</td><td class="text-right">-</td><td class="text-right"><b>0 건</b></td><td class="text-right">-</td></tr>`:`<tr><td class="text-center"><b>${r.date}</b></td><td class="text-center">${r.weather}</td><td>${r.brand}</td><td><b>${r.item}</b></td><td class="text-center"><span class="badge-boost">${r.boostPct}</span></td><td class="text-right">${r.actualQty!==null?`<span class="badge-actual">${r.actualQty.toLocaleString()} 건</span>`:'<span style="color:#cbd5e1">-</span>'}</td><td class="text-right" style="color:#64748b">${r.baseQty.toLocaleString()} 건</td><td class="text-right" style="color:#10b981;font-weight:900">${r.boostedQty.toLocaleString()} 건</td><td class="text-right" style="color:#16a34a;font-weight:900">${r.addedQty>=0?'+':''}${r.addedQty.toLocaleString()} 건</td></tr>`).join('');}
-function exportForecastToExcel(){if(!currentForecastRows.length)return alert('저장할 예측 데이터가 없습니다.');const data=currentForecastRows.map(r=>({'배송일자':r.date,'예상 날씨':r.weather,'브랜드':r.brand,'품목명':r.item,'가중치':r.boostPct,'실제 주문량':r.actualQty!==null?r.actualQty:'-','기본 예상수량':r.isSunday?0:r.baseQty,'최종 예상수량':r.boostedQty,'추가 증감량':r.isSunday?0:r.addedQty}));const ws=XLSX.utils.json_to_sheet(data);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'미래발주예측비교');XLSX.writeFile(wb,`OMS미래발주예측_v4_${document.getElementById('forecast-start-date').value}_${document.getElementById('forecast-end-date').value}.xlsx`);}
+        function getPastDatesBefore(target, map) {
+            const out = []; let d = addDays(parseDate(target), -1);
+            for (let i = 0; i < CFG.historyDays + 60; i++) {
+                const ds = formatDate(d);
+                if (map[ds] !== undefined) out.push(ds);
+                d = addDays(d, -1);
+            }
+            return out;
+        }
 
-document.addEventListener('DOMContentLoaded',async()=>{setQuickBasePeriod('thisMonth');const today=new Date();const future7=addDays(today,7);document.getElementById('forecast-start-date').value=formatDate(today);document.getElementById('forecast-end-date').value=formatDate(future7);await loadMasterLists();runForecastSimulation();});
-</script>
+        function valsBefore(target, map, n = null) {
+            const dates = getPastDatesBefore(target, map);
+            const use = n ? dates.slice(0, n) : dates;
+            return use.reverse().map(ds => map[ds] ?? 0);
+        }
+
+        function sameWeekdayVals(target, map, n = 8) {
+            const td = parseDate(target).getDay();
+            const vals = []; let d = addDays(parseDate(target), -1);
+            for (let i = 0; i < CFG.historyDays + 30 && vals.length < n; i++) {
+                if (d.getDay() === td) {
+                    const ds = formatDate(d);
+                    if (map[ds] !== undefined) vals.push({ date: ds, val: map[ds] });
+                }
+                d = addDays(d, -1);
+            }
+            return vals;
+        }
+
+        function robustMean(a) { const c = cleanArrayIQR(a); return mean(c.length ? c : a); }
+        function ewma(a, alpha = .35) { if (!a.length) return 0; let z = a[0]; for (let i = 1; i < a.length; i++) z = alpha * a[i] + (1 - alpha) * z; return Math.max(0, z); }
+        function holtDamped(a, alpha = .42, beta = .18, phi = .82) {
+            if (a.length === 0) return 0; if (a.length === 1) return a[0];
+            let level = a[0], trend = a[1] - a[0];
+            for (let i = 1; i < a.length; i++) {
+                const prev = level;
+                level = alpha * a[i] + (1 - alpha) * (level + phi * trend);
+                trend = beta * (level - prev) + (1 - beta) * phi * trend;
+            }
+            return Math.max(0, level + phi * trend);
+        }
+        function linTrend(a, n = 14, damp = .65) {
+            const y = a.slice(-n); if (y.length < 3) return robustMean(a);
+            const xm = (y.length - 1) / 2, ym = mean(y);
+            let num = 0, den = 0;
+            for (let i = 0; i < y.length; i++) { num += (i - xm) * (y[i] - ym); den += (i - xm) * (i - xm); }
+            const slope = den ? num / den : 0;
+            return Math.max(0, ym + damp * slope * (y.length));
+        }
+        function seasonalWeighted(target, map) { const s = sameWeekdayVals(target, map, 8); if (!s.length) return null; const v = s.map(x => x.val), w = v.map((_, i) => Math.pow(.72, i)); return weightedAverage(v, w); }
+        function lagSeasonal(target, map, lagWeeks = 4) {
+            const td = parseDate(target); const vals = [];
+            for (let k = 1; k <= lagWeeks; k++) { const ds = formatDate(addDays(td, -7 * k)); if (map[ds] !== undefined) vals.push({ k, val: map[ds] }); }
+            if (!vals.length) return null;
+            return weightedAverage(vals.map(x => x.val), vals.map(x => Math.pow(.70, x.k - 1)));
+        }
+        function weekdayRatioForecast(target, map) {
+            const recent = valsBefore(target, map, 28); if (!recent.length) return 0;
+            const global = robustMean(recent); const same = sameWeekdayVals(target, map, 8).map(x => x.val);
+            if (!same.length || global <= 0) return global;
+            const ratio = clamp(robustMean(same) / global, .75, 1.30);
+            return global * ratio;
+        }
+
+        /* 11가지 세부 시계열 모델 매트릭스 */
+        const MODELS = [
+            { id: 'sameWeekday', name: '동요일 최근 8회', predict: (t, m) => seasonalWeighted(t, m) },
+            { id: 'lagSeasonal', name: '주간계절 Lag 앙상블', predict: (t, m) => lagSeasonal(t, m, 4) },
+            { id: 'weekdayRatio', name: '요일비율 + 최근28일', predict: (t, m) => weekdayRatioForecast(t, m) },
+            { id: 'recent7', name: '최근 7일 Robust 평균', predict: (t, m) => robustMean(valsBefore(t, m, 7)) },
+            { id: 'recent14', name: '최근 14일 Robust 평균', predict: (t, m) => robustMean(valsBefore(t, m, 14)) },
+            { id: 'median14', name: '최근 14일 중앙값', predict: (t, m) => median(cleanArrayIQR(valsBefore(t, m, 14))) },
+            { id: 'weighted14', name: '최근성 가중 평균', predict: (t, m) => { const a = valsBefore(t, m, 14); if (!a.length) return 0; return weightedAverage(a, a.map((_, i) => Math.pow(.92, a.length - 1 - i))); } },
+            { id: 'ewma', name: 'EWMA Level', predict: (t, m) => ewma(valsBefore(t, m, 28), .35) },
+            { id: 'holt', name: 'Holt Damped Trend', predict: (t, m) => holtDamped(cleanArrayIQR(valsBefore(t, m, 56)), .42, .18, .82) },
+            { id: 'trend14', name: 'Local Trend 14일', predict: (t, m) => linTrend(cleanArrayIQR(valsBefore(t, m, 21)), 14, .65) },
+            { id: 'trend28', name: 'Local Trend 28일', predict: (t, m) => linTrend(cleanArrayIQR(valsBefore(t, m, 42)), 28, .50) }
+        ];
+
+        function simplexProject(v) {
+            const u = [...v].sort((a, b) => b - a); let css = 0, rho = -1;
+            for (let i = 0; i < u.length; i++) { css += u[i]; const t = (css - 1) / (i + 1); if (u[i] - t > 0) rho = i; }
+            const theta = rho >= 0 ? (u.slice(0, rho + 1).reduce((s, x) => s + x, 0) - 1) / (rho + 1) : 0;
+            return v.map(x => Math.max(0, x - theta));
+        }
+
+        function optimizeBlendWeights(matrix, actuals) {
+            const m = MODELS.length; if (!matrix.length) return Array(m).fill(1 / m);
+            let w = Array(m).fill(1 / m), lr = .04, reg = .015;
+            const scale = Math.max(1, median(actuals));
+            for (let it = 0; it < 700; it++) {
+                const g = Array(m).fill(0);
+                for (let r = 0; r < matrix.length; r++) {
+                    let pred = 0; for (let j = 0; j < m; j++) pred += matrix[r][j] * w[j];
+                    const denom = Math.max(scale, Math.abs(actuals[r])); const err = (pred - actuals[r]) / denom;
+                    for (let j = 0; j < m; j++) g[j] += 2 * matrix[r][j] * err / denom;
+                }
+                for (let j = 0; j < m; j++) g[j] = g[j] / Math.max(1, matrix.length) + reg * (w[j] - 1 / m);
+                w = simplexProject(w.map((x, j) => x - lr * g[j]));
+                if (it === 250) lr = .02; if (it === 500) lr = .01;
+            }
+            return w;
+        }
+
+        function modelMetrics(preds, actuals) {
+            if (!actuals.length) return { wmape: 999, smape: 999, bias: 999, score: 999, n: 0 };
+            let absErr = 0, den = 0, sm = 0, sumAct = 0, sumErr = 0;
+            for (let i = 0; i < actuals.length; i++) {
+                const a = actuals[i], p = preds[i], ae = Math.abs(a - p);
+                absErr += ae; den += Math.abs(a); sm += 2 * ae / (Math.abs(a) + Math.abs(p) + 1);
+                sumAct += Math.abs(a); sumErr += p - a;
+            }
+            const wmape = den ? 100 * absErr / den : 100 * mean(preds.map((p, i) => Math.abs(p - actuals[i])));
+            const smape = 100 * sm / actuals.length;
+            const bias = 100 * Math.abs(sumErr) / Math.max(1, sumAct);
+            const score = .52 * wmape + .28 * smape + .20 * bias;
+            return { wmape, smape, bias, score, n: actuals.length };
+        }
+
+        function inverseScoreWeights(metrics) { const raw = metrics.map(x => 1 / Math.max(.25, x.score)); const s = raw.reduce((a, b) => a + b, 0); return raw.map(x => x / s); }
+        function mixWeights(a, b, wa = .72) { return a.map((x, i) => wa * x + (1 - wa) * b[i]); }
+
+        /* 롤링 백테스트를 통한 모델 가중치 자동 계산 */
+        function buildBacktest(map, trainStart, trainEnd) {
+            let evalDates = []; let d = parseDate(trainEnd);
+            for (; d >= parseDate(trainStart); d = addDays(d, -1)) {
+                const ds = formatDate(d);
+                if (d.getDay() !== 0 && map[ds] !== undefined) evalDates.push(ds);
+                if (evalDates.length >= CFG.backtestDays) break;
+            }
+            evalDates = evalDates.reverse();
+
+            const perModel = MODELS.map(() => ({ p: [], a: [] }));
+            const matrix = [], actuals = [], meta = [];
+
+            for (const ds of evalDates) {
+                const a = map[ds]; const row = [];
+                for (let j = 0; j < MODELS.length; j++) {
+                    let p = MODELS[j].predict(ds, map);
+                    if (p === null || !Number.isFinite(p)) p = robustMean(valsBefore(ds, map, 7));
+                    p = Math.max(0, p);
+                    row.push(p); perModel[j].p.push(p); perModel[j].a.push(a);
+                }
+                matrix.push(row); actuals.push(a); meta.push({ date: ds, row, actual: a });
+            }
+
+            const metrics = perModel.map(x => modelMetrics(x.p, x.a));
+            const inverse = inverseScoreWeights(metrics);
+            const optimized = optimizeBlendWeights(matrix, actuals);
+            let globalWeights = mixWeights(optimized, inverse, .72);
+            globalWeights = globalWeights.map(x => .82 * x + .18 / MODELS.length);
+            globalWeights = globalWeights.map(x => Math.max(0, x));
+            const sw = globalWeights.reduce((s, x) => s + x, 0);
+            globalWeights = globalWeights.map(x => x / sw);
+
+            const weekdayWeights = Array.from({ length: 7 }, (_, wd) => {
+                const idx = []; meta.forEach(r => { if (parseDate(r.date).getDay() === wd) idx.push(r); });
+                if (idx.length < 3) return globalWeights.slice();
+                const mat = idx.map(r => r.row), acts = idx.map(r => r.actual);
+                const met = MODELS.map((_, j) => modelMetrics(mat.map(r => r[j]), acts));
+                const inv = inverseScoreWeights(met);
+                const blended = mixWeights(globalWeights, inv, .75);
+                const s = blended.reduce((a, b) => a + b, 0);
+                return blended.map(x => x / s);
+            });
+
+            const blendedPred = meta.map(r => r.row.reduce((s, p, j) => s + p * globalWeights[j], 0));
+            let ratioNum = 0, ratioDen = 0, regNum = 0, regDen = 0;
+            meta.forEach((r, i) => { const p = blendedPred[i], a = r.actual; ratioNum += a; ratioDen += Math.max(.1, p); regNum += a * p; regDen += p * p; });
+            const ratio = ratioDen ? ratioNum / ratioDen : 1; const slope = regDen ? regNum / regDen : 1;
+            const globalCalib = clamp(.5 * ratio + .5 * slope, ...CFG.calibrationCap);
+
+            const weekdayCalib = Array.from({ length: 7 }, (_, wd) => {
+                const rs = []; meta.forEach((r, i) => { if (parseDate(r.date).getDay() === wd && blendedPred[i] > 0) rs.push(r.actual / blendedPred[i]); });
+                return clamp(.65 + (rs.length ? mean(rs) : 1) * .35, 0.94, 1.06);
+            });
+
+            return { evalDates, meta, metrics, inverse, optimized, globalWeights, weekdayWeights, weekdayCalib, globalCalib };
+        }
+
+        function weatherBucketFor(dateStr, weatherMap) { return weatherMap[dateStr]?.bucket || 'unknown'; }
+        function learnResidualCalibrations(backtest, weatherMap) {
+            const weather = {}; const calendar = {};
+            backtest.meta.forEach(r => {
+                const wd = parseDate(r.date).getDay(); const p = r.row.reduce((s, x, j) => s + x * backtest.globalWeights[j], 0); if (p <= 0) return;
+                const ratio = clamp(r.actual / p, .75, 1.25); const bucket = weatherBucketFor(r.date, weatherMap);
+                if (!weather[bucket]) weather[bucket] = []; weather[bucket].push(ratio);
+                const d = parseDate(r.date); const day = d.getDate(); const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+                const cal = (day <= 3 ? 'start' : day >= last - 2 ? 'end' : 'middle'); const key = `${wd}_${cal}`;
+                if (!calendar[key]) calendar[key] = []; calendar[key].push(ratio);
+            });
+            const weatherFactor = {}; Object.keys(weather).forEach(k => weatherFactor[k] = weather[k].length >= 3 ? clamp(.75 * mean(weather[k]) + .25, ...CFG.weatherCalibrationCap) : 1);
+            const calendarFactor = {}; Object.keys(calendar).forEach(k => calendarFactor[k] = calendar[k].length >= 3 ? clamp(.75 * mean(calendar[k]) + .25, ...CFG.calendarCalibrationCap) : 1);
+            return { weatherFactor, calendarFactor };
+        }
+
+        function getCalendarBucket(dateStr) { const d = parseDate(dateStr); const day = d.getDate(); const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); return day <= 3 ? 'start' : day >= last - 2 ? 'end' : 'middle'; }
+        function chooseWeightsForDate(dateStr, bt) { const wd = parseDate(dateStr).getDay(); return bt.weekdayWeights?.[wd] || bt.globalWeights; }
+        function volatilityBand(target, map) {
+            const same = sameWeekdayVals(target, map, 8).map(x => x.val).filter(x => x >= 0);
+            const recent = valsBefore(target, map, 28).filter(x => x >= 0);
+            const m = Math.max(1, mean(recent)); const sd = Math.sqrt(mean(recent.map(x => (x - m) * (x - m)))); const cv = sd / m;
+            let lo = .58, hi = 1.55; if (cv > .45) { lo = .45; hi = 1.80 } else if (cv < .18) { lo = .70; hi = 1.35 }
+            const ref = Math.max(1, median(cleanArrayIQR(same.length ? same : recent)));
+            return { min: ref * lo, max: ref * hi, cv, ref };
+        }
+
+        /* 🔮 발주 예측 시뮬레이션 메인 연산 */
+        async function runForecastSimulation() {
+            const baseStart = document.getElementById('base-start-date').value, baseEnd = document.getElementById('base-end-date').value, startDate = document.getElementById('forecast-start-date').value, endDate = document.getElementById('forecast-end-date').value;
+            const brandVal = document.getElementById('forecast-brand-input').value.trim(), itemVal = document.getElementById('forecast-item-input').value.trim(), boostPercent = cleanNumber(document.getElementById('boost-percent-input').value), boostMultiplier = 1 + boostPercent / 100, isD2 = document.getElementById('chk-d2-cutoff').checked;
+            
+            if (!baseStart || !baseEnd || !startDate || !endDate) return alert('기간을 모두 선택하세요.');
+            if (baseStart > baseEnd) return alert('분석 기반 시작일은 종료일보다 이전이어야 합니다.');
+            if (startDate > endDate) return alert('예측 시작일은 종료일보다 이전이어야 합니다.');
+
+            document.getElementById('diagnostic-status').innerText = '📡 과거 데이터 / 날씨 / 백테스트를 연산 중입니다...';
+
+            try {
+                const now = new Date();
+                const maxOffset = (now.getHours() >= 11 ? 1 : 0) + (isD2 ? 1 : 0);
+                const maxActualDate = formatDate(addDays(now, maxOffset));
+
+                // 변수 선언 순서 수정 (bug-fix)
+                const trainStart = baseStart;
+                const actualTrainEnd = baseEnd < formatDate(addDays(parseDate(startDate), -1)) ? baseEnd : formatDate(addDays(parseDate(startDate), -1));
+                const horizonHistoryStart = formatDate(addDays(parseDate(startDate), -CFG.historyDays));
+                const fetchStart = trainStart < horizonHistoryStart ? trainStart : horizonHistoryStart;
+
+                const orParts = []; if (brandVal) { brandVal.split(',').map(s => s.trim()).filter(Boolean).forEach(b => orParts.push(`brand_name.ilike.*${encodeURIComponent(b)}*`)); }
+                const itemParts = []; if (itemVal) { itemVal.split(',').map(s => s.trim()).filter(Boolean).forEach(i => itemParts.push(`item_code.ilike.*${encodeURIComponent(i)}*,item_name.ilike.*${encodeURIComponent(i)}*`)); }
+                
+                let url = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${fetchStart}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,item_name,item_code,brand_name`;
+                if (orParts.length === 1) url += `&${orParts[0]}`; else if (orParts.length > 1) url += `&or=(${orParts.join(',')})`;
+                if (itemParts.length === 1) url += `&or=(${itemParts[0]})`; else if (itemParts.length > 1) url += `&or=(${itemParts.join(',')})`;
+
+                const [rows, futureWeather, historyWeather] = await Promise.all([
+                    fetchSupabaseAll(url),
+                    fetchWeather(startDate, endDate, false),
+                    fetchWeather(trainStart, actualTrainEnd, true)
+                ]);
+
+                const dailyMap = buildDailyMap(rows);
+                const bt = buildBacktest(dailyMap, trainStart, actualTrainEnd);
+                const residual = learnResidualCalibrations(bt, historyWeather || {});
+
+                let baseSum = 0, baseDays = 0;
+                Object.entries(dailyMap).forEach(([ds, q]) => {
+                    if (ds >= trainStart && ds <= actualTrainEnd && parseDate(ds).getDay() !== 0) {
+                        baseSum += q; baseDays++;
+                    }
+                });
+                const baseAvg = Math.round(baseSum / Math.max(1, baseDays));
+
+                const rowsOut = []; const dailyChartMap = {};
+                let totalBase = 0, totalBoosted = 0, remaining = 0, remainDays = 0, boostAdd = 0, totalActual = 0, totalErr = 0, overlapDays = 0;
+
+                let cur = parseDate(startDate), end = parseDate(endDate);
+                while (cur <= end) {
+                    const ds = formatDate(cur), isSunday = cur.getDay() === 0;
+                    const weather = futureWeather[ds] || { displayLabel: '☀️ 맑음', statusText: '맑음', bucket: 'unknown' };
+                    let actual = (ds <= maxActualDate && dailyMap[ds] !== undefined) ? dailyMap[ds] : null;
+                    let baseQty = 0, finalQty = 0, added = 0;
+
+                    if (!isSunday) {
+                        const weights = chooseWeightsForDate(ds, bt);
+                        const candidates = MODELS.map(m => Math.max(0, Number(m.predict(ds, dailyMap)) || 0));
+                        let ensemble = candidates.reduce((s, p, j) => s + p * weights[j], 0);
+
+                        const wd = cur.getDay();
+                        const globalCal = bt.globalCalib || 1;
+                        const wdCal = bt.weekdayCalib?.[wd] || 1;
+                        const weatherCal = residual.weatherFactor?.[weather.bucket] || 1;
+                        const dCal = residual.calendarFactor?.[`${wd}_${getCalendarBucket(ds)}`] || 1;
+
+                        ensemble *= globalCal * wdCal * weatherCal * dCal;
+                        const reg = volatilityBand(ds, dailyMap);
+                        ensemble = clamp(ensemble, reg.min, reg.max);
+
+                        baseQty = Math.max(0, Math.round(ensemble));
+
+                        // 💡 [핵심] 실적이 아직 없는 미래 남은 기간에만 가중치 적용!
+                        if (actual === null) {
+                            finalQty = Math.round(baseQty * boostMultiplier);
+                            added = finalQty - baseQty;
+                            boostAdd += added;
+                            remaining += finalQty;
+                            remainDays++;
+                        } else {
+                            finalQty = baseQty;
+                        }
+
+                        if (actual !== null) {
+                            totalActual += actual;
+                            totalErr += Math.abs(actual - finalQty);
+                            overlapDays++;
+                        }
+                    }
+
+                    totalBase += baseQty;
+                    totalBoosted += finalQty;
+                    dailyChartMap[ds] = { actualQty: actual, baseQty, boostedQty: finalQty, isSunday };
+
+                    rowsOut.push({
+                        date: formatDisplayDate(ds),
+                        weather: isSunday ? '🏖️ 일요일 (입고휴무)' : weather.displayLabel,
+                        brand: brandVal || '전체 브랜드',
+                        item: itemVal || '전체 품목 합산',
+                        boostPct: (isSunday || actual !== null) ? '-' : `+${boostPercent}%`,
+                        actualQty: actual,
+                        baseQty,
+                        boostedQty: finalQty,
+                        addedQty: added,
+                        isSunday
+                    });
+                    cur = addDays(cur, 1);
+                }
+
+                currentForecastRows = rowsOut;
+
+                let accuracy = '비교 데이터 없음', accSub = '실제 실적 겹침 없음';
+                if (overlapDays && totalActual > 0) {
+                    const wmape = 100 * totalErr / totalActual;
+                    accuracy = `${clamp(100 - wmape, 0, 100).toFixed(1)}%`;
+                    accSub = `실제 ${totalActual.toLocaleString()}건 대비 오차 ${Math.round(totalErr).toLocaleString()}건`;
+                }
+
+                // KPI 카드 업데이트 (5개 수량 카드)
+                document.getElementById('kpi-base-daily-avg').innerText = `${baseAvg.toLocaleString()} 건`;
+                document.getElementById('kpi-accuracy-percent').innerText = accuracy;
+                document.getElementById('kpi-accuracy-sub').innerText = accSub;
+                document.getElementById('kpi-forecast-qty').innerText = `${totalBoosted.toLocaleString()} 건`;
+                document.getElementById('kpi-sub-qty').innerText = `가중치 전: ${totalBase.toLocaleString()} 건`;
+                document.getElementById('kpi-boost-added-qty').innerText = `+${boostAdd.toLocaleString()} 건`;
+                document.getElementById('kpi-sub-boost-added').innerText = '미래 미발생 일수만 적용';
+                document.getElementById('kpi-remaining-qty').innerText = `${remaining.toLocaleString()} 건`;
+                document.getElementById('kpi-sub-remaining').innerText = `남은 ${remainDays}일간 필요 수량`;
+
+                renderForecastChart(dailyChartMap, futureWeather);
+                renderForecastTable(rowsOut);
+                renderDiagnostics(bt, residual);
+
+                document.getElementById('diagnostic-status').innerText = `✅ ${bt.evalDates.length}개 과거 날짜의 롤링 백테스트로 모델 최적화 완료`;
+            } catch (err) {
+                console.error(err);
+                document.getElementById('diagnostic-status').innerText = '❌ 연산 실패';
+                alert(`예측 연산 중 오류가 발생했습니다.\n${err.message || err}`);
+            }
+        }
+
+        function renderDiagnostics(bt, residual) {
+            const best = bt.metrics.map((m, i) => ({ m, i })).sort((a, b) => a.m.score - b.m.score)[0];
+            const wl = document.getElementById('model-weight-list');
+            wl.innerHTML = bt.globalWeights.map((w, i) => {
+                const pct = (w * 100).toFixed(1);
+                const m = bt.metrics[i];
+                return `<div class="weight-row">
+                    <div title="${MODELS[i].id}"><b>${MODELS[i].name}</b></div>
+                    <div class="bar-wrap"><div class="bar" style="width:${Math.min(100, w * 100 * 2.2)}%"></div></div>
+                    <div style="text-align:right;font-weight:800">${pct}%</div>
+                    <div style="text-align:right;color:#64748b">WAPE ${m.wmape.toFixed(1)}%</div>
+                </div>`;
+            }).join('');
+
+            const wf = Object.entries(residual.weatherFactor || {}).filter(([k]) => k !== 'unknown').map(([k, v]) => `${k}:${v.toFixed(3)}×`).join(' · ') || '학습 데이터 부족';
+            const cf = Object.entries(residual.calendarFactor || {}).map(([k, v]) => `${k}:${v.toFixed(3)}×`).slice(0, 8).join(' · ') || '학습 데이터 부족';
+
+            document.getElementById('calibration-summary').innerHTML = `<div class="success">
+                <b>최적화된 전역 보정:</b> ${bt.globalCalib.toFixed(3)}×<br>
+                <b>요일별 보정:</b> ${bt.weekdayCalib.map((x, i) => `${['일', '월', '화', '수', '목', '금', '토'][i]} ${x.toFixed(3)}×`).join(' · ')}<br>
+                <b>날씨 보정:</b> ${wf}<br>
+                <b>캘린더 보정:</b> ${cf}<br><br>
+                <b>최저 백테스트 오차 모델:</b> ${MODELS[best.i].name} / WMAPE ${best.m.wmape.toFixed(1)}%
+            </div>`;
+        }
+
+        function renderForecastChart(map, weatherMap) {
+            const labels = Object.keys(map).sort();
+            const actual = labels.map(k => map[k].isSunday || map[k].actualQty === null ? 0 : map[k].actualQty);
+            const base = labels.map(k => map[k].isSunday ? 0 : map[k].baseQty);
+            const boosted = labels.map(k => map[k].isSunday ? 0 : map[k].boostedQty);
+            const xlabels = labels.map(k => map[k].isSunday ? [formatDisplayDate(k), '🏖️ 입고휴무'] : (weatherMap[k] ? [formatDisplayDate(k), weatherMap[k].displayLabel] : formatDisplayDate(k)));
+
+            const ctx = document.getElementById('forecastChart').getContext('2d');
+            if (forecastChart) forecastChart.destroy();
+            forecastChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: xlabels,
+                    datasets: [
+                        { label: '📦 실제 주문량', data: actual, backgroundColor: 'rgba(2,132,199,.82)', borderRadius: 4 },
+                        { label: '📊 기본 예측', data: base, backgroundColor: 'rgba(148,163,184,.72)', borderRadius: 4 },
+                        { label: '🚀 최종 예측', data: boosted, backgroundColor: 'rgba(16,185,129,.82)', borderRadius: 4 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label || ''}: ${(c.parsed.y ?? 0).toLocaleString()} 건` } } },
+                    scales: {
+                        x: { ticks: { font: { size: 11, weight: 'bold' } } },
+                        y: { beginAtZero: true, grace: '15%', ticks: { callback: v => v.toLocaleString() + ' 건' } }
+                    }
+                }
+            });
+        }
+
+        function renderForecastTable(rows) {
+            const tbody = document.getElementById('forecast-detail-table');
+            if (!rows.length) { tbody.innerHTML = '<tr><td colspan="9" class="text-center" style="padding:30px;color:#94a3b8">예측 데이터가 없습니다.</td></tr>'; return; }
+            tbody.innerHTML = rows.map(r => r.isSunday ? `
+                <tr style="background:#f8fafc;color:#94a3b8">
+                    <td class="text-center"><b>${r.date}</b></td>
+                    <td class="text-center">${r.weather}</td>
+                    <td>${r.brand}</td>
+                    <td><b>${r.item}</b></td>
+                    <td class="text-center"><span class="badge-off">휴무</span></td>
+                    <td class="text-right">-</td>
+                    <td class="text-right">-</td>
+                    <td class="text-right"><b>0 건</b></td>
+                    <td class="text-right">-</td>
+                </tr>` : `
+                <tr>
+                    <td class="text-center"><b>${r.date}</b></td>
+                    <td class="text-center">${r.weather}</td>
+                    <td>${r.brand}</td>
+                    <td><b>${r.item}</b></td>
+                    <td class="text-center"><span class="badge-boost">${r.boostPct}</span></td>
+                    <td class="text-right">${r.actualQty !== null ? `<span class="badge-actual">${r.actualQty.toLocaleString()} 건</span>` : '<span style="color:#cbd5e1">-</span>'}</td>
+                    <td class="text-right" style="color:#64748b">${r.baseQty.toLocaleString()} 건</td>
+                    <td class="text-right" style="color:#10b981;font-weight:900">${r.boostedQty.toLocaleString()} 건</td>
+                    <td class="text-right" style="color:#16a34a;font-weight:900">${r.addedQty >= 0 ? '+' : ''}${r.addedQty.toLocaleString()} 건</td>
+                </tr>`
+            ).join('');
+        }
+
+        function exportForecastToExcel() {
+            if (!currentForecastRows.length) return alert('저장할 예측 데이터가 없습니다.');
+            const data = currentForecastRows.map(r => ({
+                '배송일자': r.date,
+                '예상 날씨': r.weather,
+                '브랜드': r.brand,
+                '품목명': r.item,
+                '가중치': r.boostPct,
+                '실제 주문량': r.actualQty !== null ? r.actualQty : '-',
+                '기본 예상수량': r.isSunday ? 0 : r.baseQty,
+                '최종 예상수량': r.boostedQty,
+                '추가 증감량': r.isSunday ? 0 : r.addedQty
+            }));
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '미래발주예측비교');
+            XLSX.writeFile(wb, `OMS미래발주예측_v4_${document.getElementById('forecast-start-date').value}_${document.getElementById('forecast-end-date').value}.xlsx`);
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            setQuickBasePeriod('thisMonth');
+            const today = new Date();
+            const future7 = addDays(today, 7);
+            document.getElementById('forecast-start-date').value = formatDate(today);
+            document.getElementById('forecast-end-date').value = formatDate(future7);
+            await loadMasterLists();
+            runForecastSimulation();
+        });
+    </script>
 </body>
 </html>
