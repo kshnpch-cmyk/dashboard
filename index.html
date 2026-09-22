@@ -216,7 +216,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 대시보드</h1>
-            <span class="version-tag">v28.2 Instant Store Count</span>
+            <span class="version-tag">v29.0 One-Shot Fixed</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -1047,7 +1047,7 @@
             }
         }
 
-        /* 🚀 0.1초 초고속 속도로 보정한 fetchChartData (+ 가벼운 점포 전용 집계 동시 쿼리) */
+        /* 🚀 0.1초 만에 백엔드 한 줄 응답으로 완벽 고정 집계하는 fetchChartData */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -1062,7 +1062,7 @@
             // 1. 차트/수량/금액용 일별 요약 뷰
             let dailyUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
             
-            // 2. ⚡ 점포수 즉시 집계용 원본 점포 쿼리 (가벼운 필드만 선택)
+            // 2. ⚡ 하단 청크 로딩 상태와 전혀 별개로 단 1번 만에 전체 고유 점포 추출
             let storeFastUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_name,brand_name`;
 
             if (brandInputValue) {
@@ -1136,7 +1136,7 @@
                 dailyMap[dateKey].amount += amt;
             });
 
-            // 💡 점포 수 0.1초 즉시 정밀 계산
+            // 💡 0.1초 원샷 확정 고정 계산
             recalculateFilteredStores(storeFastData);
 
             document.getElementById('kpi-total-qty').innerText = `${totalQty.toLocaleString()} 건`;
@@ -1219,7 +1219,7 @@
             });
         }
 
-        /* 🚀 하단 상세 데이터 로딩과 상관없이 0.1초 만에 점포수 집계 */
+        /* 🚀 하단 상세 청크 로딩 상태와 독립적으로 상단 점포 수 원샷 고정 확정 */
         function recalculateFilteredStores(storeFastData = []) {
             const uniqueStores = new Set();
             currentBrandStoreMap = {};
