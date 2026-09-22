@@ -22,7 +22,7 @@
         .brand-title { display: flex; align-items: center; gap: 10px; }
         .brand-title h1 { margin: 0; font-size: 20px; font-weight: 700; }
         .version-tag {
-            background-color: #8b5cf6; color: white; font-size: 11px; font-weight: 800;
+            background-color: #e11d48; color: white; font-size: 11px; font-weight: 800;
             padding: 3px 8px; border-radius: 12px; letter-spacing: 0.5px;
         }
         .container { padding: 20px; max-width: 98%; margin: 0 auto; }
@@ -51,7 +51,7 @@
         }
         .clear-btn:hover { background: #cbd5e1; color: #475569; }
 
-        /* 🔍 실시간 연관 검색어 드롭다운 스타일 */
+        /* 🔍 실시간 연관 검색어 드롭다운 */
         .autocomplete-dropdown {
             position: absolute; top: 100%; left: 0; width: 100%; max-height: 220px;
             overflow-y: auto; background: #ffffff; border: 1px solid #cbd5e1;
@@ -73,8 +73,8 @@
         .btn-cal { background-color: #0f766e; padding: 4px 8px; font-size: 11px; border-radius: 4px; }
         .btn-quick { background-color: #475569; padding: 6px 12px; font-size: 12px; }
         .btn-quick:hover { background-color: #334155; }
-        .btn-forecast { background-color: #7c3aed; }
-        .btn-forecast:hover { background-color: #6d28d9; }
+        .btn-forecast { background-color: #e11d48; }
+        .btn-forecast:hover { background-color: #be123c; }
         .btn-excel { background-color: #16a34a; padding: 6px 12px; font-size: 12px; }
         .btn-search-icon {
             background-color: #475569; color: white; border: none; padding: 6px 9px;
@@ -113,7 +113,7 @@
         .kpi-card.purple { border-left-color: #8b5cf6; }
         .kpi-card.orange { border-left-color: #f59e0b; }
         .kpi-card.green { border-left-color: #10b981; }
-        .kpi-card.teal { border-left-color: #0d9488; }
+        .kpi-card.red { border-left-color: #e11d48; }
         .kpi-title { font-size: 12px; color: #64748b; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
         .kpi-value { font-size: 20px; font-weight: 800; margin-top: 4px; color: #0f172a; }
         .kpi-sub { font-size: 11px; color: #8b5cf6; font-weight: 700; margin-top: 2px; }
@@ -127,7 +127,7 @@
         .text-right { text-align: right; }
         .text-center { text-align: center; }
         .code-tag { font-size: 11px; color: #64748b; font-family: monospace; }
-        .badge-boost { background-color: #f3e8ff; color: #6b21a8; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; }
+        .badge-boost { background-color: #fce7f3; color: #be185d; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; }
         .badge-off { background-color: #f1f5f9; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; }
         .badge-actual { background-color: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; }
     </style>
@@ -137,7 +137,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>🔮 더본 OMS 발주 수요 예측 시스템</h1>
-            <span class="version-tag">Forecast v1.7 Median Precision Engine</span>
+            <span class="version-tag">Forecast v1.8 Advanced Momentum Engine</span>
         </div>
         <div>
             <button class="btn" style="background-color: #334155;" onclick="window.close()">✕ 창 닫기</button>
@@ -211,7 +211,7 @@
             <!-- 2줄: 미래 예측 기간 & 필터 & 가중치 -->
             <div class="filter-row" style="margin-bottom: 15px;">
                 <div class="filter-group">
-                    <label style="color: #7c3aed;">🔮 예측/비교 대상 기간:</label>
+                    <label style="color: #e11d48;">🔮 예측/비교 대상 기간:</label>
                     <input type="date" id="forecast-start-date" class="input-box" style="padding-right: 10px;">
                     <span>~</span>
                     <input type="date" id="forecast-end-date" class="input-box" style="padding-right: 10px;">
@@ -240,10 +240,10 @@
                 </div>
 
                 <!-- 🚀 신메뉴/행사 가중치 (%) 설정 -->
-                <div class="filter-group" style="background: #f3e8ff; padding: 6px 12px; border-radius: 6px; border: 1px solid #d8b4fe;">
-                    <label style="color: #6b21a8;">🚀 신메뉴/행사 가중치:</label>
-                    <input type="number" id="boost-percent-input" class="input-box" value="0" min="0" max="500" step="10" style="width: 65px; text-align: center; font-weight: bold; color: #6b21a8; padding-right: 8px;">
-                    <span style="color: #6b21a8;">% (+<b id="boost-multiplier-text">1.0배</b>)</span>
+                <div class="filter-group" style="background: #fce7f3; padding: 6px 12px; border-radius: 6px; border: 1px solid #fbcfe8;">
+                    <label style="color: #be185d;">🚀 신메뉴/행사 가중치:</label>
+                    <input type="number" id="boost-percent-input" class="input-box" value="0" min="0" max="500" step="10" style="width: 65px; text-align: center; font-weight: bold; color: #be185d; padding-right: 8px;">
+                    <span style="color: #be185d;">% (+<b id="boost-multiplier-text">1.0배</b>)</span>
                 </div>
 
                 <button class="btn btn-forecast" onclick="runForecastSimulation()">🔮 시뮬레이션 실행</button>
@@ -256,10 +256,10 @@
                     <div class="kpi-value" id="kpi-base-daily-avg">0 건</div>
                     <div class="kpi-sub" id="kpi-sub-daily-avg-amount" style="color:#0284c7;">일평균 금액: 0 원</div>
                 </div>
-                <div class="kpi-card teal">
+                <div class="kpi-card red">
                     <div class="kpi-title">🎯 검증 기간 일치율(Accuracy)</div>
-                    <div class="kpi-value" id="kpi-accuracy-percent" style="color:#0d9488;">-%</div>
-                    <div class="kpi-sub" id="kpi-accuracy-sub" style="color:#0d9488;">중위수(Median) 보정 Engine</div>
+                    <div class="kpi-value" id="kpi-accuracy-percent" style="color:#e11d48;">-%</div>
+                    <div class="kpi-sub" id="kpi-accuracy-sub" style="color:#e11d48;">모멘텀(Momentum) 엔진 적용</div>
                 </div>
                 <div class="kpi-card purple">
                     <div class="kpi-title">총 예상 발주 수량</div>
@@ -283,7 +283,7 @@
                 </div>
             </div>
 
-            <!-- 예측 차트 -->
+            <!-- 예측 차트 (막대형 콤보) -->
             <div class="chart-container">
                 <canvas id="forecastChart"></canvas>
             </div>
@@ -364,29 +364,16 @@
             return str || '-';
         }
 
-        /* 💡 중앙값(Median) 계산 함수 - 튀는 수치 완벽 방지 */
-        function getMedian(arr) {
-            if (!arr || arr.length === 0) return 0;
-            const sorted = [...arr].sort((a, b) => a - b);
-            const mid = Math.floor(sorted.length / 2);
-            return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-        }
-
         /* 🧹 입력창 지우기(✕) 기능 */
         function clearInputField(inputId) {
             const el = document.getElementById(inputId);
-            if (el) {
-                el.value = '';
-                toggleClearBtn(inputId);
-            }
+            if (el) { el.value = ''; toggleClearBtn(inputId); }
         }
 
         function toggleClearBtn(inputId) {
             const el = document.getElementById(inputId);
             const clearBtn = inputId === 'forecast-brand-input' ? document.getElementById('btn-clear-brand') : document.getElementById('btn-clear-item');
-            if (clearBtn) {
-                clearBtn.style.display = el.value.trim() ? 'block' : 'none';
-            }
+            if (clearBtn) clearBtn.style.display = el.value.trim() ? 'block' : 'none';
         }
 
         /* 🚀 마스터 데이터 목록 로드 */
@@ -410,48 +397,41 @@
             } catch (err) {}
         }
 
-        /* 🔍 실시간 브랜드 자동완성 처리 */
-        function handleBrandInput(val) {
-            toggleClearBtn('forecast-brand-input');
-            const dropEl = document.getElementById('brand-autocomplete-list');
+        /* 🔍 실시간 연관 검색어 처리 (브랜드/품목 통합) */
+        function handleAutocompleteInput(val, type) {
+            const inputId = type === 'brand' ? 'forecast-brand-input' : 'forecast-item-input';
+            const dropId = type === 'brand' ? 'brand-autocomplete-list' : 'item-autocomplete-list';
+            const list = type === 'brand' ? allBrandList : allItemList;
+            
+            toggleClearBtn(inputId);
+            const dropEl = document.getElementById(dropId);
             const keyword = val.toLowerCase().trim();
 
-            if (!keyword || allBrandList.length === 0) { dropEl.style.display = 'none'; return; }
-            const matched = allBrandList.filter(b => b.toLowerCase().includes(keyword)).slice(0, 8);
+            if (!keyword || list.length === 0) { dropEl.style.display = 'none'; return; }
+            
+            const matched = type === 'brand' 
+                ? list.filter(b => b.toLowerCase().includes(keyword)).slice(0, 8)
+                : list.filter(i => i.code.toLowerCase().includes(keyword) || i.name.toLowerCase().includes(keyword)).slice(0, 8);
+                
             if (matched.length === 0) { dropEl.style.display = 'none'; return; }
 
-            dropEl.innerHTML = matched.map(b => `<div class="autocomplete-item" onclick="selectAutocompleteBrand('${b}')"><span>${b}</span></div>`).join('');
+            if (type === 'brand') {
+                dropEl.innerHTML = matched.map(b => `<div class="autocomplete-item" onclick="selectAutocomplete('${b}', 'brand')"><span>${b}</span></div>`).join('');
+            } else {
+                dropEl.innerHTML = matched.map(i => `<div class="autocomplete-item" onclick="selectAutocomplete('${i.name}', 'item')"><span><b>${i.name}</b></span><span class="code-tag">[${i.code}]</span></div>`).join('');
+            }
             dropEl.style.display = 'block';
         }
 
-        function selectAutocompleteBrand(brandName) {
-            document.getElementById('forecast-brand-input').value = brandName;
-            toggleClearBtn('forecast-brand-input');
-            document.getElementById('brand-autocomplete-list').style.display = 'none';
-        }
+        function handleBrandInput(val) { handleAutocompleteInput(val, 'brand'); }
+        function handleItemInput(val) { handleAutocompleteInput(val, 'item'); }
 
-        /* 🔍 실시간 품목 자동완성 처리 */
-        function handleItemInput(val) {
-            toggleClearBtn('forecast-item-input');
-            const dropEl = document.getElementById('item-autocomplete-list');
-            const keyword = val.toLowerCase().trim();
-
-            if (!keyword || allItemList.length === 0) { dropEl.style.display = 'none'; return; }
-            const matched = allItemList.filter(i => i.code.toLowerCase().includes(keyword) || i.name.toLowerCase().includes(keyword)).slice(0, 8);
-            if (matched.length === 0) { dropEl.style.display = 'none'; return; }
-
-            dropEl.innerHTML = matched.map(i => `
-                <div class="autocomplete-item" onclick="selectAutocompleteItem('${i.name}')">
-                    <span><b>${i.name}</b></span><span class="code-tag">[${i.code}]</span>
-                </div>
-            `).join('');
-            dropEl.style.display = 'block';
-        }
-
-        function selectAutocompleteItem(itemName) {
-            document.getElementById('forecast-item-input').value = itemName;
-            toggleClearBtn('forecast-item-input');
-            document.getElementById('item-autocomplete-list').style.display = 'none';
+        function selectAutocomplete(val, type) {
+            const inputId = type === 'brand' ? 'forecast-brand-input' : 'forecast-item-input';
+            const dropId = type === 'brand' ? 'brand-autocomplete-list' : 'item-autocomplete-list';
+            document.getElementById(inputId).value = val;
+            toggleClearBtn(inputId);
+            document.getElementById(dropId).style.display = 'none';
         }
 
         document.addEventListener('click', (e) => {
@@ -465,31 +445,19 @@
             }
         });
 
-        /* 🏢 브랜드 선택 모달 */
-        async function openBrandModal() {
-            document.getElementById('brand-modal').style.display = 'flex';
-            if (allBrandList.length === 0) await loadMasterLists();
-            renderBrandModalList();
-        }
+        /* 모달 관련 함수들 */
+        async function openBrandModal() { document.getElementById('brand-modal').style.display = 'flex'; if (allBrandList.length === 0) await loadMasterLists(); renderBrandModalList(); }
         function closeBrandModal() { document.getElementById('brand-modal').style.display = 'none'; }
-
         function renderBrandModalList() {
             const currentSelected = document.getElementById('forecast-brand-input').value.split(',').map(s => s.trim());
-            const searchKeyword = document.getElementById('modal-brand-search').value.toLowerCase().trim();
+            const keyword = document.getElementById('modal-brand-search').value.toLowerCase().trim();
             const listEl = document.getElementById('brand-modal-list');
-            const filtered = allBrandList.filter(b => b.toLowerCase().includes(searchKeyword));
-
+            const filtered = allBrandList.filter(b => b.toLowerCase().includes(keyword));
             if (filtered.length === 0) { listEl.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:15px;">검색 결과가 없습니다.</div>'; return; }
-            listEl.innerHTML = filtered.map(brand => `
-                <div class="search-list-item">
-                    <label><input type="checkbox" class="brand-modal-chk" value="${brand}" ${currentSelected.includes(brand) ? 'checked' : ''}><span>${brand}</span></label>
-                </div>
-            `).join('');
+            listEl.innerHTML = filtered.map(b => `<div class="search-list-item"><label><input type="checkbox" class="brand-modal-chk" value="${b}" ${currentSelected.includes(b)?'checked':''}><span>${b}</span></label></div>`).join('');
         }
-
         function filterBrandModalList() { renderBrandModalList(); }
         function toggleAllBrandCheck(status) { document.querySelectorAll('.brand-modal-chk').forEach(chk => chk.checked = status); }
-
         function applyBrandSelection() {
             const checkedVals = Array.from(document.querySelectorAll('.brand-modal-chk:checked')).map(c => c.value);
             document.getElementById('forecast-brand-input').value = checkedVals.join(', ');
@@ -497,34 +465,18 @@
             closeBrandModal();
         }
 
-        /* 📦 품목 선택 모달 */
-        async function openItemModal() {
-            document.getElementById('item-modal').style.display = 'flex';
-            if (allItemList.length === 0) await loadMasterLists();
-            renderItemModalList();
-        }
+        async function openItemModal() { document.getElementById('item-modal').style.display = 'flex'; if (allItemList.length === 0) await loadMasterLists(); renderItemModalList(); }
         function closeItemModal() { document.getElementById('item-modal').style.display = 'none'; }
-
         function renderItemModalList() {
             const currentSelected = document.getElementById('forecast-item-input').value.split(',').map(s => s.trim());
-            const searchKeyword = document.getElementById('modal-item-search').value.toLowerCase().trim();
+            const keyword = document.getElementById('modal-item-search').value.toLowerCase().trim();
             const listEl = document.getElementById('item-modal-list');
-            const filtered = allItemList.filter(item => item.code.toLowerCase().includes(searchKeyword) || item.name.toLowerCase().includes(searchKeyword));
-
+            const filtered = allItemList.filter(i => i.code.toLowerCase().includes(keyword) || i.name.toLowerCase().includes(keyword));
             if (filtered.length === 0) { listEl.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:15px;">검색 결과가 없습니다.</div>'; return; }
-            listEl.innerHTML = filtered.map(item => `
-                <div class="search-list-item">
-                    <label>
-                        <input type="checkbox" class="item-modal-chk" value="${item.name}" ${currentSelected.includes(item.name) ? 'checked' : ''}>
-                        <span><span class="code-tag">[${item.code}]</span> <b style="margin-left: 4px;">${item.name}</b></span>
-                    </label>
-                </div>
-            `).join('');
+            listEl.innerHTML = filtered.map(i => `<div class="search-list-item"><label><input type="checkbox" class="item-modal-chk" value="${i.name}" ${currentSelected.includes(i.name)?'checked':''}><span><span class="code-tag">[${i.code}]</span> <b style="margin-left: 4px;">${i.name}</b></span></label></div>`).join('');
         }
-
         function filterItemModalList() { renderItemModalList(); }
         function toggleAllItemCheck(status) { document.querySelectorAll('.item-modal-chk').forEach(chk => chk.checked = status); }
-
         function applyItemSelection() {
             const checkedVals = Array.from(document.querySelectorAll('.item-modal-chk:checked')).map(c => c.value);
             document.getElementById('forecast-item-input').value = checkedVals.join(', ');
@@ -532,19 +484,16 @@
             closeItemModal();
         }
 
-        /* 🚀 가중치 배수 텍스트 실시간 반영 */
         document.getElementById('boost-percent-input').addEventListener('input', (e) => {
             const pct = cleanNumber(e.target.value);
             const mult = (1 + (pct / 100)).toFixed(1);
             document.getElementById('boost-multiplier-text').innerText = `${mult}배`;
         });
 
-        /* ⚡ 과거 기반 기간 단축 선택 로직 */
         function setQuickBasePeriod(type) {
             const today = new Date();
             let sDate = new Date();
             let eDate = new Date();
-
             if (type === 'thisMonth') {
                 sDate = new Date(today.getFullYear(), today.getMonth(), 1);
                 eDate = new Date(today);
@@ -557,12 +506,10 @@
                 sDate.setDate(today.getDate() - distanceToLastMon);
                 eDate.setDate(sDate.getDate() + 6);
             }
-
             document.getElementById('base-start-date').value = formatDate(sDate);
             document.getElementById('base-end-date').value = formatDate(eDate);
         }
 
-        /* 🌤️ 미래 날씨 예보 조회 (Open-Meteo API) */
         async function fetchFutureWeatherData(startDate, endDate) {
             const weatherMap = {};
             try {
@@ -584,20 +531,15 @@
                             if (precip > 0 || [51, 53, 55, 61, 63, 65, 80, 81, 82].includes(wCode)) { statusIcon = "🌧️"; statusText = "비"; }
                             else if ([1, 2, 3, 45, 48].includes(wCode)) { statusIcon = "⛅"; statusText = "흐림"; }
 
-                            weatherMap[formattedDate] = {
-                                minTemp, maxTemp, statusIcon, statusText,
-                                displayLabel: `${statusIcon} ${minTemp}°/${maxTemp}°`
-                            };
+                            weatherMap[formattedDate] = { minTemp, maxTemp, statusIcon, statusText, displayLabel: `${statusIcon} ${minTemp}°/${maxTemp}°` };
                         });
                     }
                 }
-            } catch (e) {
-                console.warn("미래 날씨 예보 조회 실패:", e);
-            }
+            } catch (e) { console.warn("미래 날씨 예보 조회 실패:", e); }
             return weatherMap;
         }
 
-        /* 🔮 [중앙값 Median 보정 적용] 발주 예측 시뮬레이션 메인 로직 */
+        /* 🚀 [최고 성능] De-seasonalized Momentum Engine 적용 시뮬레이션 */
         async function runForecastSimulation() {
             const baseStartStr = document.getElementById('base-start-date').value;
             const baseEndStr = document.getElementById('base-end-date').value;
@@ -614,6 +556,7 @@
             if (baseStartStr > baseEndStr) return alert("과거 기반 시작일은 종료일보다 이전이어야 합니다.");
             if (startDate > endDate) return alert("예측 시작일은 종료일보다 이전이어야 합니다.");
 
+            // 1. 과거 데이터 및 실제 오버랩(비교용) 데이터 호출
             let pastUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${baseStartStr}&delivery_date=lte.${baseEndStr}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
             let targetActualUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
 
@@ -649,6 +592,7 @@
                 const storeData = resStores.ok ? await resStores.json() : [];
                 const actualData = resTargetActual.ok ? await resTargetActual.json() : [];
 
+                // 실제 비교용 데이터 정제
                 const actualDailyMap = {};
                 actualData.forEach(r => {
                     const dKey = formatDisplayDate(r.delivery_date);
@@ -661,7 +605,6 @@
 
                 // 과거 일자별 합산
                 const pastDailyAggMap = {};
-                let grandPastQty = 0;
                 let grandPastAmount = 0;
                 let avgUnitPrice = 12000;
 
@@ -673,34 +616,56 @@
 
                     if (!pastDailyAggMap[dKey]) pastDailyAggMap[dKey] = 0;
                     pastDailyAggMap[dKey] += q;
-
-                    grandPastQty += q;
                     grandPastAmount += amt;
                 });
 
-                // 요일별 수량 배열 (1:월 ~ 6:토)
-                const dayQtyArrays = [[], [], [], [], [], [], []];
+                // 🚀 [AI 핵심 엔진 1] 계절성(요일 패턴) 지수 추출
+                const dayQtySums = [0, 0, 0, 0, 0, 0, 0];
+                const dayCounts = [0, 0, 0, 0, 0, 0, 0];
+                let grandPastQty = 0;
+                let validPastDays = 0;
+
                 Object.keys(pastDailyAggMap).forEach(dStr => {
-                    const qVal = pastDailyAggMap[dStr];
+                    const q = pastDailyAggMap[dStr];
                     const dayIdx = new Date(dStr.replace(/\//g, '-')).getDay();
-                    if (dayIdx !== 0 && qVal > 0) {
-                        dayQtyArrays[dayIdx].push(qVal);
+                    if (dayIdx !== 0 && q > 0) { // 일요일 제외
+                        dayQtySums[dayIdx] += q;
+                        dayCounts[dayIdx]++;
+                        grandPastQty += q;
+                        validPastDays++;
                     }
                 });
 
-                // 💡 [핵심 보정] 중위수(Median) 기반으로 요일 대표값 산출 (폭주일로 인한 오버 예측 방지)
-                const dayMedians = [0, 0, 0, 0, 0, 0, 0];
-                const allDailyValues = Object.values(pastDailyAggMap).filter(v => v > 0);
-                const overallMedian = getMedian(allDailyValues);
-
-                for (let d = 1; d <= 6; d++) {
-                    const arr = dayQtyArrays[d];
-                    dayMedians[d] = arr.length > 0 ? Math.round(getMedian(arr)) : Math.round(overallMedian);
+                const overallAvgQty = validPastDays > 0 ? (grandPastQty / validPastDays) : 0;
+                
+                // 요일별 가중치 지수 (Day-of-Week Index)
+                const dowIndices = [1, 1, 1, 1, 1, 1, 1];
+                for(let d=1; d<=6; d++) {
+                    const dayAvg = dayCounts[d] > 0 ? (dayQtySums[d] / dayCounts[d]) : overallAvgQty;
+                    dowIndices[d] = overallAvgQty > 0 ? (dayAvg / overallAvgQty) : 1.0;
+                    dowIndices[d] = Math.max(0.3, Math.min(3.0, dowIndices[d])); // 극단값 캡핑
                 }
 
-                const totalPastPeriodDays = Math.max(1, Math.round((new Date(baseEndStr) - new Date(baseStartStr)) / (1000 * 60 * 60 * 24)) + 1);
-                const baseDailyAvgQty = Math.round(grandPastQty / totalPastPeriodDays);
-                const baseDailyAvgAmount = Math.round(grandPastAmount / totalPastPeriodDays);
+                // 🚀 [AI 핵심 엔진 2] 최근 모멘텀(추세) 추출 (De-seasonalized)
+                // 과거 기간 중 가장 최근 7 영업일의 추세를 파악해 예측치를 즉각 끌어올립니다.
+                const sortedPastDates = Object.keys(pastDailyAggMap).sort();
+                const recentValidDates = sortedPastDates.filter(d => new Date(d.replace(/\//g, '-')).getDay() !== 0).slice(-7);
+
+                let recentDesSum = 0;
+                recentValidDates.forEach(dStr => {
+                    const q = pastDailyAggMap[dStr];
+                    const dayIdx = new Date(dStr.replace(/\//g, '-')).getDay();
+                    const desQty = q / dowIndices[dayIdx]; // 요일 영향을 제거한 순수 체급(Volume)
+                    recentDesSum += desQty;
+                });
+
+                const recentDesAvg = recentValidDates.length > 0 ? (recentDesSum / recentValidDates.length) : overallAvgQty;
+                
+                // 추세 모멘텀 비율 계산 (전체 기간 평균 대비 최근 평균이 얼마나 상승/하락했는가)
+                let trendMomentum = overallAvgQty > 0 ? (recentDesAvg / overallAvgQty) : 1.0;
+                trendMomentum = Math.max(0.5, Math.min(2.5, trendMomentum)); // 0.5배 ~ 2.5배 사이로 제한
+
+                const baseDailyAvgAmount = validPastDays > 0 ? Math.round(grandPastAmount / validPastDays) : 0;
 
                 // 미래 예측 날씨
                 const weatherMap = await fetchFutureWeatherData(startDate, endDate);
@@ -734,7 +699,8 @@
                     let boostedAmt = 0;
 
                     if (!isSunday) {
-                        baseQty = Math.round((dayMedians[dayIdx] || overallMedian) * weatherFactor);
+                        // 🚀 최종 예측 공식 = (전체 일평균) * (해당 요일 지수) * (최근 성장 모멘텀) * (날씨 보정)
+                        baseQty = Math.round(overallAvgQty * dowIndices[dayIdx] * trendMomentum * weatherFactor);
                         boostedQty = Math.round(baseQty * boostMultiplier);
                         addedQty = boostedQty - baseQty;
                         boostedAmt = Math.round(boostedQty * avgUnitPrice);
@@ -742,6 +708,7 @@
 
                     const actualQty = (actualDailyMap[dispDate] !== undefined) ? actualDailyMap[dispDate] : null;
 
+                    // 백테스팅 일치율 집계
                     if (!isSunday && actualQty !== null) {
                         totalOverlapActual += actualQty;
                         totalOverlapError += Math.abs(actualQty - boostedQty);
@@ -768,20 +735,20 @@
 
                 currentForecastRows = futureRows;
 
-                // WMAPE 오차율
+                // 🎯 정밀 일치율(Accuracy %) (WMAPE)
                 let accuracyText = "비교 데이터 없음";
                 let accuracySubText = "구간 내 실제 실적 없음";
                 if (overlapDaysCount > 0 && totalOverlapActual > 0) {
                     const wmape = (totalOverlapError / totalOverlapActual) * 100;
                     const accuracy = Math.max(0, Math.min(100, 100 - wmape)).toFixed(1);
                     accuracyText = `${accuracy}%`;
-                    accuracySubText = `실제 ${totalOverlapActual.toLocaleString()}건 대비 오차 ${totalOverlapError.toLocaleString()}건`;
+                    accuracySubText = `실제 ${totalOverlapActual.toLocaleString()}건 대비 오차 ${Math.round(totalOverlapError).toLocaleString()}건`;
                 }
 
                 document.getElementById('kpi-accuracy-percent').innerText = accuracyText;
                 document.getElementById('kpi-accuracy-sub').innerText = accuracySubText;
 
-                document.getElementById('kpi-base-daily-avg').innerText = `${baseDailyAvgQty.toLocaleString()} 건`;
+                document.getElementById('kpi-base-daily-avg').innerText = `${Math.round(overallAvgQty).toLocaleString()} 건`;
                 document.getElementById('kpi-sub-daily-avg-amount').innerText = `일평균 금액: ${baseDailyAvgAmount.toLocaleString()} 원`;
 
                 document.getElementById('kpi-forecast-qty').innerText = `${totalBoostedQty.toLocaleString()} 건`;
@@ -804,7 +771,7 @@
             }
         }
 
-        /* 📊 차트 그리기 */
+        /* 📊 막대 콤보 차트 그리기 */
         function renderForecastChart(dailyChartMap, weatherMap) {
             const labels = Object.keys(dailyChartMap).sort();
             const actualData = labels.map(k => (dailyChartMap[k].isSunday || dailyChartMap[k].actualQty === null) ? 0 : dailyChartMap[k].actualQty);
@@ -860,7 +827,7 @@
             });
         }
 
-        /* 📋 상세 표 */
+        /* 📋 예측 상세 명세서 표 구성 */
         function renderForecastTable(rows) {
             const tbody = document.getElementById('forecast-detail-table');
             if (!rows || rows.length === 0) {
@@ -905,7 +872,7 @@
             }).join('');
         }
 
-        /* 📥 엑셀 저장 */
+        /* 📥 예측 명세서 엑셀 저장 */
         function exportForecastToExcel() {
             if (!currentForecastRows || currentForecastRows.length === 0) return alert("저장할 예측 데이터가 없습니다.");
             const exportData = currentForecastRows.map(r => ({
@@ -920,7 +887,7 @@
             XLSX.writeFile(wb, `OMS미래발주예측비교_${document.getElementById('forecast-start-date').value}_${document.getElementById('forecast-end-date').value}.xlsx`);
         }
 
-        /* ⚡ 초기 실행 */
+        /* ⚡ 페이지 로드 시 초기 실행 */
         document.addEventListener('DOMContentLoaded', async () => {
             setQuickBasePeriod('thisMonth');
 
