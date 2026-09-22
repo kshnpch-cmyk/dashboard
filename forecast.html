@@ -38,19 +38,70 @@
         
         .filter-row {
             display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
-            background-color: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 15px;
+            background-color: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 12px;
         }
         .filter-group { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #475569; position: relative; }
-        .input-box { padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none; }
+        .input-wrapper { position: relative; display: flex; align-items: center; }
+        .input-box { padding: 7px 26px 7px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none; }
+
+        /* 🧹 입력창 지우기(✕) 버튼 */
+        .clear-btn {
+            position: absolute; right: 8px; cursor: pointer; color: #94a3b8; font-size: 12px; font-weight: bold;
+            display: none; background: #e2e8f0; border-radius: 50%; width: 16px; height: 16px; text-align: center; line-height: 15px;
+        }
+        .clear-btn:hover { background: #cbd5e1; color: #475569; }
+
+        /* 🔍 실시간 연관 검색어 드롭다운 스타일 */
+        .autocomplete-dropdown {
+            position: absolute; top: 100%; left: 0; width: 100%; max-height: 220px;
+            overflow-y: auto; background: #ffffff; border: 1px solid #cbd5e1;
+            border-radius: 6px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            z-index: 1000; display: none; margin-top: 4px;
+        }
+        .autocomplete-item {
+            padding: 8px 12px; font-size: 12.5px; cursor: pointer; border-bottom: 1px solid #f1f5f9;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .autocomplete-item:hover { background-color: #eff6ff; color: #2563eb; font-weight: bold; }
+        .autocomplete-item:last-child { border-bottom: none; }
 
         .btn {
-            background-color: #2563eb; color: white; border: none; padding: 8px 16px;
+            background-color: #2563eb; color: white; border: none; padding: 8px 14px;
             border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px;
         }
         .btn:hover { background-color: #1d4ed8; }
+        .btn-cal { background-color: #0f766e; padding: 4px 8px; font-size: 11px; border-radius: 4px; }
+        .btn-quick { background-color: #475569; padding: 6px 12px; font-size: 12px; }
+        .btn-quick:hover { background-color: #334155; }
         .btn-forecast { background-color: #7c3aed; }
         .btn-forecast:hover { background-color: #6d28d9; }
         .btn-excel { background-color: #16a34a; padding: 6px 12px; font-size: 12px; }
+        .btn-search-icon {
+            background-color: #475569; color: white; border: none; padding: 6px 9px;
+            border-radius: 6px; cursor: pointer; font-size: 12px; margin-left: -2px;
+        }
+        .btn-search-icon:hover { background-color: #334155; }
+
+        /* 모달 공통 스타일 */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.6); z-index: 1001; justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background: white; padding: 20px; border-radius: 12px; width: 520px; max-width: 90%;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+            max-height: 85vh; display: flex; flex-direction: column;
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .modal-title { font-size: 16px; font-weight: 700; }
+        .close-btn { cursor: pointer; font-size: 18px; font-weight: bold; color: #64748b; }
+        .modal-body-scroll { flex: 1; overflow-y: auto; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; }
+        .search-list-item {
+            display: flex; align-items: center; justify-content: space-between; padding: 8px 10px;
+            border-bottom: 1px solid #f1f5f9; font-size: 13px; cursor: pointer;
+        }
+        .search-list-item:hover { background-color: #eff6ff; }
+        .search-list-item label { cursor: pointer; width: 100%; display: flex; align-items: center; gap: 8px; }
 
         /* KPI 그리드 및 카드 스타일 */
         .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 15px; }
@@ -82,47 +133,116 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>🔮 더본 OMS 발주 수요 예측 시스템</h1>
-            <span class="version-tag">Forecast v1.0 AI-Lite</span>
+            <span class="version-tag">Forecast v1.2 Shared Modules</span>
         </div>
         <div>
             <button class="btn" style="background-color: #334155;" onclick="window.close()">✕ 창 닫기</button>
         </div>
     </div>
 
+    <!-- 🏢 브랜드 선택 모달 -->
+    <div class="modal-overlay" id="brand-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">🏢 브랜드 다중 선택</span>
+                <span class="close-btn" onclick="closeBrandModal()">✕</span>
+            </div>
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                <input type="text" id="modal-brand-search" class="input-box" style="flex:1;" placeholder="브랜드명 검색 (Enter)" onkeydown="if(event.key==='Enter') filterBrandModalList()">
+                <button class="btn btn-cal" style="background:#2563eb;" onclick="filterBrandModalList()">검색</button>
+                <button class="btn btn-cal" style="background:#475569;" onclick="toggleAllBrandCheck(true)">전체선택</button>
+                <button class="btn btn-cal" style="background:#64748b;" onclick="toggleAllBrandCheck(false)">해제</button>
+            </div>
+            <div class="modal-body-scroll" id="brand-modal-list"></div>
+            <div style="margin-top: 15px; text-align: right;">
+                <button class="btn" onclick="applyBrandSelection()">확인 적용</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 📦 품목 다중 선택 모달 -->
+    <div class="modal-overlay" id="item-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">📦 품목 다중 선택</span>
+                <span class="close-btn" onclick="closeItemModal()">✕</span>
+            </div>
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                <input type="text" id="modal-item-search" class="input-box" style="flex:1;" placeholder="품목코드 또는 품목명 검색 (Enter)" onkeydown="if(event.key==='Enter') filterItemModalList()">
+                <button class="btn btn-cal" style="background:#2563eb;" onclick="filterItemModalList()">검색</button>
+                <button class="btn btn-cal" style="background:#475569;" onclick="toggleAllItemCheck(true)">전체선택</button>
+                <button class="btn btn-cal" style="background:#64748b;" onclick="toggleAllItemCheck(false)">해제</button>
+            </div>
+            <div class="modal-body-scroll" id="item-modal-list"></div>
+            <div style="margin-top: 15px; text-align: right;">
+                <button class="btn" onclick="applyItemSelection()">확인 적용</button>
+            </div>
+        </div>
+    </div>
+
     <div class="container">
         
-        <!-- ⚙️ 예측 조건 및 가중치 설정 패널 -->
+        <!-- ⚙️ 예측 조건 및 과거 기반 설정 패널 -->
         <div class="section-panel">
             <div class="panel-header">
-                <span class="panel-title-text">⚙️ 미래 발주 예측 설정</span>
+                <span class="panel-title-text">⚙️ 과거 기반 데이터 & 미래 예측 설정</span>
             </div>
 
+            <!-- 1줄: 과거 분석 기반 기간 선택 + 빠른 선택 버튼 -->
             <div class="filter-row">
                 <div class="filter-group">
-                    <label>예측 미래 기간:</label>
-                    <input type="date" id="forecast-start-date" class="input-box">
+                    <label style="color: #2563eb;">📌 분석 기반 과거기간:</label>
+                    <input type="date" id="base-start-date" class="input-box" style="padding-right: 10px;">
                     <span>~</span>
-                    <input type="date" id="forecast-end-date" class="input-box">
+                    <input type="date" id="base-end-date" class="input-box" style="padding-right: 10px;">
                 </div>
 
+                <div style="display: flex; gap: 6px;">
+                    <button class="btn btn-quick" onclick="setQuickBasePeriod('thisMonth')">📅 이번달 기준</button>
+                    <button class="btn btn-quick" onclick="setQuickBasePeriod('last7days')">⚡ 직전 일주일</button>
+                    <button class="btn btn-quick" onclick="setQuickBasePeriod('lastWeek')">📆 직전주 (월~일)</button>
+                </div>
+            </div>
+
+            <!-- 2줄: 미래 예측 기간 & 필터 & 가중치 -->
+            <div class="filter-row" style="margin-bottom: 15px;">
+                <div class="filter-group">
+                    <label style="color: #7c3aed;">🔮 미래 예측 기간:</label>
+                    <input type="date" id="forecast-start-date" class="input-box" style="padding-right: 10px;">
+                    <span>~</span>
+                    <input type="date" id="forecast-end-date" class="input-box" style="padding-right: 10px;">
+                </div>
+
+                <!-- 🏢 브랜드 모듈 적용 -->
                 <div class="filter-group">
                     <label>브랜드:</label>
-                    <input type="text" id="forecast-brand-input" class="input-box" placeholder="전체 또는 브랜드명" style="width: 130px;">
+                    <div class="input-wrapper">
+                        <input type="text" id="forecast-brand-input" class="input-box" placeholder="브랜드 선택/검색" style="width: 130px;" oninput="handleBrandInput(this.value)" onfocus="handleBrandInput(this.value)" onkeydown="if(event.key==='Enter') runForecastSimulation()">
+                        <span class="clear-btn" id="btn-clear-brand" onclick="clearInputField('forecast-brand-input')">✕</span>
+                    </div>
+                    <button class="btn-search-icon" onclick="openBrandModal()" title="브랜드 다중 선택 모달 열기">🔍</button>
+                    <div id="brand-autocomplete-list" class="autocomplete-dropdown"></div>
                 </div>
 
+                <!-- 📦 품목 모듈 적용 -->
                 <div class="filter-group">
                     <label>품목코드/명:</label>
-                    <input type="text" id="forecast-item-input" class="input-box" placeholder="전체 또는 품목명" style="width: 150px;">
+                    <div class="input-wrapper">
+                        <input type="text" id="forecast-item-input" class="input-box" placeholder="품목 선택/검색" style="width: 140px;" oninput="handleItemInput(this.value)" onfocus="handleItemInput(this.value)" onkeydown="if(event.key==='Enter') runForecastSimulation()">
+                        <span class="clear-btn" id="btn-clear-item" onclick="clearInputField('forecast-item-input')">✕</span>
+                    </div>
+                    <button class="btn-search-icon" onclick="openItemModal()" title="품목 다중 선택 모달 열기">🔍</button>
+                    <div id="item-autocomplete-list" class="autocomplete-dropdown"></div>
                 </div>
 
                 <!-- 🚀 신메뉴/행사 가중치 (%) 설정 -->
                 <div class="filter-group" style="background: #f3e8ff; padding: 6px 12px; border-radius: 6px; border: 1px solid #d8b4fe;">
                     <label style="color: #6b21a8;">🚀 신메뉴/행사 가중치:</label>
-                    <input type="number" id="boost-percent-input" class="input-box" value="0" min="0" max="500" step="10" style="width: 70px; text-align: center; font-weight: bold; color: #6b21a8;">
-                    <span style="color: #6b21a8;">% 추가 (+<b id="boost-multiplier-text">1.0배</b>)</span>
+                    <input type="number" id="boost-percent-input" class="input-box" value="0" min="0" max="500" step="10" style="width: 65px; text-align: center; font-weight: bold; color: #6b21a8; padding-right: 8px;">
+                    <span style="color: #6b21a8;">% (+<b id="boost-multiplier-text">1.0배</b>)</span>
                 </div>
 
-                <button class="btn btn-forecast" onclick="runForecastSimulation()">🔮 미래 발주 예측 시뮬레이션 실행</button>
+                <button class="btn btn-forecast" onclick="runForecastSimulation()">🔮 시뮬레이션 실행</button>
             </div>
 
             <!-- 종합 예측 KPI 카드 -->
@@ -143,9 +263,9 @@
                     <div class="kpi-sub" id="kpi-sub-added-amount">추가 필요 예산: +0 원</div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-title">예상 발주 참여 점포수</div>
+                    <div class="kpi-title">기반 기간 발주 점포수</div>
                     <div class="kpi-value" id="kpi-forecast-stores">0 개점</div>
-                    <div class="kpi-sub">과거 평균 발주 점포 기준</div>
+                    <div class="kpi-sub">선택된 과거 기간 기준</div>
                 </div>
             </div>
 
@@ -203,6 +323,7 @@
 
         let forecastChart = null;
         let currentForecastRows = [];
+        let allBrandList = [], allItemList = [];
 
         function formatDate(d) {
             const y = d.getFullYear();
@@ -220,12 +341,202 @@
             return parseFloat(String(val || 0).replace(/[^0-9.-]/g, '')) || 0;
         }
 
+        function cleanCode(val) {
+            if (!val && val !== 0) return '-';
+            let str = String(val).trim();
+            if (str.endsWith('.0')) str = str.substring(0, str.length - 2);
+            return str || '-';
+        }
+
+        /* 🧹 입력창 지우기(✕) 기능 */
+        function clearInputField(inputId) {
+            const el = document.getElementById(inputId);
+            if (el) {
+                el.value = '';
+                toggleClearBtn(inputId);
+            }
+        }
+
+        function toggleClearBtn(inputId) {
+            const el = document.getElementById(inputId);
+            const clearBtn = inputId === 'forecast-brand-input' ? document.getElementById('btn-clear-brand') : document.getElementById('btn-clear-item');
+            if (clearBtn) {
+                clearBtn.style.display = el.value.trim() ? 'block' : 'none';
+            }
+        }
+
+        /* 🚀 마스터 데이터 목록 로드 */
+        async function loadMasterLists() {
+            try {
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/daily_order_summary?select=brand_name,item_code,item_name`, {
+                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    allBrandList = [...new Set(data.map(r => r.brand_name))].filter(Boolean).sort();
+                    
+                    const map = new Map();
+                    data.forEach(r => {
+                        if (r.item_code || r.item_name) {
+                            map.set(`${cleanCode(r.item_code)}__${r.item_name}`, { code: cleanCode(r.item_code), name: r.item_name || '' });
+                        }
+                    });
+                    allItemList = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+                }
+            } catch (err) {}
+        }
+
+        /* 🔍 실시간 브랜드 자동완성 처리 */
+        function handleBrandInput(val) {
+            toggleClearBtn('forecast-brand-input');
+            const dropEl = document.getElementById('brand-autocomplete-list');
+            const keyword = val.toLowerCase().trim();
+
+            if (!keyword || allBrandList.length === 0) { dropEl.style.display = 'none'; return; }
+            const matched = allBrandList.filter(b => b.toLowerCase().includes(keyword)).slice(0, 8);
+            if (matched.length === 0) { dropEl.style.display = 'none'; return; }
+
+            dropEl.innerHTML = matched.map(b => `<div class="autocomplete-item" onclick="selectAutocompleteBrand('${b}')"><span>${b}</span></div>`).join('');
+            dropEl.style.display = 'block';
+        }
+
+        function selectAutocompleteBrand(brandName) {
+            document.getElementById('forecast-brand-input').value = brandName;
+            toggleClearBtn('forecast-brand-input');
+            document.getElementById('brand-autocomplete-list').style.display = 'none';
+        }
+
+        /* 🔍 실시간 품목 자동완성 처리 */
+        function handleItemInput(val) {
+            toggleClearBtn('forecast-item-input');
+            const dropEl = document.getElementById('item-autocomplete-list');
+            const keyword = val.toLowerCase().trim();
+
+            if (!keyword || allItemList.length === 0) { dropEl.style.display = 'none'; return; }
+            const matched = allItemList.filter(i => i.code.toLowerCase().includes(keyword) || i.name.toLowerCase().includes(keyword)).slice(0, 8);
+            if (matched.length === 0) { dropEl.style.display = 'none'; return; }
+
+            dropEl.innerHTML = matched.map(i => `
+                <div class="autocomplete-item" onclick="selectAutocompleteItem('${i.name}')">
+                    <span><b>${i.name}</b></span><span class="code-tag">[${i.code}]</span>
+                </div>
+            `).join('');
+            dropEl.style.display = 'block';
+        }
+
+        function selectAutocompleteItem(itemName) {
+            document.getElementById('forecast-item-input').value = itemName;
+            toggleClearBtn('forecast-item-input');
+            document.getElementById('item-autocomplete-list').style.display = 'none';
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#forecast-brand-input') && !e.target.closest('#brand-autocomplete-list')) {
+                const drop = document.getElementById('brand-autocomplete-list');
+                if (drop) drop.style.display = 'none';
+            }
+            if (!e.target.closest('#forecast-item-input') && !e.target.closest('#item-autocomplete-list')) {
+                const drop = document.getElementById('item-autocomplete-list');
+                if (drop) drop.style.display = 'none';
+            }
+        });
+
+        /* 🏢 브랜드 선택 모달 */
+        async function openBrandModal() {
+            document.getElementById('brand-modal').style.display = 'flex';
+            if (allBrandList.length === 0) await loadMasterLists();
+            renderBrandModalList();
+        }
+        function closeBrandModal() { document.getElementById('brand-modal').style.display = 'none'; }
+
+        function renderBrandModalList() {
+            const currentSelected = document.getElementById('forecast-brand-input').value.split(',').map(s => s.trim());
+            const searchKeyword = document.getElementById('modal-brand-search').value.toLowerCase().trim();
+            const listEl = document.getElementById('brand-modal-list');
+            const filtered = allBrandList.filter(b => b.toLowerCase().includes(searchKeyword));
+
+            if (filtered.length === 0) { listEl.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:15px;">검색 결과가 없습니다.</div>'; return; }
+            listEl.innerHTML = filtered.map(brand => `
+                <div class="search-list-item">
+                    <label><input type="checkbox" class="brand-modal-chk" value="${brand}" ${currentSelected.includes(brand) ? 'checked' : ''}><span>${brand}</span></label>
+                </div>
+            `).join('');
+        }
+
+        function filterBrandModalList() { renderBrandModalList(); }
+        function toggleAllBrandCheck(status) { document.querySelectorAll('.brand-modal-chk').forEach(chk => chk.checked = status); }
+
+        function applyBrandSelection() {
+            const checkedVals = Array.from(document.querySelectorAll('.brand-modal-chk:checked')).map(c => c.value);
+            document.getElementById('forecast-brand-input').value = checkedVals.join(', ');
+            toggleClearBtn('forecast-brand-input');
+            closeBrandModal();
+        }
+
+        /* 📦 품목 선택 모달 */
+        async function openItemModal() {
+            document.getElementById('item-modal').style.display = 'flex';
+            if (allItemList.length === 0) await loadMasterLists();
+            renderItemModalList();
+        }
+        function closeItemModal() { document.getElementById('item-modal').style.display = 'none'; }
+
+        function renderItemModalList() {
+            const currentSelected = document.getElementById('forecast-item-input').value.split(',').map(s => s.trim());
+            const searchKeyword = document.getElementById('modal-item-search').value.toLowerCase().trim();
+            const listEl = document.getElementById('item-modal-list');
+            const filtered = allItemList.filter(item => item.code.toLowerCase().includes(searchKeyword) || item.name.toLowerCase().includes(searchKeyword));
+
+            if (filtered.length === 0) { listEl.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:15px;">검색 결과가 없습니다.</div>'; return; }
+            listEl.innerHTML = filtered.map(item => `
+                <div class="search-list-item">
+                    <label>
+                        <input type="checkbox" class="item-modal-chk" value="${item.name}" ${currentSelected.includes(item.name) ? 'checked' : ''}>
+                        <span><span class="code-tag">[${item.code}]</span> <b style="margin-left: 4px;">${item.name}</b></span>
+                    </label>
+                </div>
+            `).join('');
+        }
+
+        function filterItemModalList() { renderItemModalList(); }
+        function toggleAllItemCheck(status) { document.querySelectorAll('.item-modal-chk').forEach(chk => chk.checked = status); }
+
+        function applyItemSelection() {
+            const checkedVals = Array.from(document.querySelectorAll('.item-modal-chk:checked')).map(c => c.value);
+            document.getElementById('forecast-item-input').value = checkedVals.join(', ');
+            toggleClearBtn('forecast-item-input');
+            closeItemModal();
+        }
+
         /* 🚀 가중치 배수 텍스트 실시간 반영 */
         document.getElementById('boost-percent-input').addEventListener('input', (e) => {
             const pct = cleanNumber(e.target.value);
             const mult = (1 + (pct / 100)).toFixed(1);
             document.getElementById('boost-multiplier-text').innerText = `${mult}배`;
         });
+
+        /* ⚡ 과거 기반 기간 단축 선택 로직 */
+        function setQuickBasePeriod(type) {
+            const today = new Date();
+            let sDate = new Date();
+            let eDate = new Date();
+
+            if (type === 'thisMonth') {
+                sDate = new Date(today.getFullYear(), today.getMonth(), 1);
+                eDate = new Date(today);
+            } else if (type === 'last7days') {
+                sDate.setDate(today.getDate() - 7);
+                eDate.setDate(today.getDate() - 1);
+            } else if (type === 'lastWeek') {
+                const dayOfWeek = today.getDay();
+                const distanceToLastMon = (dayOfWeek === 0 ? 6 : dayOfWeek - 1) + 7;
+                sDate.setDate(today.getDate() - distanceToLastMon);
+                eDate.setDate(sDate.getDate() + 6);
+            }
+
+            document.getElementById('base-start-date').value = formatDate(sDate);
+            document.getElementById('base-end-date').value = formatDate(eDate);
+        }
 
         /* 🌤️ 미래 날씨 예보 조회 (Open-Meteo API) */
         async function fetchFutureWeatherData(startDate, endDate) {
@@ -264,29 +575,45 @@
 
         /* 🔮 발주 예측 시뮬레이션 메인 로직 */
         async function runForecastSimulation() {
+            const baseStartStr = document.getElementById('base-start-date').value;
+            const baseEndStr = document.getElementById('base-end-date').value;
             const startDate = document.getElementById('forecast-start-date').value;
             const endDate = document.getElementById('forecast-end-date').value;
+
             const brandVal = document.getElementById('forecast-brand-input').value.trim();
             const itemVal = document.getElementById('forecast-item-input').value.trim();
             const boostPercent = cleanNumber(document.getElementById('boost-percent-input').value);
             const boostMultiplier = 1 + (boostPercent / 100);
 
+            if (!baseStartStr || !baseEndStr) return alert("분석 기반 과거 기간을 선택하세요.");
             if (!startDate || !endDate) return alert("미래 예측 기간을 선택하세요.");
-            if (startDate > endDate) return alert("종료 일자는 시작 일자보다 이후여야 합니다.");
+            if (baseStartStr > baseEndStr) return alert("과거 기반 시작일은 종료일보다 이전이어야 합니다.");
+            if (startDate > endDate) return alert("미래 예측 시작일은 종료일보다 이전이어야 합니다.");
 
-            // 1. 과거 최근 4주간 데이터를 Supabase에서 조회하여 요일별 평균 발주 가중치 계산
-            const past4WeeksDate = new Date(); past4WeeksDate.setDate(past4WeeksDate.getDate() - 28);
-            const pastStartStr = formatDate(past4WeeksDate);
-            const pastEndStr = formatDate(new Date());
+            // 1. 지정된 과거 기간 데이터 조회
+            let pastUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${baseStartStr}&delivery_date=lte.${baseEndStr}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
+            
+            if (brandVal) {
+                const bList = brandVal.split(',').map(b => b.trim()).filter(Boolean);
+                if (bList.length === 1) pastUrl += `&brand_name=ilike.*${encodeURIComponent(bList[0])}*`;
+                else if (bList.length > 1) pastUrl += `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`;
+            }
 
-            let pastUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${pastStartStr}&delivery_date=lte.${pastEndStr}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
-            if (brandVal) pastUrl += `&brand_name=ilike.*${encodeURIComponent(brandVal)}*`;
-            if (itemVal) pastUrl += `&or=(item_code.ilike.*${encodeURIComponent(itemVal)}*,item_name.ilike.*${encodeURIComponent(itemVal)}*)`;
+            if (itemVal) {
+                const iList = itemVal.split(',').map(i => i.trim()).filter(Boolean);
+                if (iList.length === 1) {
+                    const kw = encodeURIComponent(iList[0]);
+                    pastUrl += `&or=(item_code.ilike.*${kw}*,item_name.ilike.*${kw}*)`;
+                } else if (iList.length > 1) {
+                    const orConds = iList.map(i => `item_code.ilike.*${encodeURIComponent(i)}*,item_name.ilike.*${encodeURIComponent(i)}*`).join(',');
+                    pastUrl += `&or=(${orConds})`;
+                }
+            }
 
             try {
                 const [resPast, resStores] = await Promise.all([
                     fetch(pastUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } }),
-                    fetch(`${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${pastStartStr}&delivery_date=lte.${pastEndStr}&select=store_name`, {
+                    fetch(`${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${baseStartStr}&delivery_date=lte.${baseEndStr}&select=store_name`, {
                         headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
                     })
                 ]);
@@ -295,13 +622,13 @@
                 const storeData = resStores.ok ? await resStores.json() : [];
 
                 const pastStoreSet = new Set(storeData.map(s => s.store_name).filter(Boolean));
-                const totalStoresCount = pastStoreSet.size || 250;
+                const totalStoresCount = pastStoreSet.size || 0;
 
-                // 요일별 발주 평균 수량 산출 (0:일, 1:월, ... 6:토)
+                // 과거 요일별 발주 평균 수량 산출 (0:일, 1:월, ... 6:토)
                 const dayQtySums = [0, 0, 0, 0, 0, 0, 0];
                 const dayCounts = [0, 0, 0, 0, 0, 0, 0];
                 let grandPastQty = 0;
-                let avgUnitPrice = 12000; // 기본 단가 추정치
+                let avgUnitPrice = 12000;
 
                 pastData.forEach(r => {
                     const q = cleanNumber(r.total_qty || r.qty);
@@ -314,7 +641,8 @@
                     grandPastQty += q;
                 });
 
-                const dayAverages = dayQtySums.map((sum, idx) => dayCounts[idx] > 0 ? (sum / dayCounts[idx]) : (grandPastQty / 28));
+                const totalPastDays = Math.max(1, Math.round((new Date(baseEndStr) - new Date(baseStartStr)) / (1000 * 60 * 60 * 24)) + 1);
+                const dayAverages = dayQtySums.map((sum, idx) => dayCounts[idx] > 0 ? (sum / dayCounts[idx]) : (grandPastQty / totalPastDays));
 
                 // 2. 미래 예측 날씨 데이터 연동
                 const weatherMap = await fetchFutureWeatherData(startDate, endDate);
@@ -334,11 +662,10 @@
                     const dayIdx = curDate.getDay();
                     const wInfo = weatherMap[dispDate] || { displayLabel: "☀️ 맑음", statusText: "맑음" };
 
-                    // 날씨 가중치 (비 올 때 음료/발주 소폭 감소 보정)
                     let weatherFactor = 1.0;
                     if (wInfo.statusText === '비') weatherFactor = 0.92;
 
-                    const baseQty = Math.round(dayAverages[dayIdx] * weatherFactor);
+                    const baseQty = Math.round((dayAverages[dayIdx] || 0) * weatherFactor);
                     const boostedQty = Math.round(baseQty * boostMultiplier);
                     const addedQty = boostedQty - baseQty;
 
@@ -458,15 +785,18 @@
             XLSX.writeFile(wb, `OMS미래발주예측_${document.getElementById('forecast-start-date').value}_${document.getElementById('forecast-end-date').value}.xlsx`);
         }
 
-        /* ⚡ 페이지 로드 시 초기값 설정 */
-        document.addEventListener('DOMContentLoaded', () => {
+        /* ⚡ 페이지 로드 시 초기 실행 */
+        document.addEventListener('DOMContentLoaded', async () => {
+            setQuickBasePeriod('thisMonth');
+
             const today = new Date();
-            const future7 = new Date(); past7 = new Date();
+            const future7 = new Date();
             future7.setDate(today.getDate() + 7);
 
             document.getElementById('forecast-start-date').value = formatDate(today);
             document.getElementById('forecast-end-date').value = formatDate(future7);
 
+            await loadMasterLists();
             runForecastSimulation();
         });
     </script>
