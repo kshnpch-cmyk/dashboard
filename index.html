@@ -1207,7 +1207,7 @@
             });
         }
 
-        /* 🚀 검색 조건에 딱 들어맞는 점포 수 및 브랜드 맵 정밀 재계산 전담 함수 */
+        /* 🚀 [버그 해결] 누락 없는 점포 수 정밀 계산 함수 */
         function recalculateFilteredStores() {
             const uniqueStores = new Set();
             currentBrandStoreMap = {};
@@ -1218,7 +1218,7 @@
             const bList = brandVal ? brandVal.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
             const iList = itemVal ? itemVal.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
 
-            // 1. 상세 주문 원본 데이터(rawDetailOrders)에서 조건에 정확히 매칭되는 레코드만 추출
+            // 1. 수집 완료된 상세 원본 데이터(rawDetailOrders)에서 정밀 조건 검색
             if (rawDetailOrders && rawDetailOrders.length > 0) {
                 rawDetailOrders.forEach(r => {
                     const sName = r.store_name;
@@ -1237,7 +1237,7 @@
                 });
             }
 
-            // 2. 품목 검색어가 없고 상세 주문이 로드되기 전에는 storeSummaryList를 보조 활용
+            // 2. 품목 검색어가 없을 때 storeSummaryList 집계
             if (uniqueStores.size === 0 && storeSummaryList && storeSummaryList.length > 0 && iList.length === 0) {
                 storeSummaryList.forEach(r => {
                     const sName = r.store_name;
@@ -1305,6 +1305,9 @@
                         let calculatedPercent = Math.min(99, Math.round((rawDetailOrders.length / totalExpectedRows) * 100));
                         updateBadgePercent(calculatedPercent);
 
+                        // 💡 청크 수집 진행 도중 실시간 점포수 재계산 갱신
+                        recalculateFilteredStores();
+
                         const activeStore = document.querySelector('#store-list .active');
                         if (activeStore && activeStore.innerText.includes('전체 점포 합산')) {
                             baseDetailOrders = filteredDetailOrders;
@@ -1321,7 +1324,7 @@
             if (currentToken === activeFetchToken) {
                 currentMaxPercent = 100;
                 
-                // 🚀 [100% 로딩 완료 시점] 정밀 필터링된 점포 수 및 브랜드 맵 재계산 즉시 갱신
+                // 🚀 [100% 로딩 완료] 최종 점포 수 및 모달 리스트 정밀 최종 반영
                 recalculateFilteredStores();
 
                 const activeStore = document.querySelector('#store-list .active');
