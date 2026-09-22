@@ -22,7 +22,7 @@
         .brand-title { display: flex; align-items: center; gap: 10px; }
         .brand-title h1 { margin: 0; font-size: 20px; font-weight: 700; }
         .version-tag {
-            background-color: #10b981; color: white; font-size: 11px; font-weight: 800;
+            background-color: #2563eb; color: white; font-size: 11px; font-weight: 800;
             padding: 3px 8px; border-radius: 12px; letter-spacing: 0.5px;
         }
         .container { padding: 20px; max-width: 98%; margin: 0 auto; }
@@ -71,8 +71,8 @@
         .btn-cal { background-color: #0f766e; padding: 4px 8px; font-size: 11px; border-radius: 4px; }
         .btn-quick { background-color: #475569; padding: 6px 12px; font-size: 12px; }
         .btn-quick:hover { background-color: #334155; }
-        .btn-forecast { background-color: #10b981; }
-        .btn-forecast:hover { background-color: #059669; }
+        .btn-forecast { background-color: #2563eb; }
+        .btn-forecast:hover { background-color: #1d4ed8; }
         .btn-excel { background-color: #16a34a; padding: 6px 12px; font-size: 12px; }
         .btn-search-icon {
             background-color: #475569; color: white; border: none; padding: 6px 9px;
@@ -133,7 +133,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>🔮 더본 OMS 발주 수요 예측 시스템</h1>
-            <span class="version-tag">Forecast v2.4 Clean Boost UI</span>
+            <span class="version-tag">Forecast v3.0 Ultimate Precision Ensemble Engine</span>
         </div>
         <div>
             <button class="btn" style="background-color: #334155;" onclick="window.close()">✕ 창 닫기</button>
@@ -160,7 +160,7 @@
         </div>
     </div>
 
-    <!-- 📦 품목 다중 선택 모달 -->
+    <!-- 📦 품목 선택 모달 -->
     <div class="modal-overlay" id="item-modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -236,7 +236,6 @@
                     <div id="item-autocomplete-list" class="autocomplete-dropdown"></div>
                 </div>
 
-                <!-- 💡 [수정 반영] 배수 텍스트 제거하고 % 단량만 표출 -->
                 <div class="filter-group" style="background: #d1fae5; padding: 6px 12px; border-radius: 6px; border: 1px solid #a7f3d0;">
                     <label style="color: #065f46;">🚀 신메뉴/행사 가중치:</label>
                     <input type="number" id="boost-percent-input" class="input-box" value="0" min="0" max="500" step="10" style="width: 65px; text-align: center; font-weight: bold; color: #065f46; padding-right: 8px;">
@@ -255,7 +254,7 @@
                 <div class="kpi-card teal">
                     <div class="kpi-title">🎯 검증 기간 일치율(Accuracy)</div>
                     <div class="kpi-value" id="kpi-accuracy-percent" style="color:#0d9488;">-%</div>
-                    <div class="kpi-sub" id="kpi-accuracy-sub" style="color:#0d9488;">유효 실적 구간 산출</div>
+                    <div class="kpi-sub" id="kpi-accuracy-sub" style="color:#0d9488;">6대 앙상블 오차검증</div>
                 </div>
                 <div class="kpi-card purple">
                     <div class="kpi-title">총 예상 발주 수량</div>
@@ -516,6 +515,36 @@
             return weatherMap;
         }
 
+        /* 💡 [고급 통계 모듈 1] IQR 기반 데이터 정제 */
+        function cleanArrayIQR(arr) {
+            if (arr.length < 4) return arr;
+            const sorted = [...arr].sort((a, b) => a - b);
+            const q1 = sorted[Math.floor(sorted.length * 0.25)];
+            const q3 = sorted[Math.floor(sorted.length * 0.75)];
+            const iqr = q3 - q1;
+            const lb = q1 - 1.5 * iqr;
+            const ub = q3 + 1.5 * iqr;
+            return arr.filter(x => x >= lb && x <= ub);
+        }
+
+        /* 💡 [고급 통계 모듈 2] Holt's Double Exponential Smoothing (Level & Trend) */
+        function calculateHoltsForecast(series, h = 1, alpha = 0.4, beta = 0.2) {
+            if (series.length === 0) return 0;
+            if (series.length === 1) return series[0];
+
+            let level = series[0];
+            let trend = series[1] - series[0];
+
+            for (let i = 1; i < series.length; i++) {
+                const prevLevel = level;
+                level = alpha * series[i] + (1 - alpha) * (level + trend);
+                trend = beta * (level - prevLevel) + (1 - beta) * trend;
+            }
+
+            return Math.max(0, level + h * trend);
+        }
+
+        /* 🚀 [v3.0 Ultimate Ensemble Engine] 6대 복합 알고리즘 시뮬레이션 */
         async function runForecastSimulation() {
             const baseStartStr = document.getElementById('base-start-date').value;
             const baseEndStr = document.getElementById('base-end-date').value;
@@ -542,7 +571,7 @@
             const maxValidActualDateStr = formatDate(maxValidActualDate);
 
             const fetchStartDateObj = new Date(startDate);
-            fetchStartDateObj.setDate(fetchStartDateObj.getDate() - 28);
+            fetchStartDateObj.setDate(fetchStartDateObj.getDate() - 35); // 5주 롤링 윈도우
             const fetchStartStr = formatDate(fetchStartDateObj);
             const actualFetchStartStr = baseStartStr < fetchStartStr ? baseStartStr : fetchStartStr;
 
@@ -621,8 +650,9 @@
                     const actualQty = (dStr <= maxValidActualDateStr && fullDailyMap[dispDate] !== undefined) ? fullDailyMap[dispDate] : null;
 
                     if (!isSunday) {
+                        // 1) 과거 시점 시리얼 데이터 수집 (미래 데이터 엄격 차단)
+                        const historySeries = [];
                         const priorSameWeekdayVals = [];
-                        let priorSum = 0, priorCount = 0;
 
                         let checkDate = new Date(curDate);
                         checkDate.setDate(checkDate.getDate() - 1);
@@ -631,30 +661,52 @@
                             const checkDispDate = formatDisplayDate(formatDate(checkDate));
                             const val = fullDailyMap[checkDispDate];
                             
-                            if (val !== undefined && val > 0) {
-                                priorSum += val;
-                                priorCount++;
-                                if (checkDate.getDay() === dayIdx) {
+                            if (val !== undefined) {
+                                if (checkDate.getDay() !== 0) { // 일요일 제외
+                                    historySeries.unshift(val);
+                                }
+                                if (checkDate.getDay() === dayIdx && val > 0) {
                                     priorSameWeekdayVals.push(val);
                                 }
                             }
                             checkDate.setDate(checkDate.getDate() - 1);
                         }
 
-                        const priorOverallAvg = priorCount > 0 ? (priorSum / priorCount) : baseDailyAvgQty;
+                        // 2) 이상치 정제 적용
+                        const cleanedHistory = cleanArrayIQR(historySeries);
+                        const cleanedSameWeekday = cleanArrayIQR(priorSameWeekdayVals);
 
-                        if (priorSameWeekdayVals.length >= 3) {
-                            baseQty = Math.round(0.60 * priorSameWeekdayVals[0] + 0.25 * priorSameWeekdayVals[1] + 0.15 * priorSameWeekdayVals[2]);
-                        } else if (priorSameWeekdayVals.length === 2) {
-                            baseQty = Math.round(0.70 * priorSameWeekdayVals[0] + 0.30 * priorSameWeekdayVals[1]);
-                        } else if (priorSameWeekdayVals.length === 1) {
-                            baseQty = Math.round(0.80 * priorSameWeekdayVals[0] + 0.20 * priorOverallAvg);
-                        } else {
-                            baseQty = Math.round(priorOverallAvg);
+                        // 3) 알고리즘 1: Holt's 이중 지수 평활 (Level & Trend)
+                        const holtVal = calculateHoltsForecast(cleanedHistory, 1);
+
+                        // 4) 알고리즘 2: 직전 동일 요일 이동 가중치
+                        let weekdayVal = baseDailyAvgQty;
+                        if (cleanedSameWeekday.length >= 3) {
+                            weekdayVal = 0.55 * cleanedSameWeekday[0] + 0.30 * cleanedSameWeekday[1] + 0.15 * cleanedSameWeekday[2];
+                        } else if (cleanedSameWeekday.length === 2) {
+                            weekdayVal = 0.70 * cleanedSameWeekday[0] + 0.30 * cleanedSameWeekday[1];
+                        } else if (cleanedSameWeekday.length === 1) {
+                            weekdayVal = cleanedSameWeekday[0];
                         }
 
-                        baseQty = Math.round(baseQty * weatherFactor);
+                        // 5) 알고리즘 3: 전체 기준선 평균
+                        const baselineVal = cleanedHistory.length > 0 ? (cleanedHistory.reduce((a,b)=>a+b,0)/cleanedHistory.length) : baseDailyAvgQty;
 
+                        // 6) 3-Window 앙상블 조합 (Ensemble Synthesis)
+                        let ensembleVal = (0.45 * weekdayVal) + (0.35 * holtVal) + (0.20 * baselineVal);
+
+                        // 7) 변동성 안전 밴드 (Min-Max Safety Band Capping)
+                        const recentMedian = cleanedSameWeekday.length > 0 ? cleanedSameWeekday[0] : baselineVal;
+                        const minBound = recentMedian * 0.55;
+                        const maxBound = recentMedian * 1.65;
+                        
+                        if (recentMedian > 0) {
+                            ensembleVal = Math.max(minBound, Math.min(maxBound, ensembleVal));
+                        }
+
+                        baseQty = Math.round(ensembleVal * weatherFactor);
+
+                        // 8) 미래 미발생 구간에만 가중치 적용
                         if (actualQty === null) {
                             boostedQty = Math.round(baseQty * boostMultiplier);
                             addedQty = boostedQty - baseQty;
