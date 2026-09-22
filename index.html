@@ -216,7 +216,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 대시보드</h1>
-            <span class="version-tag">v28.0 Ultra Precise</span>
+            <span class="version-tag">v28.1 Fix 400 Bad Request</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -469,7 +469,7 @@
 
         let allBrandList = [], allItemList = [];
         let activeBrandTarget = 'chart';
-        let currentBrandStoreMap = {}; // 브랜드별 점포 Set Map
+        let currentBrandStoreMap = {};
 
         let currentPage = 1;
         let rowsPerPage = 10;
@@ -1047,7 +1047,7 @@
             }
         }
 
-        /* 🚀 0.1초 초고속 속도로 보정한 fetchChartData */
+        /* 🚀 400 에러를 완벽하게 고친 안전한 fetchChartData */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -1059,13 +1059,15 @@
             safeSetStorage('cached_chart_start_date', startDate);
             safeSetStorage('cached_chart_end_date', endDate);
 
-            // ⚡ daily_order_summary 요약 집계 테이블 사용으로 속도 최적화
             let queryUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
 
             if (brandInputValue) {
                 const brandList = brandInputValue.split(',').map(b => b.trim()).filter(Boolean);
-                if (brandList.length === 1) queryUrl += `&brand_name=ilike.*${encodeURIComponent(brandList[0])}*`;
-                else if (brandList.length > 1) queryUrl += `&or=(${brandList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`;
+                if (brandList.length === 1) {
+                    queryUrl += `&brand_name=ilike.*${encodeURIComponent(brandList[0])}*`;
+                } else if (brandList.length > 1) {
+                    queryUrl += `&or=(${brandList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`;
+                }
             }
 
             if (itemKeyword) {
@@ -1074,7 +1076,10 @@
                     const kw = encodeURIComponent(itemList[0]);
                     queryUrl += `&or=(item_code.ilike.*${kw}*,item_name.ilike.*${kw}*)`;
                 } else if (itemList.length > 1) {
-                    const orConds = itemList.map(i => `item_code.ilike.*${encodeURIComponent(i)}*,item_name.ilike.*${encodeURIComponent(i)}*`).join(',');
+                    const orConds = itemList.map(i => {
+                        const kw = encodeURIComponent(i);
+                        return `item_code.ilike.*${kw}*,item_name.ilike.*${kw}*`;
+                    }).join(',');
                     queryUrl += `&or=(${orConds})`;
                 }
             }
@@ -1084,9 +1089,12 @@
                 if (res.ok) {
                     const data = await res.json();
                     renderChartAndKPI(data);
+                } else {
+                    renderChartAndKPI([]);
                 }
             } catch (err) {
                 console.error("차트 데이터 로드 오류:", err);
+                renderChartAndKPI([]);
             }
         }
 
@@ -1121,7 +1129,7 @@
                 dailyMap[dateKey].amount += amt;
             });
 
-            // 💡 점포 수 정밀 계산
+            // 💡 점포 수 정밀 재계산
             recalculateFilteredStores();
 
             document.getElementById('kpi-total-qty').innerText = `${totalQty.toLocaleString()} 건`;
@@ -1204,7 +1212,7 @@
             });
         }
 
-        /* 🚀 [버그 완벽 수정] 브랜드 및 품목 검색어에 맞춰 정확한 주문 점포수 집계 */
+        /* 🚀 브랜드 및 품목 검색어 완벽 대응 점포수 정밀 집계 함수 */
         function recalculateFilteredStores() {
             const uniqueStores = new Set();
             currentBrandStoreMap = {};
@@ -1215,7 +1223,7 @@
             const bList = brandVal ? brandVal.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
             const iList = itemVal ? itemVal.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
 
-            // 1. 상세 주문 원본 데이터(rawDetailOrders)가 들어온 경우: 품목/브랜드 일치 점포만 중복 제거 세기
+            // 1. 상세 주문 원본 데이터(rawDetailOrders)가 들어온 경우: 품목/브랜드 일치 점포만 정확 매칭
             if (rawDetailOrders && rawDetailOrders.length > 0) {
                 rawDetailOrders.forEach(r => {
                     const sName = r.store_name;
@@ -1236,7 +1244,7 @@
                 return;
             }
 
-            // 2. 품목 검색어가 없는 경우: 요약 데이터(storeSummaryList)로 미리 표출
+            // 2. 품목 검색어가 없는 경우: 요약 데이터(storeSummaryList) 활용
             if (iList.length === 0 && storeSummaryList && storeSummaryList.length > 0) {
                 storeSummaryList.forEach(r => {
                     const sName = r.store_name;
@@ -1252,7 +1260,6 @@
                 });
                 document.getElementById('kpi-total-stores').innerText = `${uniqueStores.size.toLocaleString()} 개점`;
             } else if (iList.length > 0) {
-                // 품목 검색어가 존재하고 아직 하단 원본 데이터 로딩 중인 경우
                 document.getElementById('kpi-total-stores').innerText = "계산 중...";
             }
         }
@@ -1306,7 +1313,6 @@
                         let calculatedPercent = Math.min(99, Math.round((rawDetailOrders.length / totalExpectedRows) * 100));
                         updateBadgePercent(calculatedPercent);
 
-                        // 💡 수집 도중에도 품목 매칭 점포수 실시간 업데이트
                         recalculateFilteredStores();
 
                         const activeStore = document.querySelector('#store-list .active');
