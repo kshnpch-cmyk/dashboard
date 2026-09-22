@@ -103,20 +103,21 @@
         .search-list-item:hover { background-color: #eff6ff; }
         .search-list-item label { cursor: pointer; width: 100%; display: flex; align-items: center; gap: 8px; }
 
-        /* KPI 그리드 및 카드 스타일 */
-        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 15px; }
+        /* 5개 컬럼 KPI 그리드 */
+        .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 15px; }
         .kpi-card { 
-            background: #f8fafc; padding: 15px 20px; border-radius: 8px; 
+            background: #f8fafc; padding: 14px 16px; border-radius: 8px; 
             border-left: 5px solid #2563eb; position: relative; 
         }
+        .kpi-card.blue { border-left-color: #0284c7; }
         .kpi-card.purple { border-left-color: #8b5cf6; }
         .kpi-card.orange { border-left-color: #f59e0b; }
         .kpi-card.green { border-left-color: #10b981; }
-        .kpi-title { font-size: 13px; color: #64748b; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
-        .kpi-value { font-size: 22px; font-weight: 800; margin-top: 4px; color: #0f172a; }
-        .kpi-sub { font-size: 11.5px; color: #8b5cf6; font-weight: 700; margin-top: 2px; }
+        .kpi-title { font-size: 12px; color: #64748b; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+        .kpi-value { font-size: 20px; font-weight: 800; margin-top: 4px; color: #0f172a; }
+        .kpi-sub { font-size: 11px; color: #8b5cf6; font-weight: 700; margin-top: 2px; }
 
-        .chart-container { position: relative; height: 320px; width: 100%; }
+        .chart-container { position: relative; height: 340px; width: 100%; }
 
         .table-container { width: 100%; overflow-x: auto; margin-top: 10px; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
@@ -126,6 +127,7 @@
         .text-center { text-align: center; }
         .code-tag { font-size: 11px; color: #64748b; font-family: monospace; }
         .badge-boost { background-color: #f3e8ff; color: #6b21a8; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; }
+        .badge-off { background-color: #f1f5f9; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; }
     </style>
 </head>
 <body>
@@ -133,7 +135,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>🔮 더본 OMS 발주 수요 예측 시스템</h1>
-            <span class="version-tag">Forecast v1.2 Shared Modules</span>
+            <span class="version-tag">Forecast v1.4 Bar Chart</span>
         </div>
         <div>
             <button class="btn" style="background-color: #334155;" onclick="window.close()">✕ 창 닫기</button>
@@ -245,8 +247,13 @@
                 <button class="btn btn-forecast" onclick="runForecastSimulation()">🔮 시뮬레이션 실행</button>
             </div>
 
-            <!-- 종합 예측 KPI 카드 -->
+            <!-- 종합 예측 KPI 카드 5종 -->
             <div class="kpi-grid">
+                <div class="kpi-card blue">
+                    <div class="kpi-title">과거 일평균 발주량</div>
+                    <div class="kpi-value" id="kpi-base-daily-avg">0 건</div>
+                    <div class="kpi-sub" id="kpi-sub-daily-avg-amount" style="color:#0284c7;">일평균 금액: 0 원</div>
+                </div>
                 <div class="kpi-card purple">
                     <div class="kpi-title">총 예상 발주 수량</div>
                     <div class="kpi-value" id="kpi-forecast-qty">0 건</div>
@@ -255,12 +262,12 @@
                 <div class="kpi-card green">
                     <div class="kpi-title">총 예상 발주 금액</div>
                     <div class="kpi-value" id="kpi-forecast-amount">0 원</div>
-                    <div class="kpi-sub" id="kpi-sub-amount">가중치 미적용: 0 원</div>
+                    <div class="kpi-sub" id="kpi-sub-amount" style="color:#10b981;">가중치 미적용: 0 원</div>
                 </div>
                 <div class="kpi-card orange">
-                    <div class="kpi-title">가중치로 인한 추가 필요 수량</div>
+                    <div class="kpi-title">가중치 추가 수량</div>
                     <div class="kpi-value" id="kpi-boost-added-qty">+0 건</div>
-                    <div class="kpi-sub" id="kpi-sub-added-amount">추가 필요 예산: +0 원</div>
+                    <div class="kpi-sub" id="kpi-sub-added-amount" style="color:#f59e0b;">추가 필요 예산: +0 원</div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-title">기반 기간 발주 점포수</div>
@@ -269,7 +276,7 @@
                 </div>
             </div>
 
-            <!-- 예측 차트 -->
+            <!-- 예측 차트 (막대형) -->
             <div class="chart-container">
                 <canvas id="forecastChart"></canvas>
             </div>
@@ -278,7 +285,7 @@
         <!-- 📋 일별/품목별 상세 예측 명세서 -->
         <div class="section-panel">
             <div class="panel-header">
-                <span class="panel-title-text">📋 일별 미래 발주 예측 상세 명세서</span>
+                <span class="panel-title-text">📋 일별 미래 발주 예측 상세 명세서 (일요일 입고 제외)</span>
                 <button class="btn btn-excel" onclick="exportForecastToExcel()">📥 예측 명세서 엑셀 저장</button>
             </div>
 
@@ -286,7 +293,7 @@
                 <table>
                     <colgroup>
                         <col style="width: 100px;">
-                        <col style="width: 100px;">
+                        <col style="width: 110px;">
                         <col style="width: 130px;">
                         <col style="width: 180px;">
                         <col style="width: 90px;">
@@ -628,6 +635,7 @@
                 const dayQtySums = [0, 0, 0, 0, 0, 0, 0];
                 const dayCounts = [0, 0, 0, 0, 0, 0, 0];
                 let grandPastQty = 0;
+                let grandPastAmount = 0;
                 let avgUnitPrice = 12000;
 
                 pastData.forEach(r => {
@@ -639,15 +647,21 @@
                     dayQtySums[d] += q;
                     dayCounts[d]++;
                     grandPastQty += q;
+                    grandPastAmount += amt;
                 });
 
                 const totalPastDays = Math.max(1, Math.round((new Date(baseEndStr) - new Date(baseStartStr)) / (1000 * 60 * 60 * 24)) + 1);
-                const dayAverages = dayQtySums.map((sum, idx) => dayCounts[idx] > 0 ? (sum / dayCounts[idx]) : (grandPastQty / totalPastDays));
+                
+                // 과거 기간 일평균 수량/금액 계산
+                const baseDailyAvgQty = Math.round(grandPastQty / totalPastDays);
+                const baseDailyAvgAmount = Math.round(grandPastAmount / totalPastDays);
+
+                const dayAverages = dayQtySums.map((sum, idx) => dayCounts[idx] > 0 ? (sum / dayCounts[idx]) : baseDailyAvgQty);
 
                 // 2. 미래 예측 날씨 데이터 연동
                 const weatherMap = await fetchFutureWeatherData(startDate, endDate);
 
-                // 3. 미래 날짜별 예측 수치 산출
+                // 3. 미래 날짜별 예측 수치 산출 (일요일 입고 제외 반영)
                 const futureRows = [];
                 const dailyChartMap = {};
                 let totalBaseQty = 0, totalBoostedQty = 0;
@@ -660,47 +674,57 @@
                     const dStr = formatDate(curDate);
                     const dispDate = formatDisplayDate(dStr);
                     const dayIdx = curDate.getDay();
+                    const isSunday = (dayIdx === 0);
+
                     const wInfo = weatherMap[dispDate] || { displayLabel: "☀️ 맑음", statusText: "맑음" };
 
                     let weatherFactor = 1.0;
                     if (wInfo.statusText === '비') weatherFactor = 0.92;
 
-                    const baseQty = Math.round((dayAverages[dayIdx] || 0) * weatherFactor);
-                    const boostedQty = Math.round(baseQty * boostMultiplier);
-                    const addedQty = boostedQty - baseQty;
+                    let baseQty = 0;
+                    let boostedQty = 0;
+                    let addedQty = 0;
+                    let boostedAmt = 0;
 
-                    const baseAmt = Math.round(baseQty * avgUnitPrice);
-                    const boostedAmt = Math.round(boostedQty * avgUnitPrice);
+                    if (!isSunday) {
+                        baseQty = Math.round((dayAverages[dayIdx] || 0) * weatherFactor);
+                        boostedQty = Math.round(baseQty * boostMultiplier);
+                        addedQty = boostedQty - baseQty;
+                        boostedAmt = Math.round(boostedQty * avgUnitPrice);
+                    }
 
                     totalBaseQty += baseQty;
                     totalBoostedQty += boostedQty;
-                    totalBaseAmt += baseAmt;
+                    totalBaseAmt += (baseQty * avgUnitPrice);
                     totalBoostedAmt += boostedAmt;
 
                     futureRows.push({
                         date: dispDate,
-                        weather: wInfo.displayLabel,
+                        weather: isSunday ? '🏖️ 일요일 (입고휴무)' : wInfo.displayLabel,
                         brand: brandVal || '전체 브랜드',
                         item: itemVal || '전체 품목 합산',
-                        boostPct: `+${boostPercent}%`,
-                        baseQty, boostedQty, addedQty, boostedAmt
+                        boostPct: isSunday ? '-' : `+${boostPercent}%`,
+                        baseQty, boostedQty, addedQty, boostedAmt, isSunday
                     });
 
-                    dailyChartMap[dispDate] = { baseQty, boostedQty };
+                    dailyChartMap[dispDate] = { baseQty, boostedQty, isSunday };
                     curDate.setDate(curDate.getDate() + 1);
                 }
 
                 currentForecastRows = futureRows;
 
                 // 4. KPI 수치 업데이트
+                document.getElementById('kpi-base-daily-avg').innerText = `${baseDailyAvgQty.toLocaleString()} 건`;
+                document.getElementById('kpi-sub-daily-avg-amount').innerText = `일평균 금액: ${baseDailyAvgAmount.toLocaleString()} 원`;
+
                 document.getElementById('kpi-forecast-qty').innerText = `${totalBoostedQty.toLocaleString()} 건`;
                 document.getElementById('kpi-sub-qty').innerText = `가중치 미적용: ${totalBaseQty.toLocaleString()} 건`;
 
                 document.getElementById('kpi-forecast-amount').innerText = `${totalBoostedAmt.toLocaleString()} 원`;
-                document.getElementById('kpi-sub-amount').innerText = `가중치 미적용: ${totalBaseAmt.toLocaleString()} 원`;
+                document.getElementById('kpi-sub-amount').innerText = `가중치 미적용: ${Math.round(totalBaseAmt).toLocaleString()} 원`;
 
                 document.getElementById('kpi-boost-added-qty').innerText = `+${(totalBoostedQty - totalBaseQty).toLocaleString()} 건`;
-                document.getElementById('kpi-sub-added-amount').innerText = `추가 필요 예산: +${(totalBoostedAmt - totalBaseAmt).toLocaleString()} 원`;
+                document.getElementById('kpi-sub-added-amount').innerText = `추가 필요 예산: +${Math.round(totalBoostedAmt - totalBaseAmt).toLocaleString()} 원`;
 
                 document.getElementById('kpi-forecast-stores').innerText = `${totalStoresCount.toLocaleString()} 개점`;
 
@@ -714,14 +738,16 @@
             }
         }
 
-        /* 📊 미래 예측 차트 그리기 */
+        /* 📊 [수정] 직관적인 비교를 위한 막대형(Bar) 차트 구현 */
         function renderForecastChart(dailyChartMap, weatherMap) {
             const labels = Object.keys(dailyChartMap).sort();
-            const baseData = labels.map(k => dailyChartMap[k].baseQty);
-            const boostedData = labels.map(k => dailyChartMap[k].boostedQty);
+            const baseData = labels.map(k => dailyChartMap[k].isSunday ? 0 : dailyChartMap[k].baseQty);
+            const boostedData = labels.map(k => dailyChartMap[k].isSunday ? 0 : dailyChartMap[k].boostedQty);
 
             const labelsWithWeather = labels.map(dStr => {
                 const w = weatherMap[dStr];
+                const item = dailyChartMap[dStr];
+                if (item && item.isSunday) return [dStr, '🏖️ 입고휴무'];
                 return w ? [dStr, w.displayLabel] : dStr;
             });
 
@@ -730,19 +756,42 @@
             if (forecastChart) forecastChart.destroy();
 
             forecastChart = new Chart(ctx, {
-                type: 'line',
+                type: 'bar',
                 data: {
                     labels: labelsWithWeather,
                     datasets: [
-                        { label: '🚀 가중치 적용 예측량', data: boostedData, borderColor: '#8b5cf6', backgroundColor: 'rgba(139, 92, 246, 0.1)', borderWidth: 3, fill: true, tension: 0.3 },
-                        { label: '📊 기본 통계 예측량', data: baseData, borderColor: '#94a3b8', borderDash: [5, 5], borderWidth: 2, tension: 0.3 }
+                        { label: '📊 기본 통계 예측량', data: baseData, backgroundColor: 'rgba(148, 163, 184, 0.7)', borderRadius: 4 },
+                        { label: '🚀 가중치 적용 예측량', data: boostedData, backgroundColor: 'rgba(139, 92, 246, 0.85)', borderRadius: 4 }
                     ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) label += ': ';
+                                    if (context.parsed.y !== null) {
+                                        label += context.parsed.y.toLocaleString() + ' 건';
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
                     scales: {
-                        y: { beginAtZero: true, grace: '15%' }
+                        x: {
+                            ticks: { font: { size: 11, weight: 'bold' } }
+                        },
+                        y: { 
+                            beginAtZero: true, 
+                            grace: '15%',
+                            ticks: {
+                                callback: function(value) { return value.toLocaleString() + ' 건'; }
+                            }
+                        }
                     }
                 }
             });
@@ -756,19 +805,36 @@
                 return;
             }
 
-            tbody.innerHTML = rows.map(r => `
-                <tr>
-                    <td class="text-center"><b>${r.date}</b></td>
-                    <td class="text-center">${r.weather}</td>
-                    <td>${r.brand}</td>
-                    <td><b>${r.item}</b></td>
-                    <td class="text-center"><span class="badge-boost">${r.boostPct}</span></td>
-                    <td class="text-right" style="color: #64748b;">${r.baseQty.toLocaleString()} 건</td>
-                    <td class="text-right" style="color: #7c3aed; font-weight: bold;">${r.boostedQty.toLocaleString()} 건</td>
-                    <td class="text-right" style="color: #16a34a; font-weight: bold;">+${r.addedQty.toLocaleString()} 건</td>
-                    <td class="text-right"><b>${r.boostedAmt.toLocaleString()} 원</b></td>
-                </tr>
-            `).join('');
+            tbody.innerHTML = rows.map(r => {
+                if (r.isSunday) {
+                    return `
+                        <tr style="background-color: #f8fafc; color: #94a3b8;">
+                            <td class="text-center"><b>${r.date}</b></td>
+                            <td class="text-center">${r.weather}</td>
+                            <td>${r.brand}</td>
+                            <td><b>${r.item}</b></td>
+                            <td class="text-center"><span class="badge-off">휴무</span></td>
+                            <td class="text-right">-</td>
+                            <td class="text-right" style="font-weight: bold; color:#94a3b8;">0 건</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right">0 원</td>
+                        </tr>
+                    `;
+                }
+                return `
+                    <tr>
+                        <td class="text-center"><b>${r.date}</b></td>
+                        <td class="text-center">${r.weather}</td>
+                        <td>${r.brand}</td>
+                        <td><b>${r.item}</b></td>
+                        <td class="text-center"><span class="badge-boost">${r.boostPct}</span></td>
+                        <td class="text-right" style="color: #64748b;">${r.baseQty.toLocaleString()} 건</td>
+                        <td class="text-right" style="color: #7c3aed; font-weight: bold;">${r.boostedQty.toLocaleString()} 건</td>
+                        <td class="text-right" style="color: #16a34a; font-weight: bold;">+${r.addedQty.toLocaleString()} 건</td>
+                        <td class="text-right"><b>${r.boostedAmt.toLocaleString()} 원</b></td>
+                    </tr>
+                `;
+            }).join('');
         }
 
         /* 📥 예측 명세서 엑셀 저장 */
@@ -776,8 +842,8 @@
             if (!currentForecastRows || currentForecastRows.length === 0) return alert("저장할 예측 데이터가 없습니다.");
             const exportData = currentForecastRows.map(r => ({
                 '예측 배송일자': r.date, '예상 날씨': r.weather, '브랜드': r.brand, '품목명': r.item,
-                '가중치': r.boostPct, '기본 예상수량': r.baseQty, '최종 예상수량': r.boostedQty,
-                '추가 증감량': r.addedQty, '최종 예상금액': r.boostedAmt
+                '가중치': r.boostPct, '기본 예상수량': r.isSunday ? 0 : r.baseQty, '최종 예상수량': r.boostedQty,
+                '추가 증감량': r.isSunday ? 0 : r.addedQty, '최종 예상금액': r.boostedAmt
             }));
             const ws = XLSX.utils.json_to_sheet(exportData);
             const wb = XLSX.utils.book_new();
