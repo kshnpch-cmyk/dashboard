@@ -22,7 +22,7 @@
         .brand-title { display: flex; align-items: center; gap: 10px; }
         .brand-title h1 { margin: 0; font-size: 20px; font-weight: 700; }
         .version-tag {
-            background-color: #e11d48; color: white; font-size: 11px; font-weight: 800;
+            background-color: #10b981; color: white; font-size: 11px; font-weight: 800;
             padding: 3px 8px; border-radius: 12px; letter-spacing: 0.5px;
         }
         .container { padding: 20px; max-width: 98%; margin: 0 auto; }
@@ -73,8 +73,8 @@
         .btn-cal { background-color: #0f766e; padding: 4px 8px; font-size: 11px; border-radius: 4px; }
         .btn-quick { background-color: #475569; padding: 6px 12px; font-size: 12px; }
         .btn-quick:hover { background-color: #334155; }
-        .btn-forecast { background-color: #e11d48; }
-        .btn-forecast:hover { background-color: #be123c; }
+        .btn-forecast { background-color: #10b981; }
+        .btn-forecast:hover { background-color: #059669; }
         .btn-excel { background-color: #16a34a; padding: 6px 12px; font-size: 12px; }
         .btn-search-icon {
             background-color: #475569; color: white; border: none; padding: 6px 9px;
@@ -113,7 +113,7 @@
         .kpi-card.purple { border-left-color: #8b5cf6; }
         .kpi-card.orange { border-left-color: #f59e0b; }
         .kpi-card.green { border-left-color: #10b981; }
-        .kpi-card.red { border-left-color: #e11d48; }
+        .kpi-card.teal { border-left-color: #0d9488; }
         .kpi-title { font-size: 12px; color: #64748b; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
         .kpi-value { font-size: 20px; font-weight: 800; margin-top: 4px; color: #0f172a; }
         .kpi-sub { font-size: 11px; color: #8b5cf6; font-weight: 700; margin-top: 2px; }
@@ -127,7 +127,7 @@
         .text-right { text-align: right; }
         .text-center { text-align: center; }
         .code-tag { font-size: 11px; color: #64748b; font-family: monospace; }
-        .badge-boost { background-color: #fce7f3; color: #be185d; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; }
+        .badge-boost { background-color: #d1fae5; color: #065f46; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; }
         .badge-off { background-color: #f1f5f9; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; }
         .badge-actual { background-color: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; }
     </style>
@@ -137,7 +137,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>🔮 더본 OMS 발주 수요 예측 시스템</h1>
-            <span class="version-tag">Forecast v1.8 Advanced Momentum Engine</span>
+            <span class="version-tag">Forecast v1.9 Rolling Weekday Engine</span>
         </div>
         <div>
             <button class="btn" style="background-color: #334155;" onclick="window.close()">✕ 창 닫기</button>
@@ -211,7 +211,7 @@
             <!-- 2줄: 미래 예측 기간 & 필터 & 가중치 -->
             <div class="filter-row" style="margin-bottom: 15px;">
                 <div class="filter-group">
-                    <label style="color: #e11d48;">🔮 예측/비교 대상 기간:</label>
+                    <label style="color: #10b981;">🔮 예측/비교 대상 기간:</label>
                     <input type="date" id="forecast-start-date" class="input-box" style="padding-right: 10px;">
                     <span>~</span>
                     <input type="date" id="forecast-end-date" class="input-box" style="padding-right: 10px;">
@@ -240,10 +240,10 @@
                 </div>
 
                 <!-- 🚀 신메뉴/행사 가중치 (%) 설정 -->
-                <div class="filter-group" style="background: #fce7f3; padding: 6px 12px; border-radius: 6px; border: 1px solid #fbcfe8;">
-                    <label style="color: #be185d;">🚀 신메뉴/행사 가중치:</label>
-                    <input type="number" id="boost-percent-input" class="input-box" value="0" min="0" max="500" step="10" style="width: 65px; text-align: center; font-weight: bold; color: #be185d; padding-right: 8px;">
-                    <span style="color: #be185d;">% (+<b id="boost-multiplier-text">1.0배</b>)</span>
+                <div class="filter-group" style="background: #d1fae5; padding: 6px 12px; border-radius: 6px; border: 1px solid #a7f3d0;">
+                    <label style="color: #065f46;">🚀 신메뉴/행사 가중치:</label>
+                    <input type="number" id="boost-percent-input" class="input-box" value="0" min="0" max="500" step="10" style="width: 65px; text-align: center; font-weight: bold; color: #065f46; padding-right: 8px;">
+                    <span style="color: #065f46;">% (+<b id="boost-multiplier-text">1.0배</b>)</span>
                 </div>
 
                 <button class="btn btn-forecast" onclick="runForecastSimulation()">🔮 시뮬레이션 실행</button>
@@ -256,10 +256,10 @@
                     <div class="kpi-value" id="kpi-base-daily-avg">0 건</div>
                     <div class="kpi-sub" id="kpi-sub-daily-avg-amount" style="color:#0284c7;">일평균 금액: 0 원</div>
                 </div>
-                <div class="kpi-card red">
+                <div class="kpi-card teal">
                     <div class="kpi-title">🎯 검증 기간 일치율(Accuracy)</div>
-                    <div class="kpi-value" id="kpi-accuracy-percent" style="color:#e11d48;">-%</div>
-                    <div class="kpi-sub" id="kpi-accuracy-sub" style="color:#e11d48;">모멘텀(Momentum) 엔진 적용</div>
+                    <div class="kpi-value" id="kpi-accuracy-percent" style="color:#0d9488;">-%</div>
+                    <div class="kpi-sub" id="kpi-accuracy-sub" style="color:#0d9488;">롤링 요일 이동평균 Engine</div>
                 </div>
                 <div class="kpi-card purple">
                     <div class="kpi-title">총 예상 발주 수량</div>
@@ -283,7 +283,7 @@
                 </div>
             </div>
 
-            <!-- 예측 차트 (막대형 콤보) -->
+            <!-- 예측 차트 -->
             <div class="chart-container">
                 <canvas id="forecastChart"></canvas>
             </div>
@@ -397,7 +397,7 @@
             } catch (err) {}
         }
 
-        /* 🔍 실시간 연관 검색어 처리 (브랜드/품목 통합) */
+        /* 🔍 실시간 연관 검색어 처리 */
         function handleAutocompleteInput(val, type) {
             const inputId = type === 'brand' ? 'forecast-brand-input' : 'forecast-item-input';
             const dropId = type === 'brand' ? 'brand-autocomplete-list' : 'item-autocomplete-list';
@@ -539,7 +539,7 @@
             return weatherMap;
         }
 
-        /* 🚀 [최고 성능] De-seasonalized Momentum Engine 적용 시뮬레이션 */
+        /* 🚀 [v1.9 핵심] Rolling Weekday Engine (미래 데이터 차단 & 직전 동일 요일 가중) */
         async function runForecastSimulation() {
             const baseStartStr = document.getElementById('base-start-date').value;
             const baseEndStr = document.getElementById('base-end-date').value;
@@ -556,118 +556,70 @@
             if (baseStartStr > baseEndStr) return alert("과거 기반 시작일은 종료일보다 이전이어야 합니다.");
             if (startDate > endDate) return alert("예측 시작일은 종료일보다 이전이어야 합니다.");
 
-            // 1. 과거 데이터 및 실제 오버랩(비교용) 데이터 호출
-            let pastUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${baseStartStr}&delivery_date=lte.${baseEndStr}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
-            let targetActualUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
+            // 💡 롤링 백테스팅을 위해 과거 데이터는 최소 예측 시작 28일 전부터 끝날짜까지 통합 수집
+            const fetchStartDateObj = new Date(startDate);
+            fetchStartDateObj.setDate(fetchStartDateObj.getDate() - 28);
+            const fetchStartStr = formatDate(fetchStartDateObj);
+            const actualFetchStartStr = baseStartStr < fetchStartStr ? baseStartStr : fetchStartStr;
+
+            let fullDataUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${actualFetchStartStr}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
 
             if (brandVal) {
                 const bList = brandVal.split(',').map(b => b.trim()).filter(Boolean);
-                const bCond = bList.length === 1 ? `&brand_name=ilike.*${encodeURIComponent(bList[0])}*` : `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`;
-                pastUrl += bCond; targetActualUrl += bCond;
+                fullDataUrl += bList.length === 1 ? `&brand_name=ilike.*${encodeURIComponent(bList[0])}*` : `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`;
             }
 
             if (itemVal) {
                 const iList = itemVal.split(',').map(i => i.trim()).filter(Boolean);
-                let iCond = '';
                 if (iList.length === 1) {
                     const kw = encodeURIComponent(iList[0]);
-                    iCond = `&or=(item_code.ilike.*${kw}*,item_name.ilike.*${kw}*)`;
+                    fullDataUrl += `&or=(item_code.ilike.*${kw}*,item_name.ilike.*${kw}*)`;
                 } else if (iList.length > 1) {
                     const orConds = iList.map(i => `item_code.ilike.*${encodeURIComponent(i)}*,item_name.ilike.*${encodeURIComponent(i)}*`).join(',');
-                    iCond = `&or=(${orConds})`;
+                    fullDataUrl += `&or=(${orConds})`;
                 }
-                pastUrl += iCond; targetActualUrl += iCond;
             }
 
             try {
-                const [resPast, resStores, resTargetActual] = await Promise.all([
-                    fetch(pastUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } }),
+                const [resFull, resStores] = await Promise.all([
+                    fetch(fullDataUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } }),
                     fetch(`${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${baseStartStr}&delivery_date=lte.${baseEndStr}&select=store_name`, {
                         headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
-                    }),
-                    fetch(targetActualUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } })
+                    })
                 ]);
 
-                const pastData = resPast.ok ? await resPast.json() : [];
+                const fullData = resFull.ok ? await resFull.json() : [];
                 const storeData = resStores.ok ? await resStores.json() : [];
-                const actualData = resTargetActual.ok ? await resTargetActual.json() : [];
-
-                // 실제 비교용 데이터 정제
-                const actualDailyMap = {};
-                actualData.forEach(r => {
-                    const dKey = formatDisplayDate(r.delivery_date);
-                    if (!actualDailyMap[dKey]) actualDailyMap[dKey] = 0;
-                    actualDailyMap[dKey] += cleanNumber(r.total_qty || r.qty);
-                });
 
                 const pastStoreSet = new Set(storeData.map(s => s.store_name).filter(Boolean));
                 const totalStoresCount = pastStoreSet.size || 0;
 
-                // 과거 일자별 합산
-                const pastDailyAggMap = {};
-                let grandPastAmount = 0;
+                // 일자별 전체 실적 맵 구성
+                const fullDailyMap = {};
                 let avgUnitPrice = 12000;
+                let grandPastQtySum = 0;
+                let grandPastDaysCount = 0;
 
-                pastData.forEach(r => {
+                fullData.forEach(r => {
                     const dKey = formatDisplayDate(r.delivery_date);
                     const q = cleanNumber(r.total_qty || r.qty);
                     const amt = cleanNumber(r.total_amount);
                     if (q > 0 && amt > 0) avgUnitPrice = amt / q;
 
-                    if (!pastDailyAggMap[dKey]) pastDailyAggMap[dKey] = 0;
-                    pastDailyAggMap[dKey] += q;
-                    grandPastAmount += amt;
-                });
+                    if (!fullDailyMap[dKey]) fullDailyMap[dKey] = 0;
+                    fullDailyMap[dKey] += q;
 
-                // 🚀 [AI 핵심 엔진 1] 계절성(요일 패턴) 지수 추출
-                const dayQtySums = [0, 0, 0, 0, 0, 0, 0];
-                const dayCounts = [0, 0, 0, 0, 0, 0, 0];
-                let grandPastQty = 0;
-                let validPastDays = 0;
-
-                Object.keys(pastDailyAggMap).forEach(dStr => {
-                    const q = pastDailyAggMap[dStr];
-                    const dayIdx = new Date(dStr.replace(/\//g, '-')).getDay();
-                    if (dayIdx !== 0 && q > 0) { // 일요일 제외
-                        dayQtySums[dayIdx] += q;
-                        dayCounts[dayIdx]++;
-                        grandPastQty += q;
-                        validPastDays++;
+                    if (dKey >= formatDisplayDate(baseStartStr) && dKey <= formatDisplayDate(baseEndStr)) {
+                        grandPastQtySum += q;
+                        grandPastDaysCount++;
                     }
                 });
 
-                const overallAvgQty = validPastDays > 0 ? (grandPastQty / validPastDays) : 0;
-                
-                // 요일별 가중치 지수 (Day-of-Week Index)
-                const dowIndices = [1, 1, 1, 1, 1, 1, 1];
-                for(let d=1; d<=6; d++) {
-                    const dayAvg = dayCounts[d] > 0 ? (dayQtySums[d] / dayCounts[d]) : overallAvgQty;
-                    dowIndices[d] = overallAvgQty > 0 ? (dayAvg / overallAvgQty) : 1.0;
-                    dowIndices[d] = Math.max(0.3, Math.min(3.0, dowIndices[d])); // 극단값 캡핑
-                }
+                const baseDailyAvgQty = Math.round(grandPastQtySum / (grandPastDaysCount || 1));
+                const totalPastPeriodDays = Math.max(1, Math.round((new Date(baseEndStr) - new Date(baseStartStr)) / (1000 * 60 * 60 * 24)) + 1);
+                const baseDailyAvgAmount = Math.round((grandPastQtySum * avgUnitPrice) / totalPastPeriodDays);
 
-                // 🚀 [AI 핵심 엔진 2] 최근 모멘텀(추세) 추출 (De-seasonalized)
-                // 과거 기간 중 가장 최근 7 영업일의 추세를 파악해 예측치를 즉각 끌어올립니다.
-                const sortedPastDates = Object.keys(pastDailyAggMap).sort();
-                const recentValidDates = sortedPastDates.filter(d => new Date(d.replace(/\//g, '-')).getDay() !== 0).slice(-7);
-
-                let recentDesSum = 0;
-                recentValidDates.forEach(dStr => {
-                    const q = pastDailyAggMap[dStr];
-                    const dayIdx = new Date(dStr.replace(/\//g, '-')).getDay();
-                    const desQty = q / dowIndices[dayIdx]; // 요일 영향을 제거한 순수 체급(Volume)
-                    recentDesSum += desQty;
-                });
-
-                const recentDesAvg = recentValidDates.length > 0 ? (recentDesSum / recentValidDates.length) : overallAvgQty;
-                
-                // 추세 모멘텀 비율 계산 (전체 기간 평균 대비 최근 평균이 얼마나 상승/하락했는가)
-                let trendMomentum = overallAvgQty > 0 ? (recentDesAvg / overallAvgQty) : 1.0;
-                trendMomentum = Math.max(0.5, Math.min(2.5, trendMomentum)); // 0.5배 ~ 2.5배 사이로 제한
-
-                const baseDailyAvgAmount = validPastDays > 0 ? Math.round(grandPastAmount / validPastDays) : 0;
-
-                // 미래 예측 날씨
+                // 미래 날씨
                 const weatherMap = await fetchFutureWeatherData(startDate, endDate);
 
                 const futureRows = [];
@@ -682,6 +634,7 @@
                 let curDate = new Date(startDate);
                 const endDt = new Date(endDate);
 
+                // 🚀 [롤링 예측 수행] 각 날짜 T를 예측할 때는 T 이전의 날짜들만 이용
                 while (curDate <= endDt) {
                     const dStr = formatDate(curDate);
                     const dispDate = formatDisplayDate(dStr);
@@ -699,16 +652,49 @@
                     let boostedAmt = 0;
 
                     if (!isSunday) {
-                        // 🚀 최종 예측 공식 = (전체 일평균) * (해당 요일 지수) * (최근 성장 모멘텀) * (날씨 보정)
-                        baseQty = Math.round(overallAvgQty * dowIndices[dayIdx] * trendMomentum * weatherFactor);
+                        // 💡 현재 예측일(curDate)보다 엄격히 이전 날짜의 실적만 수집 (미래 오염 차단)
+                        const priorSameWeekdayVals = [];
+                        let priorSum = 0, priorCount = 0;
+
+                        let checkDate = new Date(curDate);
+                        checkDate.setDate(checkDate.getDate() - 1); // 어제부터 과거로 역추적
+
+                        while (checkDate >= new Date(actualFetchStartStr)) {
+                            const checkDispDate = formatDisplayDate(formatDate(checkDate));
+                            const val = fullDailyMap[checkDispDate];
+                            
+                            if (val !== undefined && val > 0) {
+                                priorSum += val;
+                                priorCount++;
+                                if (checkDate.getDay() === dayIdx) {
+                                    priorSameWeekdayVals.push(val); // 직전 동일 요일 수치 저장 (가장 최근 순)
+                                }
+                            }
+                            checkDate.setDate(checkDate.getDate() - 1);
+                        }
+
+                        const priorOverallAvg = priorCount > 0 ? (priorSum / priorCount) : baseDailyAvgQty;
+
+                        // 💡 직전 동일 요일에 대한 롤링 이동 가중치 적용
+                        if (priorSameWeekdayVals.length >= 3) {
+                            baseQty = Math.round(0.60 * priorSameWeekdayVals[0] + 0.25 * priorSameWeekdayVals[1] + 0.15 * priorSameWeekdayVals[2]);
+                        } else if (priorSameWeekdayVals.length === 2) {
+                            baseQty = Math.round(0.70 * priorSameWeekdayVals[0] + 0.30 * priorSameWeekdayVals[1]);
+                        } else if (priorSameWeekdayVals.length === 1) {
+                            baseQty = Math.round(0.80 * priorSameWeekdayVals[0] + 0.20 * priorOverallAvg);
+                        } else {
+                            baseQty = Math.round(priorOverallAvg);
+                        }
+
+                        baseQty = Math.round(baseQty * weatherFactor);
                         boostedQty = Math.round(baseQty * boostMultiplier);
                         addedQty = boostedQty - baseQty;
                         boostedAmt = Math.round(boostedQty * avgUnitPrice);
                     }
 
-                    const actualQty = (actualDailyMap[dispDate] !== undefined) ? actualDailyMap[dispDate] : null;
+                    // 비교용 실제 수량
+                    const actualQty = (fullDailyMap[dispDate] !== undefined) ? fullDailyMap[dispDate] : null;
 
-                    // 백테스팅 일치율 집계
                     if (!isSunday && actualQty !== null) {
                         totalOverlapActual += actualQty;
                         totalOverlapError += Math.abs(actualQty - boostedQty);
@@ -735,7 +721,7 @@
 
                 currentForecastRows = futureRows;
 
-                // 🎯 정밀 일치율(Accuracy %) (WMAPE)
+                // WMAPE 오차율
                 let accuracyText = "비교 데이터 없음";
                 let accuracySubText = "구간 내 실제 실적 없음";
                 if (overlapDaysCount > 0 && totalOverlapActual > 0) {
@@ -748,7 +734,7 @@
                 document.getElementById('kpi-accuracy-percent').innerText = accuracyText;
                 document.getElementById('kpi-accuracy-sub').innerText = accuracySubText;
 
-                document.getElementById('kpi-base-daily-avg').innerText = `${Math.round(overallAvgQty).toLocaleString()} 건`;
+                document.getElementById('kpi-base-daily-avg').innerText = `${baseDailyAvgQty.toLocaleString()} 건`;
                 document.getElementById('kpi-sub-daily-avg-amount').innerText = `일평균 금액: ${baseDailyAvgAmount.toLocaleString()} 원`;
 
                 document.getElementById('kpi-forecast-qty').innerText = `${totalBoostedQty.toLocaleString()} 건`;
@@ -796,7 +782,7 @@
                     datasets: [
                         { label: '📦 실제 주문량 (Actual)', data: actualData, backgroundColor: 'rgba(2, 132, 199, 0.85)', borderRadius: 4 },
                         { label: '📊 기본 통계 예측량', data: baseData, backgroundColor: 'rgba(148, 163, 184, 0.7)', borderRadius: 4 },
-                        { label: '🚀 가중치 적용 예측량', data: boostedData, backgroundColor: 'rgba(139, 92, 246, 0.85)', borderRadius: 4 }
+                        { label: '🚀 가중치 적용 예측량', data: boostedData, backgroundColor: 'rgba(16, 185, 129, 0.85)', borderRadius: 4 }
                     ]
                 },
                 options: {
@@ -864,7 +850,7 @@
                         <td class="text-center"><span class="badge-boost">${r.boostPct}</span></td>
                         <td class="text-right">${actualText}</td>
                         <td class="text-right" style="color: #64748b;">${r.baseQty.toLocaleString()} 건</td>
-                        <td class="text-right" style="color: #7c3aed; font-weight: bold;">${r.boostedQty.toLocaleString()} 건</td>
+                        <td class="text-right" style="color: #10b981; font-weight: bold;">${r.boostedQty.toLocaleString()} 건</td>
                         <td class="text-right" style="color: #16a34a; font-weight: bold;">+${r.addedQty.toLocaleString()} 건</td>
                         <td class="text-right"><b>${r.boostedAmt.toLocaleString()} 원</b></td>
                     </tr>
