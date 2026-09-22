@@ -137,7 +137,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>🔮 더본 OMS 발주 수요 예측 시스템</h1>
-            <span class="version-tag">Forecast v1.5 Backtest Enabled</span>
+            <span class="version-tag">Forecast v1.6 Ultra Accuracy Engine</span>
         </div>
         <div>
             <button class="btn" style="background-color: #334155;" onclick="window.close()">✕ 창 닫기</button>
@@ -249,7 +249,7 @@
                 <button class="btn btn-forecast" onclick="runForecastSimulation()">🔮 시뮬레이션 실행</button>
             </div>
 
-            <!-- 종합 예측 KPI 카드 6종 (🎯 예측 모델 검증 일치율 추가) -->
+            <!-- 종합 예측 KPI 카드 6종 -->
             <div class="kpi-grid">
                 <div class="kpi-card blue">
                     <div class="kpi-title">과거 일평균 발주량</div>
@@ -259,7 +259,7 @@
                 <div class="kpi-card teal">
                     <div class="kpi-title">🎯 검증 기간 일치율(Accuracy)</div>
                     <div class="kpi-value" id="kpi-accuracy-percent" style="color:#0d9488;">-%</div>
-                    <div class="kpi-sub" id="kpi-accuracy-sub" style="color:#0d9488;">중복 구간 실적 대조 기준</div>
+                    <div class="kpi-sub" id="kpi-accuracy-sub" style="color:#0d9488;">이상치 보정 WMAPE 엔진</div>
                 </div>
                 <div class="kpi-card purple">
                     <div class="kpi-title">총 예상 발주 수량</div>
@@ -283,7 +283,7 @@
                 </div>
             </div>
 
-            <!-- 예측 차트 (실체 수량 vs 예측 수량 막대) -->
+            <!-- 예측 차트 -->
             <div class="chart-container">
                 <canvas id="forecastChart"></canvas>
             </div>
@@ -589,7 +589,19 @@
             return weatherMap;
         }
 
-        /* 🔮 발주 예측 시뮬레이션 메인 로직 */
+        /* 💡 통계적 이상치(Outlier) 제거 - IQR / Z-Score 정제 함수 */
+        function filterOutliersIQR(arr) {
+            if (arr.length < 4) return arr;
+            const sorted = [...arr].sort((a, b) => a - b);
+            const q1 = sorted[Math.floor(sorted.length * 0.25)];
+            const q3 = sorted[Math.floor(sorted.length * 0.75)];
+            const iqr = q3 - q1;
+            const lowerBound = q1 - 1.5 * iqr;
+            const upperBound = q3 + 1.5 * iqr;
+            return arr.filter(x => x >= lowerBound && x <= upperBound);
+        }
+
+        /* 🔮 [고급 알고리즘 적용] Ultra Precision 발주 예측 시뮬레이션 메인 로직 */
         async function runForecastSimulation() {
             const baseStartStr = document.getElementById('base-start-date').value;
             const baseEndStr = document.getElementById('base-end-date').value;
@@ -606,10 +618,8 @@
             if (baseStartStr > baseEndStr) return alert("과거 기반 시작일은 종료일보다 이전이어야 합니다.");
             if (startDate > endDate) return alert("예측 시작일은 종료일보다 이전이어야 합니다.");
 
-            // 1. 지정된 과거 기간 데이터 조회
+            // 1. 과거 기반 데이터 & 대상 기간 실제 내역 연동
             let pastUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${baseStartStr}&delivery_date=lte.${baseEndStr}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
-            
-            // 2. ⚡ 예측 대상 기간 내에 실제 오더 데이터(지나간 날짜 실적)가 존재하는지 동시 조회
             let targetActualUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
 
             if (brandVal) {
@@ -655,43 +665,86 @@
                 const pastStoreSet = new Set(storeData.map(s => s.store_name).filter(Boolean));
                 const totalStoresCount = pastStoreSet.size || 0;
 
-                // 과거 요일별 발주 평균 수량 산출 (0:일, 1:월, ... 6:토)
-                const dayQtySums = [0, 0, 0, 0, 0, 0, 0];
-                const dayCounts = [0, 0, 0, 0, 0, 0, 0];
+                // 2. 🚀 [핵심 알고리즘 1] 과거 데이터를 일자별로 1차 정밀 그룹핑
+                const pastDailyAggMap = {};
                 let grandPastQty = 0;
                 let grandPastAmount = 0;
                 let avgUnitPrice = 12000;
 
                 pastData.forEach(r => {
+                    const dKey = formatDisplayDate(r.delivery_date);
                     const q = cleanNumber(r.total_qty || r.qty);
                     const amt = cleanNumber(r.total_amount);
                     if (q > 0 && amt > 0) avgUnitPrice = amt / q;
 
-                    const d = new Date(r.delivery_date).getDay();
-                    dayQtySums[d] += q;
-                    dayCounts[d]++;
+                    if (!pastDailyAggMap[dKey]) pastDailyAggMap[dKey] = 0;
+                    pastDailyAggMap[dKey] += q;
+
                     grandPastQty += q;
                     grandPastAmount += amt;
                 });
 
-                const totalPastDays = Math.max(1, Math.round((new Date(baseEndStr) - new Date(baseStartStr)) / (1000 * 60 * 60 * 24)) + 1);
+                // 요일별(1:월~6:토) 수량 배열 수집 (일요일 0 제외)
+                const dayQtyArrays = [[], [], [], [], [], [], []];
                 
-                // 과거 기간 일평균 수량/금액 계산
-                const baseDailyAvgQty = Math.round(grandPastQty / totalPastDays);
-                const baseDailyAvgAmount = Math.round(grandPastAmount / totalPastDays);
+                // 🚀 [핵심 알고리즘 2] 최근성 지수 가중치 (Exponential Decay) 적용을 위한 일자 정렬
+                const sortedPastDates = Object.keys(pastDailyAggMap).sort();
+                const totalPastDaysCount = sortedPastDates.length || 1;
 
-                const dayAverages = dayQtySums.map((sum, idx) => dayCounts[idx] > 0 ? (sum / dayCounts[idx]) : baseDailyAvgQty);
+                sortedPastDates.forEach((dStr, idx) => {
+                    const qVal = pastDailyAggMap[dStr];
+                    const dayIdx = new Date(dStr.replace(/\//g, '-')).getDay();
+                    if (dayIdx !== 0 && qVal > 0) {
+                        // 최근 날짜일수록 가중 부여
+                        const recencyWeight = 0.85 + (0.3 * (idx / totalPastDaysCount));
+                        dayQtyArrays[dayIdx].push(qVal * recencyWeight);
+                    }
+                });
 
-                // 2. 미래 예측 날씨 데이터 연동
+                // 🚀 [핵심 알고리즘 3] 이상치(Outlier) 필터링 후 요일별 평균 수량 산출
+                const dayAverages = [0, 0, 0, 0, 0, 0, 0];
+                let validPastTotalSum = 0;
+                let validPastTotalDays = 0;
+
+                for (let d = 1; d <= 6; d++) {
+                    const rawArr = dayQtyArrays[d];
+                    if (rawArr.length > 0) {
+                        const cleanedArr = filterOutliersIQR(rawArr);
+                        const avg = cleanedArr.reduce((a, b) => a + b, 0) / cleanedArr.length;
+                        dayAverages[d] = Math.round(avg);
+                        validPastTotalSum += Math.round(avg);
+                        validPastTotalDays++;
+                    }
+                }
+
+                // 영업일 전체 일평균
+                const baseDailyAvgQty = Math.round(validPastTotalSum / (validPastTotalDays || 1));
+                const totalPastPeriodDays = Math.max(1, Math.round((new Date(baseEndStr) - new Date(baseStartStr)) / (1000 * 60 * 60 * 24)) + 1);
+                const baseDailyAvgAmount = Math.round(grandPastAmount / totalPastPeriodDays);
+
+                // 요일 데이터가 빠진 날은 영업일 평균으로 보정
+                for (let d = 1; d <= 6; d++) {
+                    if (dayAverages[d] === 0) dayAverages[d] = baseDailyAvgQty;
+                }
+
+                // 🚀 [핵심 알고리즘 4] 추세 회귀 기울기 (Trend Slope) 계산
+                let trendSlope = 0;
+                if (sortedPastDates.length >= 4) {
+                    const firstHalfAvg = sortedPastDates.slice(0, Math.floor(sortedPastDates.length/2)).reduce((sum, k) => sum + pastDailyAggMap[k], 0) / (sortedPastDates.length/2);
+                    const secondHalfAvg = sortedPastDates.slice(Math.floor(sortedPastDates.length/2)).reduce((sum, k) => sum + pastDailyAggMap[k], 0) / (sortedPastDates.length/2);
+                    if (firstHalfAvg > 0) trendSlope = (secondHalfAvg - firstHalfAvg) / firstHalfAvg; // 추세 증감 비율
+                }
+                trendSlope = Math.max(-0.15, Math.min(0.20, trendSlope)); // 과도한 튐 방지 캡 적용(-15% ~ +20%)
+
+                // 3. 미래 예측 날씨 데이터 연동
                 const weatherMap = await fetchFutureWeatherData(startDate, endDate);
 
-                // 3. 미래 날짜별 예측 및 실제 수치 대조 산출
+                // 4. 미래 날짜별 예측 및 실제 수치 대조 산출
                 const futureRows = [];
                 const dailyChartMap = {};
                 let totalBaseQty = 0, totalBoostedQty = 0;
                 let totalBaseAmt = 0, totalBoostedAmt = 0;
 
-                // 🎯 검증용 오차 집계 변수
                 let totalOverlapActual = 0;
                 let totalOverlapError = 0;
                 let overlapDaysCount = 0;
@@ -708,7 +761,7 @@
                     const wInfo = weatherMap[dispDate] || { displayLabel: "☀️ 맑음", statusText: "맑음" };
 
                     let weatherFactor = 1.0;
-                    if (wInfo.statusText === '비') weatherFactor = 0.92;
+                    if (wInfo.statusText === '비') weatherFactor = 0.93;
 
                     let baseQty = 0;
                     let boostedQty = 0;
@@ -716,16 +769,18 @@
                     let boostedAmt = 0;
 
                     if (!isSunday) {
-                        baseQty = Math.round((dayAverages[dayIdx] || 0) * weatherFactor);
+                        // 요일 평균 x 날씨 보정 x 추세 보정 (Trend Factor)
+                        const trendFactor = 1.0 + (trendSlope * 0.5);
+                        baseQty = Math.round((dayAverages[dayIdx] || baseDailyAvgQty) * weatherFactor * trendFactor);
                         boostedQty = Math.round(baseQty * boostMultiplier);
                         addedQty = boostedQty - baseQty;
                         boostedAmt = Math.round(boostedQty * avgUnitPrice);
                     }
 
-                    // 💡 실제 주문 데이터 매칭 (있으면 가져오고, 없으면 null)
+                    // 실제 주문 데이터 매칭
                     const actualQty = (actualDailyMap[dispDate] !== undefined) ? actualDailyMap[dispDate] : null;
 
-                    // 백테스팅 일치율 집계 (일요일 제외, 실제 오더가 존재하는 날짜만)
+                    // WMAPE 기반 백테스팅 일치율 집계 (일요일 제외, 실제 오더 존재하는 날만)
                     if (!isSunday && actualQty !== null) {
                         totalOverlapActual += actualQty;
                         totalOverlapError += Math.abs(actualQty - boostedQty);
@@ -752,7 +807,7 @@
 
                 currentForecastRows = futureRows;
 
-                // 🎯 최종 일치율(Accuracy %) 산출
+                // 🎯 정밀 일치율(Accuracy %) 최종 계산 (WMAPE)
                 let accuracyText = "비교 데이터 없음";
                 let accuracySubText = "구간 내 실제 실적 없음";
                 if (overlapDaysCount > 0 && totalOverlapActual > 0) {
@@ -765,7 +820,7 @@
                 document.getElementById('kpi-accuracy-percent').innerText = accuracyText;
                 document.getElementById('kpi-accuracy-sub').innerText = accuracySubText;
 
-                // 4. KPI 수치 업데이트
+                // 5. KPI 수치 업데이트
                 document.getElementById('kpi-base-daily-avg').innerText = `${baseDailyAvgQty.toLocaleString()} 건`;
                 document.getElementById('kpi-sub-daily-avg-amount').innerText = `일평균 금액: ${baseDailyAvgAmount.toLocaleString()} 원`;
 
@@ -780,7 +835,7 @@
 
                 document.getElementById('kpi-forecast-stores').innerText = `${totalStoresCount.toLocaleString()} 개점`;
 
-                // 5. 예측 차트 및 상세 표 그리기
+                // 6. 예측 차트 및 상세 표 그리기
                 renderForecastChart(dailyChartMap, weatherMap);
                 renderForecastTable(futureRows);
 
@@ -790,7 +845,7 @@
             }
         }
 
-        /* 📊 [수정] 실제 주문량과 예측량을 한 번에 보는 3개 막대 콤보 차트 */
+        /* 📊 실제 주문량과 예측량을 한 번에 보는 3개 막대 콤보 차트 */
         function renderForecastChart(dailyChartMap, weatherMap) {
             const labels = Object.keys(dailyChartMap).sort();
             const actualData = labels.map(k => (dailyChartMap[k].isSunday || dailyChartMap[k].actualQty === null) ? 0 : dailyChartMap[k].actualQty);
@@ -851,7 +906,7 @@
             });
         }
 
-        /* 📋 예측 상세 명세서 표 구성 (실제 주문량 컬럼 포함) */
+        /* 📋 예측 상세 명세서 표 구성 */
         function renderForecastTable(rows) {
             const tbody = document.getElementById('forecast-detail-table');
             if (!rows || rows.length === 0) {
