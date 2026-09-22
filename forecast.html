@@ -100,8 +100,7 @@
         .search-list-item:hover { background-color: #eff6ff; }
         .search-list-item label { cursor: pointer; width: 100%; display: flex; align-items: center; gap: 8px; }
 
-        /* 6개 컬럼 KPI 그리드 */
-        .kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 15px; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 15px; }
         .kpi-card { 
             background: #f8fafc; padding: 14px 16px; border-radius: 8px; 
             border-left: 5px solid #2563eb; position: relative; 
@@ -134,7 +133,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>🔮 더본 OMS 발주 수요 예측 시스템</h1>
-            <span class="version-tag">Forecast v2.2 Remaining Qty & No Amount</span>
+            <span class="version-tag">Forecast v2.4 Clean Boost UI</span>
         </div>
         <div>
             <button class="btn" style="background-color: #334155;" onclick="window.close()">✕ 창 닫기</button>
@@ -237,16 +236,16 @@
                     <div id="item-autocomplete-list" class="autocomplete-dropdown"></div>
                 </div>
 
+                <!-- 💡 [수정 반영] 배수 텍스트 제거하고 % 단량만 표출 -->
                 <div class="filter-group" style="background: #d1fae5; padding: 6px 12px; border-radius: 6px; border: 1px solid #a7f3d0;">
                     <label style="color: #065f46;">🚀 신메뉴/행사 가중치:</label>
                     <input type="number" id="boost-percent-input" class="input-box" value="0" min="0" max="500" step="10" style="width: 65px; text-align: center; font-weight: bold; color: #065f46; padding-right: 8px;">
-                    <span style="color: #065f46;">% (+<b id="boost-multiplier-text">1.0배</b>)</span>
+                    <span style="color: #065f46;">%</span>
                 </div>
 
                 <button class="btn btn-forecast" onclick="runForecastSimulation()">🔮 시뮬레이션 실행</button>
             </div>
 
-            <!-- 💡 [수정] 수량 중심 6개 KPI 카드 (금액 전면 제거 & 남은기간 수량 신설) -->
             <div class="kpi-grid">
                 <div class="kpi-card blue">
                     <div class="kpi-title">과거 일평균 발주량</div>
@@ -266,17 +265,12 @@
                 <div class="kpi-card orange">
                     <div class="kpi-title">가중치 추가 수량</div>
                     <div class="kpi-value" id="kpi-boost-added-qty">+0 건</div>
-                    <div class="kpi-sub" id="kpi-sub-boost-added" style="color:#f59e0b;">행사 가중치 반영분</div>
+                    <div class="kpi-sub" id="kpi-sub-boost-added" style="color:#f59e0b;">미래 남은기간 반영분</div>
                 </div>
                 <div class="kpi-card green">
                     <div class="kpi-title">🔮 남은 기간 필요 수량 합계</div>
                     <div class="kpi-value" id="kpi-remaining-qty" style="color:#10b981;">0 건</div>
                     <div class="kpi-sub" id="kpi-sub-remaining" style="color:#10b981;">미래 남은기간 필요 수량</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-title">기반 기간 발주 점포수</div>
-                    <div class="kpi-value" id="kpi-forecast-stores">0 개점</div>
-                    <div class="kpi-sub">선택된 과거 기간 기준</div>
                 </div>
             </div>
 
@@ -473,12 +467,6 @@
             closeItemModal();
         }
 
-        document.getElementById('boost-percent-input').addEventListener('input', (e) => {
-            const pct = cleanNumber(e.target.value);
-            const mult = (1 + (pct / 100)).toFixed(1);
-            document.getElementById('boost-multiplier-text').innerText = `${mult}배`;
-        });
-
         function setQuickBasePeriod(type) {
             const today = new Date();
             let sDate = new Date();
@@ -528,7 +516,6 @@
             return weatherMap;
         }
 
-        /* 🚀 [v2.2 남은 수량 카드 추가 & 금액 제거 적용] */
         async function runForecastSimulation() {
             const baseStartStr = document.getElementById('base-start-date').value;
             const baseEndStr = document.getElementById('base-end-date').value;
@@ -545,7 +532,6 @@
             if (baseStartStr > baseEndStr) return alert("과거 기반 시작일은 종료일보다 이전이어야 합니다.");
             if (startDate > endDate) return alert("예측 시작일은 종료일보다 이전이어야 합니다.");
 
-            // 11시 기준 및 D-2 체크박스 연동 실제 데이터 유효 범위 산출
             const now = new Date();
             const currentHour = now.getHours();
             const isD2Checked = document.getElementById('chk-d2-cutoff').checked;
@@ -561,38 +547,26 @@
             const actualFetchStartStr = baseStartStr < fetchStartStr ? baseStartStr : fetchStartStr;
 
             let fullDataUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${actualFetchStartStr}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,item_name,item_code,brand_name`;
-            let storeSummaryUrl = `${SUPABASE_URL}/rest/v1/store_order_summary?delivery_date=gte.${baseStartStr}&delivery_date=lte.${baseEndStr}&select=store_name,brand_name`;
 
             if (brandVal) {
                 const bList = brandVal.split(',').map(b => b.trim()).filter(Boolean);
-                const bCond = bList.length === 1 ? `&brand_name=ilike.*${encodeURIComponent(bList[0])}*` : `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`;
-                fullDataUrl += bCond; storeSummaryUrl += bCond;
+                fullDataUrl += bList.length === 1 ? `&brand_name=ilike.*${encodeURIComponent(bList[0])}*` : `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`;
             }
 
             if (itemVal) {
                 const iList = itemVal.split(',').map(i => i.trim()).filter(Boolean);
-                let iCond = '';
                 if (iList.length === 1) {
                     const kw = encodeURIComponent(iList[0]);
-                    iCond = `&or=(item_code.ilike.*${kw}*,item_name.ilike.*${kw}*)`;
+                    fullDataUrl += `&or=(item_code.ilike.*${kw}*,item_name.ilike.*${kw}*)`;
                 } else if (iList.length > 1) {
                     const orConds = iList.map(i => `item_code.ilike.*${encodeURIComponent(i)}*,item_name.ilike.*${encodeURIComponent(i)}*`).join(',');
-                    iCond = `&or=(${orConds})`;
+                    fullDataUrl += `&or=(${orConds})`;
                 }
-                fullDataUrl += iCond;
             }
 
             try {
-                const [resFull, resStores] = await Promise.all([
-                    fetch(fullDataUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } }),
-                    fetch(storeSummaryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } })
-                ]);
-
+                const resFull = await fetch(fullDataUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                 const fullData = resFull.ok ? await resFull.json() : [];
-                const storeData = resStores.ok ? await resStores.json() : [];
-
-                const pastStoreSet = new Set(storeData.map(s => s.store_name).filter(Boolean));
-                const totalStoresCount = pastStoreSet.size || 0;
 
                 const fullDailyMap = {};
                 let grandPastQtySum = 0;
@@ -612,16 +586,15 @@
                 });
 
                 const baseDailyAvgQty = Math.round(grandPastQtySum / (grandPastDaysCount || 1));
-
                 const weatherMap = await fetchFutureWeatherData(startDate, endDate);
 
                 const futureRows = [];
                 const dailyChartMap = {};
                 let totalBaseQty = 0, totalBoostedQty = 0;
                 
-                // 💡 [신설] 남은 기간 필요 수량 변수
                 let remainingRequiredQty = 0;
                 let remainingDaysCount = 0;
+                let futureBoostAddedQty = 0;
 
                 let totalOverlapActual = 0;
                 let totalOverlapError = 0;
@@ -644,6 +617,8 @@
                     let baseQty = 0;
                     let boostedQty = 0;
                     let addedQty = 0;
+
+                    const actualQty = (dStr <= maxValidActualDateStr && fullDailyMap[dispDate] !== undefined) ? fullDailyMap[dispDate] : null;
 
                     if (!isSunday) {
                         const priorSameWeekdayVals = [];
@@ -679,23 +654,23 @@
                         }
 
                         baseQty = Math.round(baseQty * weatherFactor);
-                        boostedQty = Math.round(baseQty * boostMultiplier);
-                        addedQty = boostedQty - baseQty;
+
+                        if (actualQty === null) {
+                            boostedQty = Math.round(baseQty * boostMultiplier);
+                            addedQty = boostedQty - baseQty;
+                            futureBoostAddedQty += addedQty;
+                            remainingRequiredQty += boostedQty;
+                            remainingDaysCount++;
+                        } else {
+                            boostedQty = baseQty;
+                            addedQty = 0;
+                        }
                     }
 
-                    const actualQty = (dStr <= maxValidActualDateStr && fullDailyMap[dispDate] !== undefined) ? fullDailyMap[dispDate] : null;
-
-                    // 검증 일치율 계산
                     if (!isSunday && actualQty !== null) {
                         totalOverlapActual += actualQty;
                         totalOverlapError += Math.abs(actualQty - boostedQty);
                         overlapDaysCount++;
-                    }
-
-                    // 💡 [핵심] 실적 미발생 남은 기간의 필요 수량 합산
-                    if (!isSunday && actualQty === null) {
-                        remainingRequiredQty += boostedQty;
-                        remainingDaysCount++;
                     }
 
                     totalBaseQty += baseQty;
@@ -706,7 +681,7 @@
                         weather: isSunday ? '🏖️ 일요일 (입고휴무)' : wInfo.displayLabel,
                         brand: brandVal || '전체 브랜드',
                         item: itemVal || '전체 품목 합산',
-                        boostPct: isSunday ? '-' : `+${boostPercent}%`,
+                        boostPct: (isSunday || actualQty !== null) ? '-' : `+${boostPercent}%`,
                         actualQty, baseQty, boostedQty, addedQty, isSunday
                     });
 
@@ -734,14 +709,11 @@
                 document.getElementById('kpi-forecast-qty').innerText = `${totalBoostedQty.toLocaleString()} 건`;
                 document.getElementById('kpi-sub-qty').innerText = `가중치 미적용: ${totalBaseQty.toLocaleString()} 건`;
 
-                document.getElementById('kpi-boost-added-qty').innerText = `+${(totalBoostedQty - totalBaseQty).toLocaleString()} 건`;
-                document.getElementById('kpi-sub-boost-added').innerText = `행사 가중치 반영분`;
+                document.getElementById('kpi-boost-added-qty').innerText = `+${futureBoostAddedQty.toLocaleString()} 건`;
+                document.getElementById('kpi-sub-boost-added').innerText = `미래 남은기간 반영분`;
 
-                // 💡 [신설] 남은 기간 필요 수량 카드 표출
                 document.getElementById('kpi-remaining-qty').innerText = `${remainingRequiredQty.toLocaleString()} 건`;
                 document.getElementById('kpi-sub-remaining').innerText = `남은 ${remainingDaysCount}일간 필요 수량`;
-
-                document.getElementById('kpi-forecast-stores').innerText = `${totalStoresCount.toLocaleString()} 개점`;
 
                 renderForecastChart(dailyChartMap, weatherMap);
                 renderForecastTable(futureRows);
