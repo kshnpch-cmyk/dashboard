@@ -1047,7 +1047,7 @@
             }
         }
 
-        /* 🚀 0.1초 초고속 속도로 보정한 fetchChartData */
+        /* 🚀 0.1초 초고속 속도로 보정한 fetchChartData (점포수 사전 연동) */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -1059,42 +1059,52 @@
             safeSetStorage('cached_chart_start_date', startDate);
             safeSetStorage('cached_chart_end_date', endDate);
 
-            // ⚡ daily_order_summary 요약 집계 테이블 사용으로 속도 최적화
-            let queryUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
+            // 1. 차트/수량/금액용 일별 요약 뷰
+            let dailyUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
+            
+            // 2. ⚡ 점포수 미리 사전 계산용 점포별 요약 뷰 (store_name 포함)
+            let storeUrl = `${SUPABASE_URL}/rest/v1/store_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_code,store_name,brand_name,order_count`;
 
             if (brandInputValue) {
                 const brandList = brandInputValue.split(',').map(b => b.trim()).filter(Boolean);
-                if (brandList.length === 1) queryUrl += `&brand_name=ilike.*${encodeURIComponent(brandList[0])}*`;
-                else if (brandList.length > 1) queryUrl += `&or=(${brandList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`;
+                if (brandList.length === 1) {
+                    const bCond = `&brand_name=ilike.*${encodeURIComponent(brandList[0])}*`;
+                    dailyUrl += bCond; storeUrl += bCond;
+                } else if (brandList.length > 1) {
+                    const bCond = `&or=(${brandList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`;
+                    dailyUrl += bCond; storeUrl += bCond;
+                }
             }
 
             if (itemKeyword) {
                 const itemList = itemKeyword.split(',').map(i => i.trim()).filter(Boolean);
                 if (itemList.length === 1) {
                     const kw = encodeURIComponent(itemList[0]);
-                    queryUrl += `&or=(item_code.ilike.*${kw}*,item_name.ilike.*${kw}*)`;
+                    dailyUrl += `&or=(item_code.ilike.*${kw}*,item_name.ilike.*${kw}*)`;
                 } else if (itemList.length > 1) {
-                    const orConds = itemList.map(i => {
-                        const kw = encodeURIComponent(i);
-                        return `item_code.ilike.*${kw}*,item_name.ilike.*${kw}*`;
-                    }).join(',');
-                    queryUrl += `&or=(${orConds})`;
+                    const orConds = itemList.map(i => `item_code.ilike.*${encodeURIComponent(i)}*,item_name.ilike.*${encodeURIComponent(i)}*`).join(',');
+                    dailyUrl += `&or=(${orConds})`;
                 }
             }
 
             try {
-                const res = await fetchWithUltraCache(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
-                if (res.ok) {
-                    const data = await res.json();
-                    renderChartAndKPI(data);
+                const [resDaily, resStore] = await Promise.all([
+                    fetchWithUltraCache(dailyUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } }),
+                    fetchWithUltraCache(storeUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } })
+                ]);
+
+                if (resDaily.ok) {
+                    const dailyData = await resDaily.json();
+                    const storeData = resStore.ok ? await resStore.json() : [];
+                    renderChartAndKPI(dailyData, storeData);
                 }
             } catch (err) {
                 console.error("차트 데이터 로드 오류:", err);
             }
         }
 
-        /* 📊 대시보드 차트 및 KPI 표출 (필터링 조건 정확 매칭 보정) */
-        async function renderChartAndKPI(data) {
+        /* 📊 대시보드 차트 및 KPI 표출 */
+        async function renderChartAndKPI(data, storeData = []) {
             if (!data || !Array.isArray(data) || data.length === 0) {
                 document.getElementById('kpi-total-qty').innerText = "0 건";
                 document.getElementById('kpi-total-items').innerText = "0 종";
@@ -1124,8 +1134,8 @@
                 dailyMap[dateKey].amount += amt;
             });
 
-            // 💡 점포 수 및 브랜드별 점포 맵 재계산 실행
-            recalculateFilteredStores();
+            // 💡 점포 수 및 브랜드별 점포 맵 사전 재계산
+            recalculateFilteredStores(storeData);
 
             document.getElementById('kpi-total-qty').innerText = `${totalQty.toLocaleString()} 건`;
             document.getElementById('kpi-total-items').innerText = `${uniqueItems.size.toLocaleString()} 종`;
@@ -1207,8 +1217,8 @@
             });
         }
 
-        /* 🚀 [버그 해결] 누락 없는 점포 수 정밀 계산 함수 */
-        function recalculateFilteredStores() {
+        /* 🚀 [초고속 사전 계산] 조건별 정확한 점포 수 집계 전담 함수 */
+        function recalculateFilteredStores(presetStoreData = []) {
             const uniqueStores = new Set();
             currentBrandStoreMap = {};
 
@@ -1218,7 +1228,7 @@
             const bList = brandVal ? brandVal.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
             const iList = itemVal ? itemVal.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
 
-            // 1. 수집 완료된 상세 원본 데이터(rawDetailOrders)에서 정밀 조건 검색
+            // 1. 수집 완료된 상세 원본 데이터(rawDetailOrders) 정밀 계산
             if (rawDetailOrders && rawDetailOrders.length > 0) {
                 rawDetailOrders.forEach(r => {
                     const sName = r.store_name;
@@ -1237,20 +1247,23 @@
                 });
             }
 
-            // 2. 품목 검색어가 없을 때 storeSummaryList 집계
-            if (uniqueStores.size === 0 && storeSummaryList && storeSummaryList.length > 0 && iList.length === 0) {
-                storeSummaryList.forEach(r => {
-                    const sName = r.store_name;
-                    const bName = r.brand_name || '미지정 브랜드';
+            // 2. ⚡ 0.1초 즉시 계산용: 사전 조회된 presetStoreData 또는 storeSummaryList 활용
+            if (uniqueStores.size === 0) {
+                const targetList = (presetStoreData && presetStoreData.length > 0) ? presetStoreData : storeSummaryList;
+                if (targetList && targetList.length > 0) {
+                    targetList.forEach(r => {
+                        const sName = r.store_name;
+                        const bName = r.brand_name || '미지정 브랜드';
 
-                    let brandMatch = (bList.length === 0) || bList.some(b => bName.toLowerCase().includes(b));
+                        let brandMatch = (bList.length === 0) || bList.some(b => bName.toLowerCase().includes(b));
 
-                    if (sName && sName !== '-' && brandMatch) {
-                        uniqueStores.add(sName);
-                        if (!currentBrandStoreMap[bName]) currentBrandStoreMap[bName] = new Set();
-                        currentBrandStoreMap[bName].add(sName);
-                    }
-                });
+                        if (sName && sName !== '-' && brandMatch) {
+                            uniqueStores.add(sName);
+                            if (!currentBrandStoreMap[bName]) currentBrandStoreMap[bName] = new Set();
+                            currentBrandStoreMap[bName].add(sName);
+                        }
+                    });
+                }
             }
 
             document.getElementById('kpi-total-stores').innerText = `${uniqueStores.size.toLocaleString()} 개점`;
@@ -1305,9 +1318,6 @@
                         let calculatedPercent = Math.min(99, Math.round((rawDetailOrders.length / totalExpectedRows) * 100));
                         updateBadgePercent(calculatedPercent);
 
-                        // 💡 청크 수집 진행 도중 실시간 점포수 재계산 갱신
-                        recalculateFilteredStores();
-
                         const activeStore = document.querySelector('#store-list .active');
                         if (activeStore && activeStore.innerText.includes('전체 점포 합산')) {
                             baseDetailOrders = filteredDetailOrders;
@@ -1324,7 +1334,7 @@
             if (currentToken === activeFetchToken) {
                 currentMaxPercent = 100;
                 
-                // 🚀 [100% 로딩 완료] 최종 점포 수 및 모달 리스트 정밀 최종 반영
+                // 🚀 [100% 로딩 완료] 품목 조건까지 반영된 최종 정밀 점포 수 갱신
                 recalculateFilteredStores();
 
                 const activeStore = document.querySelector('#store-list .active');
