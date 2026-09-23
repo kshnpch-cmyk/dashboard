@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>더본 OMS 발주 수요 예측 v7.0 Dynamic Softmax Ensemble</title>
+    <title>더본 OMS 발주 수요 예측 v7.1 Fixed Boost Engine</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
@@ -12,7 +12,7 @@
         .navbar { background: #0f172a; color: #fff; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,.1); flex-wrap: wrap; gap: 15px; }
         .brand-title { display: flex; align-items: center; gap: 10px; }
         .brand-title h1 { margin: 0; font-size: 20px; font-weight: 800; }
-        .version-tag { background: #8b5cf6; color: #fff; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 12px; letter-spacing: .4px; }
+        .version-tag { background: #10b981; color: #fff; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 12px; letter-spacing: .4px; }
         .container { padding: 20px; max-width: 98%; margin: 0 auto; }
         .section-panel { background: #fff; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
         .panel-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
@@ -81,7 +81,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>🔮 더본 OMS 발주 수요 예측 시스템</h1>
-            <span class="version-tag">Forecast v7.0 Dynamic Softmax Ensemble</span>
+            <span class="version-tag">Forecast v7.1 Fixed Boost Engine</span>
         </div>
         <div><button class="btn" style="background:#334155" onclick="window.close()">✕ 창 닫기</button></div>
     </div>
@@ -159,7 +159,7 @@
                 <button class="btn btn-forecast" onclick="runForecastSimulation()">🔮 시뮬레이션 실행</button>
             </div>
 
-            <!-- KPI 카드 5개 (수량 및 일치율 중심) -->
+            <!-- KPI 카드 5개 -->
             <div class="kpi-grid">
                 <div class="kpi-card blue">
                     <div class="kpi-title">과거 일평균 발주량</div>
@@ -174,12 +174,12 @@
                 <div class="kpi-card purple">
                     <div class="kpi-title">총 예상 발주 수량</div>
                     <div class="kpi-value" id="kpi-forecast-qty">0 건</div>
-                    <div class="kpi-sub" id="kpi-sub-qty">가중치 전: 0 건</div>
+                    <div class="kpi-sub" id="kpi-sub-qty">가중치 미적용: 0 건</div>
                 </div>
                 <div class="kpi-card orange">
                     <div class="kpi-title">가중치 추가 수량</div>
                     <div class="kpi-value" id="kpi-boost-added-qty">+0 건</div>
-                    <div class="kpi-sub" id="kpi-sub-boost-added" style="color:#f59e0b">미래 남은기간 반영분</div>
+                    <div class="kpi-sub" id="kpi-sub-boost-added" style="color:#f59e0b">가중치 반영분</div>
                 </div>
                 <div class="kpi-card green">
                     <div class="kpi-title">🔮 남은 기간 필요 수량</div>
@@ -599,8 +599,6 @@
 
             const metrics = perModel.map(x => modelMetrics(x.p, x.a));
 
-            // 💡 [v7.0 핵심] 지수형 소프트맥스(Softmax) 가중치 부여
-            // 오차가 가장 적어 일치율이 높은 우수 모델에 가중치(80%+) 집중 배분
             const minWmape = Math.min(...metrics.map(m => m.wmape));
             const softmaxLambda = 0.12;
             const expWeightsRaw = metrics.map(m => Math.exp(-softmaxLambda * (m.wmape - minWmape)));
@@ -742,6 +740,7 @@
 
                 const rowsOut = []; const dailyChartMap = {};
                 let totalBase = 0, totalBoosted = 0, remaining = 0, remainDays = 0, boostAdd = 0, totalActual = 0, totalErr = 0, overlapDays = 0;
+                let futureBoostAddedQty = 0, totalBoostAddedQty = 0;
 
                 let cur = parseDate(startDate), end = parseDate(endDate);
                 while (cur <= end) {
@@ -765,7 +764,6 @@
 
                         ensemble *= globalCal * wdCal * weatherCal * dCal * holidayCal;
 
-                        // 💡 [v7.0 핵심] 직전 유효 실적일의 급증세(Spike) 동적 모멘텀 추종
                         let lastActualVal = null;
                         let checkDate = addDays(cur, -1);
                         for (let k = 0; k < 7; k++) {
@@ -789,15 +787,15 @@
 
                         baseQty = Math.max(0, Math.round(ensemble));
 
-                        // 실제 발주 실적이 없는 미래 남은 기간에만 가중치 적용
+                        // 💡 [핵심 수정 완료] 최종 예측 수량(finalQty)에 가중치(Boost) 일관 연산!
+                        finalQty = Math.round(baseQty * boostMultiplier);
+                        added = finalQty - baseQty;
+                        totalBoostAddedQty += added;
+
                         if (actual === null) {
-                            finalQty = Math.round(baseQty * boostMultiplier);
-                            added = finalQty - baseQty;
-                            boostAdd += added;
+                            futureBoostAddedQty += added;
                             remaining += finalQty;
                             remainDays++;
-                        } else {
-                            finalQty = baseQty;
                         }
 
                         if (actual !== null) {
@@ -816,7 +814,7 @@
                         weather: isSunday ? '🏖️ 일요일 (입고휴무)' : weather.displayLabel,
                         brand: brandVal || '전체 브랜드',
                         item: itemVal || '전체 품목 합산',
-                        boostPct: (isSunday || actual !== null) ? '-' : `+${boostPercent}%`,
+                        boostPct: isSunday ? '-' : `+${boostPercent}%`,
                         actualQty: actual,
                         baseQty,
                         boostedQty: finalQty,
@@ -840,14 +838,18 @@
                 const btMetric = modelMetrics(btPred, bt.meta.map(r => r.actual));
                 const btAccuracyPct = clamp(100 - btMetric.wmape, 0, 100).toFixed(1);
 
+                // 가중치 추가 수량 표출 보정 (미래 미발생 구간 우선 표출)
+                const displayBoostAdded = (remainDays > 0) ? futureBoostAddedQty : totalBoostAddedQty;
+                const displayBoostSub = (remainDays > 0) ? '미래 남은기간 반영분' : '선택 구간 전체 반영분';
+
                 // KPI 카드 업데이트 (5개 수량 카드)
                 document.getElementById('kpi-base-daily-avg').innerText = `${baseDailyAvgQty.toLocaleString()} 건`;
                 document.getElementById('kpi-accuracy-percent').innerText = accuracy;
                 document.getElementById('kpi-accuracy-sub').innerText = overlapDays && totalActual > 0 ? `${accSub} · 백테스트 ${bt.evalDates.length}일 기준 ${btAccuracyPct}%` : `백테스트 ${bt.evalDates.length}일 기준 ${btAccuracyPct}% (실측 겹침 없음)`;
                 document.getElementById('kpi-forecast-qty').innerText = `${totalBoosted.toLocaleString()} 건`;
                 document.getElementById('kpi-sub-qty').innerText = `가중치 전: ${totalBase.toLocaleString()} 건`;
-                document.getElementById('kpi-boost-added-qty').innerText = `+${boostAdd.toLocaleString()} 건`;
-                document.getElementById('kpi-sub-boost-added').innerText = '미래 미발생 일수만 적용';
+                document.getElementById('kpi-boost-added-qty').innerText = `+${displayBoostAdded.toLocaleString()} 건`;
+                document.getElementById('kpi-sub-boost-added').innerText = displayBoostSub;
                 document.getElementById('kpi-remaining-qty').innerText = `${remaining.toLocaleString()} 건`;
                 document.getElementById('kpi-sub-remaining').innerText = `남은 ${remainDays}일간 필요 수량`;
 
