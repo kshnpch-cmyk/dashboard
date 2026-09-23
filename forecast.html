@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>더본 OMS 발주 수요 예측 v4.1 Adaptive Ensemble</title>
+    <title>더본 OMS 발주 수요 예측 v5.1 Clean Ensemble Engine</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
@@ -12,7 +12,7 @@
         .navbar { background: #0f172a; color: #fff; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,.1); flex-wrap: wrap; gap: 15px; }
         .brand-title { display: flex; align-items: center; gap: 10px; }
         .brand-title h1 { margin: 0; font-size: 20px; font-weight: 800; }
-        .version-tag { background: #2563eb; color: #fff; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 12px; letter-spacing: .4px; }
+        .version-tag { background: #10b981; color: #fff; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 12px; letter-spacing: .4px; }
         .container { padding: 20px; max-width: 98%; margin: 0 auto; }
         .section-panel { background: #fff; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
         .panel-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
@@ -73,16 +73,8 @@
         .badge-boost { background: #d1fae5; color: #065f46; padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 11px; }
         .badge-off { background: #f1f5f9; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 11px; }
         .badge-actual { background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 11px; }
-        
-        .diagnostic-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 15px; }
-        .diag-card { border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; padding: 15px; }
-        .diag-title { font-weight: 800; font-size: 14px; margin-bottom: 10px; color: #0f172a; }
-        .weight-row { display: grid; grid-template-columns: 150px 1fr 65px 85px; gap: 8px; align-items: center; margin: 6px 0; font-size: 12px; }
-        .bar-wrap { height: 10px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
-        .bar { height: 100%; background: #2563eb; border-radius: 999px; }
-        .status-line { font-size: 12px; color: #64748b; line-height: 1.5; }
+        .badge-holiday { background: #fee2e2; color: #b91c1c; padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 10.5px; display: inline-block; margin-top: 3px; white-space: nowrap; }
         .pill { display: inline-block; padding: 3px 7px; border-radius: 999px; background: #eef2ff; color: #3730a3; font-size: 11px; font-weight: 800; margin: 2px; }
-        .success { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; padding: 10px; border-radius: 8px; font-size: 12px; line-height: 1.5; }
     </style>
 </head>
 <body>
@@ -90,13 +82,15 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>🔮 더본 OMS 발주 수요 예측 시스템</h1>
-            <span class="version-tag">Forecast v4.1 Adaptive Ensemble</span>
+            <span class="version-tag">Forecast v5.1 Clean Ensemble Engine</span>
         </div>
         <div><button class="btn" style="background:#334155" onclick="window.close()">✕ 창 닫기</button></div>
     </div>
 
-    <!-- 모달 창 -->
+    <!-- 🏢 브랜드 선택 모달 -->
     <div class="modal-overlay" id="brand-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">🏢 브랜드 다중 선택</span><span class="close-btn" onclick="closeBrandModal()">✕</span></div><div style="display:flex;gap:8px;margin-bottom:8px"><input type="text" id="modal-brand-search" class="input-box" style="flex:1" placeholder="브랜드명 검색 (Enter)" onkeydown="if(event.key==='Enter')filterBrandModalList()"><button class="btn" onclick="filterBrandModalList()">검색</button><button class="btn" style="background:#475569" onclick="toggleAllBrandCheck(true)">전체선택</button><button class="btn" style="background:#64748b" onclick="toggleAllBrandCheck(false)">해제</button></div><div class="modal-body-scroll" id="brand-modal-list"></div><div style="margin-top:15px;text-align:right"><button class="btn" onclick="applyBrandSelection()">확인 적용</button></div></div></div>
+    
+    <!-- 📦 품목 선택 모달 -->
     <div class="modal-overlay" id="item-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">📦 품목 다중 선택</span><span class="close-btn" onclick="closeItemModal()">✕</span></div><div style="display:flex;gap:8px;margin-bottom:8px"><input type="text" id="modal-item-search" class="input-box" style="flex:1" placeholder="품목코드 또는 품목명 검색 (Enter)" onkeydown="if(event.key==='Enter')filterItemModalList()"><button class="btn" onclick="filterItemModalList()">검색</button><button class="btn" style="background:#475569" onclick="toggleAllItemCheck(true)">전체선택</button><button class="btn" style="background:#64748b" onclick="toggleAllItemCheck(false)">해제</button></div><div class="modal-body-scroll" id="item-modal-list"></div><div style="margin-top:15px;text-align:right"><button class="btn" onclick="applyItemSelection()">확인 적용</button></div></div></div>
 
     <div class="container">
@@ -104,11 +98,11 @@
         <!-- 설정 패널 -->
         <div class="section-panel">
             <div class="panel-header">
-                <span class="panel-title-text">⚙️ 분석 기반 · 미래 예측 설정</span>
+                <span class="panel-title-text">⚙️ 과거 기반 데이터 & 미래 예측 설정</span>
                 <div>
                     <span class="pill">데이터 누수 차단</span>
-                    <span class="pill">자동 모델 최적화</span>
-                    <span class="pill">D-2 Cutoff 제어</span>
+                    <span class="pill">11개 앙상블 엔진</span>
+                    <span class="pill">공휴일 보정</span>
                 </div>
             </div>
 
@@ -167,7 +161,7 @@
                 <button class="btn btn-forecast" onclick="runForecastSimulation()">🔮 시뮬레이션 실행</button>
             </div>
 
-            <!-- KPI 카드 5개 (수량 및 일치율 전용) -->
+            <!-- KPI 카드 5개 (수량 및 일치율 중심) -->
             <div class="kpi-grid">
                 <div class="kpi-card blue">
                     <div class="kpi-title">과거 일평균 발주량</div>
@@ -182,7 +176,7 @@
                 <div class="kpi-card purple">
                     <div class="kpi-title">총 예상 발주 수량</div>
                     <div class="kpi-value" id="kpi-forecast-qty">0 건</div>
-                    <div class="kpi-sub" id="kpi-sub-qty">가중치 미적용: 0 건</div>
+                    <div class="kpi-sub" id="kpi-sub-qty">가중치 전: 0 건</div>
                 </div>
                 <div class="kpi-card orange">
                     <div class="kpi-title">가중치 추가 수량</div>
@@ -192,29 +186,11 @@
                 <div class="kpi-card green">
                     <div class="kpi-title">🔮 남은 기간 필요 수량</div>
                     <div class="kpi-value" id="kpi-remaining-qty" style="color:#10b981">0 건</div>
-                    <div class="kpi-sub" id="kpi-sub-remaining" style="color:#10b981">미래 남은기간 필요 수량</div>
+                    <div class="kpi-sub" id="kpi-sub-remaining" style="color:#10b981">미래 미발생 일수 기준</div>
                 </div>
             </div>
 
             <div class="chart-container"><canvas id="forecastChart"></canvas></div>
-        </div>
-
-        <!-- 모델 성능 진단 영역 -->
-        <div class="section-panel">
-            <div class="panel-header">
-                <span class="panel-title-text">🧠 적응형 앙상블 모델 성능 · 기여도 진단</span>
-                <span id="diagnostic-status" class="status-line">시뮬레이션 실행 후 자동 산출</span>
-            </div>
-            <div class="diagnostic-grid">
-                <div class="diag-card">
-                    <div class="diag-title">백테스트 기반 모델 기여 가중치 (%)</div>
-                    <div id="model-weight-list" class="status-line">데이터를 계산 중입니다...</div>
-                </div>
-                <div class="diag-card">
-                    <div class="diag-title">자동 보정 및 학습 특성</div>
-                    <div id="calibration-summary" class="status-line">대상 기간을 선택하고 실행하세요.</div>
-                </div>
-            </div>
         </div>
 
         <!-- 상세 비교 표 -->
@@ -267,11 +243,13 @@
             backtestDays: 56,
             minTrainDays: 35,
             modelWeightShrink: 0.18,
-            weekdayWeightBlend: 0.25,
             calibrationCap: [0.90, 1.10],
             weekdayCalibrationCap: [0.94, 1.06],
             weatherCalibrationCap: [0.96, 1.04],
             calendarCalibrationCap: [0.97, 1.03],
+            holidayCalibrationCap: [0.80, 1.25],
+            credibilityK: { optimizedBlend: 16, weekdaySpecific: 24, weather: 5, calendar: 6, holiday: 4 },
+            horizonWidenPerWeek: 0.06,
             maxRowsPerPage: 1000
         };
 
@@ -282,16 +260,41 @@
         function formatDate(d) { const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); return `${y}-${m}-${day}`; }
         function parseDate(s) { return new Date(`${s}T00:00:00`); }
         function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
+        function daysBetween(a, b) { return Math.round((b - a) / 86400000); }
         function formatDisplayDate(dateStr) { if (!dateStr) return '-'; return String(dateStr).split('T')[0].replace(/-/g, '/'); }
         function cleanNumber(val) { return parseFloat(String(val ?? 0).replace(/[^0-9.-]/g, '')) || 0; }
         function cleanCode(val) { if (!val && val !== 0) return '-'; let str = String(val).trim(); if (str.endsWith('.0')) str = str.slice(0, -2); return str || '-'; }
         function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
         function mean(a) { return a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0; }
         function median(a) { if (!a.length) return 0; const s = [...a].sort((x, y) => x - y); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+        function sumAbs(a) { return a.reduce((s, x) => s + Math.abs(x), 0); }
         function weightedAverage(values, weights) { let sw = 0, s = 0; for (let i = 0; i < values.length; i++) { const w = weights[i] ?? 1; s += values[i] * w; sw += w; } return sw ? s / sw : 0; }
         function cleanArrayIQR(arr) { if (arr.length < 6) return arr.slice(); const s = [...arr].sort((a, b) => a - b); const q1 = s[Math.floor(s.length * 0.25)], q3 = s[Math.floor(s.length * 0.75)], iqr = q3 - q1; const lb = q1 - 1.5 * iqr, ub = q3 + 1.5 * iqr; const out = arr.filter(x => x >= lb && x <= ub); return out.length >= 3 ? out : arr.slice(); }
+        function credibility(n, k) { return n / (n + Math.max(0.0001, k)); }
+        function winsorize(arr, pct = 0.15) { const n = arr.length; if (n < 4) return arr.slice(); const s = [...arr].sort((a, b) => a - b); const trim = Math.max(1, Math.round(n * pct)); const loIdx = Math.min(trim, Math.floor((n - 1) / 2)); const hiIdx = Math.max(n - 1 - trim, Math.ceil((n - 1) / 2)); const lo = s[loIdx], hi = s[hiIdx]; return arr.map(x => clamp(x, lo, hi)); }
+        
+        function nowKST() {
+            const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).formatToParts(new Date());
+            const g = t => Number((parts.find(p => p.type === t) || {}).value || 0);
+            let h = g('hour'); if (h === 24) h = 0;
+            return new Date(g('year'), g('month') - 1, g('day'), h, g('minute'), g('second'));
+        }
 
-        /* Supabase Range 페이징 조회를 통한 500 에러 방지 */
+        const KR_HOLIDAYS = new Set([
+            '2025-01-01','2025-01-27','2025-01-28','2025-01-29','2025-01-30','2025-03-01','2025-03-03','2025-05-05','2025-05-06','2025-06-03','2025-06-06','2025-08-15','2025-10-03','2025-10-05','2025-10-06','2025-10-07','2025-10-08','2025-10-09','2025-12-25',
+            '2026-01-01','2026-02-16','2026-02-17','2026-02-18','2026-03-01','2026-03-02','2026-05-01','2026-05-05','2026-05-24','2026-05-25','2026-06-03','2026-06-06','2026-07-17','2026-08-15','2026-08-17','2026-09-24','2026-09-25','2026-09-26','2026-10-03','2026-10-05','2026-10-09','2026-12-25',
+            '2027-01-01','2027-02-06','2027-02-07','2027-02-08','2027-02-09','2027-03-01','2027-05-01','2027-05-03','2027-05-05','2027-05-13','2027-06-06','2027-07-17','2027-07-19','2027-08-15','2027-08-16','2027-09-14','2027-09-15','2027-09-16','2027-10-03','2027-10-04','2027-10-09','2027-10-11','2027-12-25','2027-12-27'
+        ]);
+
+        function holidayBucketFor(dateStr) {
+            if (KR_HOLIDAYS.has(dateStr)) return 'holiday';
+            if (KR_HOLIDAYS.has(formatDate(addDays(parseDate(dateStr), 1)))) return 'holiday_eve';
+            if (KR_HOLIDAYS.has(formatDate(addDays(parseDate(dateStr), -1)))) return 'holiday_after';
+            return 'none';
+        }
+        function holidayLabelKR(bucket) { return { holiday: '🎌 공휴일', holiday_eve: '🎌 연휴전', holiday_after: '🎌 연휴후' }[bucket] || ''; }
+
+        /* Supabase Range 페이징 조회를 통한 전수 로딩 (1,000개 제한 해제) */
         async function fetchSupabaseAll(urlBase, extraHeaders = {}) {
             const out = []; let start = 0;
             while (true) {
@@ -309,19 +312,29 @@
                 out.push(...page);
                 if (page.length < CFG.maxRowsPerPage) break;
                 start += CFG.maxRowsPerPage;
-                if (start > 50000) break;
+                if (start > 100000) break;
             }
             return out;
         }
 
+        /* 💡 [수정 완료] 전체 품목 및 브랜드 로드 ("생크림" 등 검색 누락 버그 해결) */
         async function loadMasterLists() {
             try {
-                const url = `${SUPABASE_URL}/rest/v1/daily_order_summary?select=brand_name,item_code,item_name&limit=1000`;
+                const url = `${SUPABASE_URL}/rest/v1/daily_order_summary?select=brand_name,item_code,item_name`;
                 const data = await fetchSupabaseAll(url);
                 allBrandList = [...new Set(data.map(r => r.brand_name).filter(Boolean))].sort();
+                
                 const map = new Map();
-                data.forEach(r => { if (r.item_code || r.item_name) map.set(`${cleanCode(r.item_code)}__${r.item_name}`, { code: cleanCode(r.item_code), name: r.item_name || '' }); });
-                allItemList = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+                data.forEach(r => {
+                    if (r.item_code || r.item_name) {
+                        const code = cleanCode(r.item_code);
+                        const name = String(r.item_name || '').trim();
+                        if (name || code !== '-') {
+                            map.set(`${code}__${name}`, { code, name });
+                        }
+                    }
+                });
+                allItemList = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
             } catch (err) { console.warn('마스터 목록 로드 실패', err); }
         }
 
@@ -335,9 +348,15 @@
             toggleClearBtn(inputId);
             const drop = document.getElementById(dropId);
             const key = String(val || '').toLowerCase().trim();
+            
             if (!key || !list.length) { drop.style.display = 'none'; return; }
-            const matched = type === 'brand' ? list.filter(b => b.toLowerCase().includes(key)).slice(0, 8) : list.filter(i => i.code.toLowerCase().includes(key) || i.name.toLowerCase().includes(key)).slice(0, 8);
+            
+            const matched = type === 'brand' 
+                ? list.filter(b => b.toLowerCase().includes(key)).slice(0, 10)
+                : list.filter(i => i.code.toLowerCase().includes(key) || i.name.toLowerCase().includes(key)).slice(0, 10);
+                
             if (!matched.length) { drop.style.display = 'none'; return; }
+            
             drop.innerHTML = type === 'brand' 
                 ? matched.map(b => `<div class="autocomplete-item" onclick="selectAutocomplete('${b.replace(/'/g, "\\'")}', 'brand')"><span>${b}</span></div>`).join('')
                 : matched.map(i => `<div class="autocomplete-item" onclick="selectAutocomplete('${i.name.replace(/'/g, "\\'")}', 'item')"><span><b>${i.name}</b></span><span class="code-tag">[${i.code}]</span></div>`).join('');
@@ -387,8 +406,7 @@
         function applyItemSelection() { document.getElementById('forecast-item-input').value = Array.from(document.querySelectorAll('.item-modal-chk:checked')).map(x => x.value).join(', '); toggleClearBtn('forecast-item-input'); closeItemModal(); }
 
         function setQuickBasePeriod(type) {
-            const today = new Date();
-            let s = new Date(today), e = new Date(today);
+            const today = nowKST(); let s = new Date(today), e = new Date(today);
             if (type === 'thisMonth') { s = new Date(today.getFullYear(), today.getMonth(), 1); }
             else if (type === 'last7days') { s.setDate(today.getDate() - 7); e.setDate(today.getDate() - 1); }
             else if (type === 'lastWeek') { const dow = today.getDay(); const distance = (dow === 0 ? 6 : dow - 1) + 7; s.setDate(today.getDate() - distance); e.setDate(s.getDate() + 6); }
@@ -481,12 +499,13 @@
             const slope = den ? num / den : 0;
             return Math.max(0, ym + damp * slope * (y.length));
         }
-        function seasonalWeighted(target, map) { const s = sameWeekdayVals(target, map, 8); if (!s.length) return null; const v = s.map(x => x.val), w = v.map((_, i) => Math.pow(.72, i)); return weightedAverage(v, w); }
+        function seasonalWeighted(target, map) { const s = sameWeekdayVals(target, map, 8); if (!s.length) return null; const v = winsorize(s.map(x => x.val)); const w = v.map((_, i) => Math.pow(.72, i)); return weightedAverage(v, w); }
         function lagSeasonal(target, map, lagWeeks = 4) {
             const td = parseDate(target); const vals = [];
             for (let k = 1; k <= lagWeeks; k++) { const ds = formatDate(addDays(td, -7 * k)); if (map[ds] !== undefined) vals.push({ k, val: map[ds] }); }
             if (!vals.length) return null;
-            return weightedAverage(vals.map(x => x.val), vals.map(x => Math.pow(.70, x.k - 1)));
+            const clipped = winsorize(vals.map(x => x.val));
+            return weightedAverage(clipped, vals.map(x => Math.pow(.70, x.k - 1)));
         }
         function weekdayRatioForecast(target, map) {
             const recent = valsBefore(target, map, 28); if (!recent.length) return 0;
@@ -496,7 +515,6 @@
             return global * ratio;
         }
 
-        /* 11가지 세부 시계열 모델 매트릭스 */
         const MODELS = [
             { id: 'sameWeekday', name: '동요일 최근 8회', predict: (t, m) => seasonalWeighted(t, m) },
             { id: 'lagSeasonal', name: '주간계절 Lag 앙상블', predict: (t, m) => lagSeasonal(t, m, 4) },
@@ -522,7 +540,7 @@
             const m = MODELS.length; if (!matrix.length) return Array(m).fill(1 / m);
             let w = Array(m).fill(1 / m), lr = .04, reg = .015;
             const scale = Math.max(1, median(actuals));
-            for (let it = 0; it < 700; it++) {
+            for (let it = 0; it < 1000; it++) {
                 const g = Array(m).fill(0);
                 for (let r = 0; r < matrix.length; r++) {
                     let pred = 0; for (let j = 0; j < m; j++) pred += matrix[r][j] * w[j];
@@ -531,7 +549,7 @@
                 }
                 for (let j = 0; j < m; j++) g[j] = g[j] / Math.max(1, matrix.length) + reg * (w[j] - 1 / m);
                 w = simplexProject(w.map((x, j) => x - lr * g[j]));
-                if (it === 250) lr = .02; if (it === 500) lr = .01;
+                if (it === 300) lr = .025; if (it === 600) lr = .012; if (it === 850) lr = .006;
             }
             return w;
         }
@@ -551,10 +569,9 @@
             return { wmape, smape, bias, score, n: actuals.length };
         }
 
-        function inverseScoreWeights(metrics) { const raw = metrics.map(x => 1 / Math.max(.25, x.score)); const s = raw.reduce((a, b) => a + b, 0); return raw.map(x => x / s); }
+        function inverseScoreWeights(metrics) { const raw = metrics.map(x => 1 / Math.max(.25, x.score)); const s = sumAbs(raw); return raw.map(x => x / s); }
         function mixWeights(a, b, wa = .72) { return a.map((x, i) => wa * x + (1 - wa) * b[i]); }
 
-        /* 롤링 백테스트를 통한 모델 가중치 자동 계산 */
         function buildBacktest(map, trainStart, trainEnd) {
             let evalDates = []; let d = parseDate(trainEnd);
             for (; d >= parseDate(trainStart); d = addDays(d, -1)) {
@@ -581,62 +598,101 @@
             const metrics = perModel.map(x => modelMetrics(x.p, x.a));
             const inverse = inverseScoreWeights(metrics);
             const optimized = optimizeBlendWeights(matrix, actuals);
-            let globalWeights = mixWeights(optimized, inverse, .72);
-            globalWeights = globalWeights.map(x => .82 * x + .18 / MODELS.length);
+
+            const optCred = credibility(evalDates.length, CFG.credibilityK.optimizedBlend);
+            let globalWeights = mixWeights(optimized, inverse, optCred);
+            globalWeights = globalWeights.map((x) => (1 - CFG.modelWeightShrink) * x + CFG.modelWeightShrink / MODELS.length);
             globalWeights = globalWeights.map(x => Math.max(0, x));
-            const sw = globalWeights.reduce((s, x) => s + x, 0);
-            globalWeights = globalWeights.map(x => x / sw);
+            const swg = globalWeights.reduce((s, x) => s + x, 0);
+            globalWeights = globalWeights.map(x => swg ? x / swg : 1 / MODELS.length);
 
             const weekdayWeights = Array.from({ length: 7 }, (_, wd) => {
-                const idx = []; meta.forEach(r => { if (parseDate(r.date).getDay() === wd) idx.push(r); });
-                if (idx.length < 3) return globalWeights.slice();
+                const idx = []; meta.forEach((r) => { if (parseDate(r.date).getDay() === wd) idx.push(r); });
+                if (idx.length < 2) return globalWeights.slice();
                 const mat = idx.map(r => r.row), acts = idx.map(r => r.actual);
                 const met = MODELS.map((_, j) => modelMetrics(mat.map(r => r[j]), acts));
                 const inv = inverseScoreWeights(met);
-                const blended = mixWeights(globalWeights, inv, .75);
-                const s = blended.reduce((a, b) => a + b, 0);
-                return blended.map(x => x / s);
+                const cred = credibility(idx.length, CFG.credibilityK.weekdaySpecific);
+                const blended = mixWeights(globalWeights, inv, 1 - cred);
+                const s = blended.reduce((s, x) => s + x, 0);
+                return s ? blended.map(x => x / s) : globalWeights.slice();
             });
 
-            const blendedPred = meta.map(r => r.row.reduce((s, p, j) => s + p * globalWeights[j], 0));
+            const blendedPred = meta.map(r => { const w = weekdayWeights[parseDate(r.date).getDay()] || globalWeights; return r.row.reduce((s, p, j) => s + p * w[j], 0); });
+
             let ratioNum = 0, ratioDen = 0, regNum = 0, regDen = 0;
             meta.forEach((r, i) => { const p = blendedPred[i], a = r.actual; ratioNum += a; ratioDen += Math.max(.1, p); regNum += a * p; regDen += p * p; });
             const ratio = ratioDen ? ratioNum / ratioDen : 1; const slope = regDen ? regNum / regDen : 1;
-            const globalCalib = clamp(.5 * ratio + .5 * slope, ...CFG.calibrationCap);
+            const globalCalibRaw = .5 * ratio + .5 * slope;
+            const overallCred = credibility(meta.length, CFG.credibilityK.optimizedBlend);
+            const globalCalib = clamp(1 + overallCred * (globalCalibRaw - 1), CFG.calibrationCap[0], CFG.calibrationCap[1]);
 
             const weekdayCalib = Array.from({ length: 7 }, (_, wd) => {
                 const rs = []; meta.forEach((r, i) => { if (parseDate(r.date).getDay() === wd && blendedPred[i] > 0) rs.push(r.actual / blendedPred[i]); });
-                return clamp(.65 + (rs.length ? mean(rs) : 1) * .35, 0.94, 1.06);
+                const cred = credibility(rs.length, CFG.credibilityK.weekdaySpecific);
+                const raw = rs.length ? mean(rs) : 1;
+                return clamp(1 + cred * (raw - 1), CFG.weekdayCalibrationCap[0], CFG.weekdayCalibrationCap[1]);
             });
 
-            return { evalDates, meta, metrics, inverse, optimized, globalWeights, weekdayWeights, weekdayCalib, globalCalib };
+            const trainEndD = parseDate(trainEnd);
+            const cappedWideStartStr = formatDate(addDays(trainEndD, -400));
+            const wideStart = trainStart > cappedWideStartStr ? trainStart : cappedWideStartStr;
+            const wideMeta = []; let wd2 = parseDate(wideStart);
+            for (; wd2 <= trainEndD; wd2 = addDays(wd2, 1)) {
+                const ds = formatDate(wd2);
+                if (wd2.getDay() === 0 || map[ds] === undefined) continue;
+                const row = MODELS.map(mo => { let p = Number(mo.predict(ds, map)); if (!Number.isFinite(p)) p = robustMean(valsBefore(ds, map, 7)); return Math.max(0, p); });
+                const w = weekdayWeights[wd2.getDay()] || globalWeights;
+                const pred = row.reduce((s, p, j) => s + p * w[j], 0) * globalCalib;
+                wideMeta.push({ date: ds, pred, actual: map[ds] });
+            }
+
+            return { evalDates, meta, metrics, inverse, optimized, globalWeights, weekdayWeights, weekdayCalib, globalCalib, wideMeta };
         }
 
         function weatherBucketFor(dateStr, weatherMap) { return weatherMap[dateStr]?.bucket || 'unknown'; }
-        function learnResidualCalibrations(backtest, weatherMap) {
-            const weather = {}; const calendar = {};
-            backtest.meta.forEach(r => {
-                const wd = parseDate(r.date).getDay(); const p = r.row.reduce((s, x, j) => s + x * backtest.globalWeights[j], 0); if (p <= 0) return;
-                const ratio = clamp(r.actual / p, .75, 1.25); const bucket = weatherBucketFor(r.date, weatherMap);
-                if (!weather[bucket]) weather[bucket] = []; weather[bucket].push(ratio);
-                const d = parseDate(r.date); const day = d.getDate(); const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-                const cal = (day <= 3 ? 'start' : day >= last - 2 ? 'end' : 'middle'); const key = `${wd}_${cal}`;
-                if (!calendar[key]) calendar[key] = []; calendar[key].push(ratio);
+        function getCalendarBucket(dateStr) { const d = parseDate(dateStr); const day = d.getDate(); const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); return day <= 3 ? 'start' : day >= last - 2 ? 'end' : 'middle'; }
+
+        function credShrink(bucketsMap, k, cap) {
+            const out = {};
+            Object.keys(bucketsMap).forEach(key => {
+                const arr = bucketsMap[key]; const n = arr.length; if (n < 2) return;
+                const cred = credibility(n, k); const raw = mean(arr);
+                out[key] = clamp(1 + cred * (raw - 1), cap[0], cap[1]);
             });
-            const weatherFactor = {}; Object.keys(weather).forEach(k => weatherFactor[k] = weather[k].length >= 3 ? clamp(.75 * mean(weather[k]) + .25, ...CFG.weatherCalibrationCap) : 1);
-            const calendarFactor = {}; Object.keys(calendar).forEach(k => calendarFactor[k] = calendar[k].length >= 3 ? clamp(.75 * mean(calendar[k]) + .25, ...CFG.calendarCalibrationCap) : 1);
-            return { weatherFactor, calendarFactor };
+            return out;
         }
 
-        function getCalendarBucket(dateStr) { const d = parseDate(dateStr); const day = d.getDate(); const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); return day <= 3 ? 'start' : day >= last - 2 ? 'end' : 'middle'; }
+        function learnResidualCalibrations(backtest, weatherMap) {
+            const weather = {}, calendar = {}, holiday = {};
+            (backtest.wideMeta || []).forEach(r => {
+                const p = r.pred; if (p <= 0) return;
+                const wd = parseDate(r.date).getDay();
+                const wbucket = weatherBucketFor(r.date, weatherMap);
+                const cbucket = `${wd}_${getCalendarBucket(r.date)}`;
+                const hbucket = holidayBucketFor(r.date);
+                const ratioTight = clamp(r.actual / p, .75, 1.25);
+                if (!weather[wbucket]) weather[wbucket] = []; weather[wbucket].push(ratioTight);
+                if (!calendar[cbucket]) calendar[cbucket] = []; calendar[cbucket].push(ratioTight);
+                if (hbucket !== 'none') { const ratioWide = clamp(r.actual / p, .55, 1.7); if (!holiday[hbucket]) holiday[hbucket] = []; holiday[hbucket].push(ratioWide); }
+            });
+            return {
+                weatherFactor: credShrink(weather, CFG.credibilityK.weather, CFG.weatherCalibrationCap),
+                calendarFactor: credShrink(calendar, CFG.credibilityK.calendar, CFG.calendarCalibrationCap),
+                holidayFactor: credShrink(holiday, CFG.credibilityK.holiday, CFG.holidayCalibrationCap)
+            };
+        }
+
         function chooseWeightsForDate(dateStr, bt) { const wd = parseDate(dateStr).getDay(); return bt.weekdayWeights?.[wd] || bt.globalWeights; }
-        function volatilityBand(target, map) {
+        function volatilityBand(target, map, horizonDays = 0) {
             const same = sameWeekdayVals(target, map, 8).map(x => x.val).filter(x => x >= 0);
             const recent = valsBefore(target, map, 28).filter(x => x >= 0);
             const m = Math.max(1, mean(recent)); const sd = Math.sqrt(mean(recent.map(x => (x - m) * (x - m)))); const cv = sd / m;
             let lo = .58, hi = 1.55; if (cv > .45) { lo = .45; hi = 1.80 } else if (cv < .18) { lo = .70; hi = 1.35 }
+            const widen = 1 + CFG.horizonWidenPerWeek * Math.sqrt(Math.max(0, horizonDays) / 7);
+            lo = lo / widen; hi = hi * widen;
             const ref = Math.max(1, median(cleanArrayIQR(same.length ? same : recent)));
-            return { min: ref * lo, max: ref * hi, cv, ref };
+            return { min: ref * lo, max: ref * hi, cv, ref, horizonDays };
         }
 
         /* 🔮 발주 예측 시뮬레이션 메인 연산 */
@@ -648,14 +704,11 @@
             if (baseStart > baseEnd) return alert('분석 기반 시작일은 종료일보다 이전이어야 합니다.');
             if (startDate > endDate) return alert('예측 시작일은 종료일보다 이전이어야 합니다.');
 
-            document.getElementById('diagnostic-status').innerText = '📡 과거 데이터 / 날씨 / 백테스트를 연산 중입니다...';
-
             try {
-                const now = new Date();
+                const now = nowKST();
                 const maxOffset = (now.getHours() >= 11 ? 1 : 0) + (isD2 ? 1 : 0);
                 const maxActualDate = formatDate(addDays(now, maxOffset));
 
-                // 변수 선언 순서 수정 (bug-fix)
                 const trainStart = baseStart;
                 const actualTrainEnd = baseEnd < formatDate(addDays(parseDate(startDate), -1)) ? baseEnd : formatDate(addDays(parseDate(startDate), -1));
                 const horizonHistoryStart = formatDate(addDays(parseDate(startDate), -CFG.historyDays));
@@ -695,10 +748,11 @@
                     const weather = futureWeather[ds] || { displayLabel: '☀️ 맑음', statusText: '맑음', bucket: 'unknown' };
                     let actual = (ds <= maxActualDate && dailyMap[ds] !== undefined) ? dailyMap[ds] : null;
                     let baseQty = 0, finalQty = 0, added = 0;
+                    const hBucket = holidayBucketFor(ds);
 
                     if (!isSunday) {
                         const weights = chooseWeightsForDate(ds, bt);
-                        const candidates = MODELS.map(m => Math.max(0, Number(m.predict(ds, dailyMap)) || 0));
+                        const candidates = MODELS.map(mo => Math.max(0, Number(mo.predict(ds, dailyMap)) || 0));
                         let ensemble = candidates.reduce((s, p, j) => s + p * weights[j], 0);
 
                         const wd = cur.getDay();
@@ -706,14 +760,16 @@
                         const wdCal = bt.weekdayCalib?.[wd] || 1;
                         const weatherCal = residual.weatherFactor?.[weather.bucket] || 1;
                         const dCal = residual.calendarFactor?.[`${wd}_${getCalendarBucket(ds)}`] || 1;
+                        const holidayCal = residual.holidayFactor?.[hBucket] || 1;
 
-                        ensemble *= globalCal * wdCal * weatherCal * dCal;
-                        const reg = volatilityBand(ds, dailyMap);
+                        ensemble *= globalCal * wdCal * weatherCal * dCal * holidayCal;
+                        const horizonDays = Math.max(0, daysBetween(parseDate(maxActualDate), cur));
+                        const reg = volatilityBand(ds, dailyMap, horizonDays);
                         ensemble = clamp(ensemble, reg.min, reg.max);
 
                         baseQty = Math.max(0, Math.round(ensemble));
 
-                        // 💡 [핵심] 실적이 아직 없는 미래 남은 기간에만 가중치 적용!
+                        // 💡 [핵심] 실제 발주 실적이 없는 미래 남은 기간에만 가중치 적용!
                         if (actual === null) {
                             finalQty = Math.round(baseQty * boostMultiplier);
                             added = finalQty - baseQty;
@@ -745,7 +801,8 @@
                         baseQty,
                         boostedQty: finalQty,
                         addedQty: added,
-                        isSunday
+                        isSunday,
+                        holidayLabel: isSunday ? '' : holidayLabelKR(hBucket)
                     });
                     cur = addDays(cur, 1);
                 }
@@ -759,10 +816,14 @@
                     accSub = `실제 ${totalActual.toLocaleString()}건 대비 오차 ${Math.round(totalErr).toLocaleString()}건`;
                 }
 
+                const btPred = bt.meta.map(r => { const w = bt.weekdayWeights?.[parseDate(r.date).getDay()] || bt.globalWeights; return r.row.reduce((s, p, j) => s + p * w[j], 0) * bt.globalCalib; });
+                const btMetric = modelMetrics(btPred, bt.meta.map(r => r.actual));
+                const btAccuracyPct = clamp(100 - btMetric.wmape, 0, 100).toFixed(1);
+
                 // KPI 카드 업데이트 (5개 수량 카드)
                 document.getElementById('kpi-base-daily-avg').innerText = `${baseAvg.toLocaleString()} 건`;
                 document.getElementById('kpi-accuracy-percent').innerText = accuracy;
-                document.getElementById('kpi-accuracy-sub').innerText = accSub;
+                document.getElementById('kpi-accuracy-sub').innerText = overlapDays && totalActual > 0 ? `${accSub} · 백테스트 ${bt.evalDates.length}일 기준 ${btAccuracyPct}%` : `백테스트 ${bt.evalDates.length}일 기준 ${btAccuracyPct}% (실측 겹침 없음)`;
                 document.getElementById('kpi-forecast-qty').innerText = `${totalBoosted.toLocaleString()} 건`;
                 document.getElementById('kpi-sub-qty').innerText = `가중치 전: ${totalBase.toLocaleString()} 건`;
                 document.getElementById('kpi-boost-added-qty').innerText = `+${boostAdd.toLocaleString()} 건`;
@@ -772,40 +833,11 @@
 
                 renderForecastChart(dailyChartMap, futureWeather);
                 renderForecastTable(rowsOut);
-                renderDiagnostics(bt, residual);
 
-                document.getElementById('diagnostic-status').innerText = `✅ ${bt.evalDates.length}개 과거 날짜의 롤링 백테스트로 모델 최적화 완료`;
             } catch (err) {
                 console.error(err);
-                document.getElementById('diagnostic-status').innerText = '❌ 연산 실패';
                 alert(`예측 연산 중 오류가 발생했습니다.\n${err.message || err}`);
             }
-        }
-
-        function renderDiagnostics(bt, residual) {
-            const best = bt.metrics.map((m, i) => ({ m, i })).sort((a, b) => a.m.score - b.m.score)[0];
-            const wl = document.getElementById('model-weight-list');
-            wl.innerHTML = bt.globalWeights.map((w, i) => {
-                const pct = (w * 100).toFixed(1);
-                const m = bt.metrics[i];
-                return `<div class="weight-row">
-                    <div title="${MODELS[i].id}"><b>${MODELS[i].name}</b></div>
-                    <div class="bar-wrap"><div class="bar" style="width:${Math.min(100, w * 100 * 2.2)}%"></div></div>
-                    <div style="text-align:right;font-weight:800">${pct}%</div>
-                    <div style="text-align:right;color:#64748b">WAPE ${m.wmape.toFixed(1)}%</div>
-                </div>`;
-            }).join('');
-
-            const wf = Object.entries(residual.weatherFactor || {}).filter(([k]) => k !== 'unknown').map(([k, v]) => `${k}:${v.toFixed(3)}×`).join(' · ') || '학습 데이터 부족';
-            const cf = Object.entries(residual.calendarFactor || {}).map(([k, v]) => `${k}:${v.toFixed(3)}×`).slice(0, 8).join(' · ') || '학습 데이터 부족';
-
-            document.getElementById('calibration-summary').innerHTML = `<div class="success">
-                <b>최적화된 전역 보정:</b> ${bt.globalCalib.toFixed(3)}×<br>
-                <b>요일별 보정:</b> ${bt.weekdayCalib.map((x, i) => `${['일', '월', '화', '수', '목', '금', '토'][i]} ${x.toFixed(3)}×`).join(' · ')}<br>
-                <b>날씨 보정:</b> ${wf}<br>
-                <b>캘린더 보정:</b> ${cf}<br><br>
-                <b>최저 백테스트 오차 모델:</b> ${MODELS[best.i].name} / WMAPE ${best.m.wmape.toFixed(1)}%
-            </div>`;
         }
 
         function renderForecastChart(map, weatherMap) {
@@ -841,9 +873,11 @@
         function renderForecastTable(rows) {
             const tbody = document.getElementById('forecast-detail-table');
             if (!rows.length) { tbody.innerHTML = '<tr><td colspan="9" class="text-center" style="padding:30px;color:#94a3b8">예측 데이터가 없습니다.</td></tr>'; return; }
-            tbody.innerHTML = rows.map(r => r.isSunday ? `
+            tbody.innerHTML = rows.map(r => {
+                const dateCell = `<b>${r.date}</b>${r.holidayLabel ? `<br><span class="badge-holiday">${r.holidayLabel}</span>` : ''}`;
+                return r.isSunday ? `
                 <tr style="background:#f8fafc;color:#94a3b8">
-                    <td class="text-center"><b>${r.date}</b></td>
+                    <td class="text-center">${dateCell}</td>
                     <td class="text-center">${r.weather}</td>
                     <td>${r.brand}</td>
                     <td><b>${r.item}</b></td>
@@ -854,7 +888,7 @@
                     <td class="text-right">-</td>
                 </tr>` : `
                 <tr>
-                    <td class="text-center"><b>${r.date}</b></td>
+                    <td class="text-center">${dateCell}</td>
                     <td class="text-center">${r.weather}</td>
                     <td>${r.brand}</td>
                     <td><b>${r.item}</b></td>
@@ -863,14 +897,15 @@
                     <td class="text-right" style="color:#64748b">${r.baseQty.toLocaleString()} 건</td>
                     <td class="text-right" style="color:#10b981;font-weight:900">${r.boostedQty.toLocaleString()} 건</td>
                     <td class="text-right" style="color:#16a34a;font-weight:900">${r.addedQty >= 0 ? '+' : ''}${r.addedQty.toLocaleString()} 건</td>
-                </tr>`
-            ).join('');
+                </tr>`;
+            }).join('');
         }
 
         function exportForecastToExcel() {
             if (!currentForecastRows.length) return alert('저장할 예측 데이터가 없습니다.');
             const data = currentForecastRows.map(r => ({
                 '배송일자': r.date,
+                '공휴일 정보': r.holidayLabel || '-',
                 '예상 날씨': r.weather,
                 '브랜드': r.brand,
                 '품목명': r.item,
@@ -883,12 +918,12 @@
             const ws = XLSX.utils.json_to_sheet(data);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, '미래발주예측비교');
-            XLSX.writeFile(wb, `OMS미래발주예측_v4_${document.getElementById('forecast-start-date').value}_${document.getElementById('forecast-end-date').value}.xlsx`);
+            XLSX.writeFile(wb, `OMS미래발주예측_v5_${document.getElementById('forecast-start-date').value}_${document.getElementById('forecast-end-date').value}.xlsx`);
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
             setQuickBasePeriod('thisMonth');
-            const today = new Date();
+            const today = nowKST();
             const future7 = addDays(today, 7);
             document.getElementById('forecast-start-date').value = formatDate(today);
             document.getElementById('forecast-end-date').value = formatDate(future7);
