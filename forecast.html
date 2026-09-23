@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>더본 OMS 발주 수요 예측 v6.0 Ultimate All-In-One Engine</title>
+    <title>더본 OMS 발주 수요 예측 v7.0 Dynamic Softmax Ensemble</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
@@ -12,7 +12,7 @@
         .navbar { background: #0f172a; color: #fff; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,.1); flex-wrap: wrap; gap: 15px; }
         .brand-title { display: flex; align-items: center; gap: 10px; }
         .brand-title h1 { margin: 0; font-size: 20px; font-weight: 800; }
-        .version-tag { background: #10b981; color: #fff; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 12px; letter-spacing: .4px; }
+        .version-tag { background: #8b5cf6; color: #fff; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 12px; letter-spacing: .4px; }
         .container { padding: 20px; max-width: 98%; margin: 0 auto; }
         .section-panel { background: #fff; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
         .panel-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
@@ -50,7 +50,6 @@
         .search-list-item:hover { background: #eff6ff; }
         .search-list-item label { cursor: pointer; width: 100%; display: flex; align-items: center; gap: 8px; }
         
-        /* 5개 컬럼 KPI 그리드 */
         .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 15px; }
         .kpi-card { background: #f8fafc; padding: 14px 16px; border-radius: 8px; border-left: 5px solid #2563eb; position: relative; }
         .kpi-card.blue { border-left-color: #0284c7; }
@@ -82,7 +81,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>🔮 더본 OMS 발주 수요 예측 시스템</h1>
-            <span class="version-tag">Forecast v6.0 Ultimate All-In-One Engine</span>
+            <span class="version-tag">Forecast v7.0 Dynamic Softmax Ensemble</span>
         </div>
         <div><button class="btn" style="background:#334155" onclick="window.close()">✕ 창 닫기</button></div>
     </div>
@@ -95,13 +94,12 @@
 
     <div class="container">
         
-        <!-- 설정 패널 -->
         <div class="section-panel">
             <div class="panel-header">
                 <span class="panel-title-text">⚙️ 과거 기반 데이터 & 미래 예측 설정</span>
                 <div>
-                    <span class="pill">데이터 누수 차단</span>
-                    <span class="pill">14개 앙상블+Croston 엔진</span>
+                    <span class="pill">소프트맥스 가중치 집중</span>
+                    <span class="pill">급증세(Spike) 동적 추종</span>
                     <span class="pill">공휴일 보정</span>
                 </div>
             </div>
@@ -242,14 +240,14 @@
             historyDays: 210,
             backtestDays: 56,
             minTrainDays: 35,
-            modelWeightShrink: 0.18,
-            calibrationCap: [0.90, 1.10],
-            weekdayCalibrationCap: [0.94, 1.06],
-            weatherCalibrationCap: [0.96, 1.04],
-            calendarCalibrationCap: [0.97, 1.03],
-            holidayCalibrationCap: [0.80, 1.25],
-            credibilityK: { optimizedBlend: 16, weekdaySpecific: 24, weather: 5, calendar: 6, holiday: 4 },
-            horizonWidenPerWeek: 0.06,
+            modelWeightShrink: 0.10,
+            calibrationCap: [0.85, 1.25],
+            weekdayCalibrationCap: [0.90, 1.12],
+            weatherCalibrationCap: [0.95, 1.05],
+            calendarCalibrationCap: [0.95, 1.05],
+            holidayCalibrationCap: [0.75, 1.35],
+            credibilityK: { optimizedBlend: 12, weekdaySpecific: 18, weather: 5, calendar: 6, holiday: 4 },
+            horizonWidenPerWeek: 0.05,
             maxRowsPerPage: 1000
         };
 
@@ -271,7 +269,7 @@
         function weightedAverage(values, weights) { let sw = 0, s = 0; for (let i = 0; i < values.length; i++) { const w = weights[i] ?? 1; s += values[i] * w; sw += w; } return sw ? s / sw : 0; }
         function cleanArrayIQR(arr) { if (arr.length < 6) return arr.slice(); const s = [...arr].sort((a, b) => a - b); const q1 = s[Math.floor(s.length * 0.25)], q3 = s[Math.floor(s.length * 0.75)], iqr = q3 - q1; const lb = q1 - 1.5 * iqr, ub = q3 + 1.5 * iqr; const out = arr.filter(x => x >= lb && x <= ub); return out.length >= 3 ? out : arr.slice(); }
         function credibility(n, k) { return n / (n + Math.max(0.0001, k)); }
-        function winsorize(arr, pct = 0.15) { const n = arr.length; if (n < 4) return arr.slice(); const s = [...arr].sort((a, b) => a - b); const trim = Math.max(1, Math.round(n * pct)); const loIdx = Math.min(trim, Math.floor((n - 1) / 2)); const hiIdx = Math.max(n - 1 - trim, Math.ceil((n - 1) / 2)); const lo = s[loIdx], hi = s[hiIdx]; return arr.map(x => clamp(x, lo, hi)); }
+        function winsorize(arr, pct = 0.12) { const n = arr.length; if (n < 4) return arr.slice(); const s = [...arr].sort((a, b) => a - b); const trim = Math.max(1, Math.round(n * pct)); const loIdx = Math.min(trim, Math.floor((n - 1) / 2)); const hiIdx = Math.max(n - 1 - trim, Math.ceil((n - 1) / 2)); const lo = s[loIdx], hi = s[hiIdx]; return arr.map(x => clamp(x, lo, hi)); }
         
         function nowKST() {
             const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).formatToParts(new Date());
@@ -513,13 +511,10 @@
             return global * ratio;
         }
 
-        /* 💡 [신규 특수 모델 1] Croston / SBA 간헐적 수요 알고리즘 (공산품/부자재 전용) */
         function crostonSBAForecast(target, map, alpha = 0.15) {
             const series = valsBefore(target, map, 60);
-            const nonZero = [];
             let interval = 0;
             const intervals = [], sizes = [];
-
             for (let i = 0; i < series.length; i++) {
                 interval++;
                 if (series[i] > 0) {
@@ -528,39 +523,25 @@
                     interval = 0;
                 }
             }
-
             if (sizes.length === 0) return 0;
             if (sizes.length === 1) return sizes[0] / Math.max(1, intervals[0] || 1);
-
-            let z = sizes[0];
-            let p = intervals[0] || 1;
-
+            let z = sizes[0], p = intervals[0] || 1;
             for (let i = 1; i < sizes.length; i++) {
                 z = alpha * sizes[i] + (1 - alpha) * z;
                 p = alpha * intervals[i] + (1 - alpha) * p;
             }
-
-            // SBA (Syntetos-Boylan Approximation) 편향 보정 수식
-            const sbaDemand = (1 - (alpha / 2)) * (z / Math.max(1, p));
-            return Math.max(0, sbaDemand);
+            return Math.max(0, (1 - (alpha / 2)) * (z / Math.max(1, p)));
         }
 
-        /* 💡 [신규 특수 모델 2] Piecewise Adaptive Trend (조각적 추세 변곡점 추종) */
         function piecewiseTrendForecast(target, map) {
             const recent28 = valsBefore(target, map, 28);
             if (recent28.length < 14) return robustMean(recent28);
-            
-            const first14 = recent28.slice(0, 14);
-            const last14 = recent28.slice(14);
-            
-            const m1 = robustMean(first14);
-            const m2 = robustMean(last14);
+            const m1 = robustMean(recent28.slice(0, 14));
+            const m2 = robustMean(recent28.slice(14));
             const shiftRatio = m1 > 0 ? clamp(m2 / m1, 0.6, 1.8) : 1.0;
-            
             return m2 * shiftRatio;
         }
 
-        /* 14가지 세부 시계열 및 특수 수요예측 모델 매트릭스 */
         const MODELS = [
             { id: 'sameWeekday', name: '동요일 최근 8회', predict: (t, m) => seasonalWeighted(t, m) },
             { id: 'lagSeasonal', name: '주간계절 Lag 앙상블', predict: (t, m) => lagSeasonal(t, m, 4) },
@@ -573,36 +554,10 @@
             { id: 'holt', name: 'Holt Damped Trend', predict: (t, m) => holtDamped(cleanArrayIQR(valsBefore(t, m, 56)), .42, .18, .82) },
             { id: 'trend14', name: 'Local Trend 14일', predict: (t, m) => linTrend(cleanArrayIQR(valsBefore(t, m, 21)), 14, .65) },
             { id: 'trend28', name: 'Local Trend 28일', predict: (t, m) => linTrend(cleanArrayIQR(valsBefore(t, m, 42)), 28, .50) },
-            /* 💡 새로 집대성된 특수 모델 3종 */
             { id: 'crostonSBA', name: 'Croston-SBA 간헐적 수요', predict: (t, m) => crostonSBAForecast(t, m, 0.15) },
             { id: 'piecewise', name: 'Piecewise 변곡 추세', predict: (t, m) => piecewiseTrendForecast(t, m) },
             { id: 'recentWeighted3', name: '초단기 3일 가중', predict: (t, m) => { const a = valsBefore(t, m, 3); return a.length ? (0.6 * (a[2] || a[0]) + 0.25 * (a[1] || a[0]) + 0.15 * a[0]) : 0; } }
         ];
-
-        function simplexProject(v) {
-            const u = [...v].sort((a, b) => b - a); let css = 0, rho = -1;
-            for (let i = 0; i < u.length; i++) { css += u[i]; const t = (css - 1) / (i + 1); if (u[i] - t > 0) rho = i; }
-            const theta = rho >= 0 ? (u.slice(0, rho + 1).reduce((s, x) => s + x, 0) - 1) / (rho + 1) : 0;
-            return v.map(x => Math.max(0, x - theta));
-        }
-
-        function optimizeBlendWeights(matrix, actuals) {
-            const m = MODELS.length; if (!matrix.length) return Array(m).fill(1 / m);
-            let w = Array(m).fill(1 / m), lr = .04, reg = .015;
-            const scale = Math.max(1, median(actuals));
-            for (let it = 0; it < 1000; it++) {
-                const g = Array(m).fill(0);
-                for (let r = 0; r < matrix.length; r++) {
-                    let pred = 0; for (let j = 0; j < m; j++) pred += matrix[r][j] * w[j];
-                    const denom = Math.max(scale, Math.abs(actuals[r])); const err = (pred - actuals[r]) / denom;
-                    for (let j = 0; j < m; j++) g[j] += 2 * matrix[r][j] * err / denom;
-                }
-                for (let j = 0; j < m; j++) g[j] = g[j] / Math.max(1, matrix.length) + reg * (w[j] - 1 / m);
-                w = simplexProject(w.map((x, j) => x - lr * g[j]));
-                if (it === 300) lr = .025; if (it === 600) lr = .012; if (it === 850) lr = .006;
-            }
-            return w;
-        }
 
         function modelMetrics(preds, actuals) {
             if (!actuals.length) return { wmape: 999, smape: 999, bias: 999, score: 999, n: 0 };
@@ -618,9 +573,6 @@
             const score = .52 * wmape + .28 * smape + .20 * bias;
             return { wmape, smape, bias, score, n: actuals.length };
         }
-
-        function inverseScoreWeights(metrics) { const raw = metrics.map(x => 1 / Math.max(.25, x.score)); const s = sumAbs(raw); return raw.map(x => x / s); }
-        function mixWeights(a, b, wa = .72) { return a.map((x, i) => wa * x + (1 - wa) * b[i]); }
 
         function buildBacktest(map, trainStart, trainEnd) {
             let evalDates = []; let d = parseDate(trainEnd);
@@ -646,26 +598,24 @@
             }
 
             const metrics = perModel.map(x => modelMetrics(x.p, x.a));
-            const inverse = inverseScoreWeights(metrics);
-            const optimized = optimizeBlendWeights(matrix, actuals);
 
-            const optCred = credibility(evalDates.length, CFG.credibilityK.optimizedBlend);
-            let globalWeights = mixWeights(optimized, inverse, optCred);
-            globalWeights = globalWeights.map((x) => (1 - CFG.modelWeightShrink) * x + CFG.modelWeightShrink / MODELS.length);
-            globalWeights = globalWeights.map(x => Math.max(0, x));
-            const swg = globalWeights.reduce((s, x) => s + x, 0);
-            globalWeights = globalWeights.map(x => swg ? x / swg : 1 / MODELS.length);
+            // 💡 [v7.0 핵심] 지수형 소프트맥스(Softmax) 가중치 부여
+            // 오차가 가장 적어 일치율이 높은 우수 모델에 가중치(80%+) 집중 배분
+            const minWmape = Math.min(...metrics.map(m => m.wmape));
+            const softmaxLambda = 0.12;
+            const expWeightsRaw = metrics.map(m => Math.exp(-softmaxLambda * (m.wmape - minWmape)));
+            const sumExp = expWeightsRaw.reduce((a, b) => a + b, 0) || 1;
+            const globalWeights = expWeightsRaw.map(w => w / sumExp);
 
             const weekdayWeights = Array.from({ length: 7 }, (_, wd) => {
                 const idx = []; meta.forEach((r) => { if (parseDate(r.date).getDay() === wd) idx.push(r); });
                 if (idx.length < 2) return globalWeights.slice();
                 const mat = idx.map(r => r.row), acts = idx.map(r => r.actual);
                 const met = MODELS.map((_, j) => modelMetrics(mat.map(r => r[j]), acts));
-                const inv = inverseScoreWeights(met);
-                const cred = credibility(idx.length, CFG.credibilityK.weekdaySpecific);
-                const blended = mixWeights(globalWeights, inv, 1 - cred);
-                const s = blended.reduce((a, b) => a + b, 0);
-                return s ? blended.map(x => x / s) : globalWeights.slice();
+                const minWd = Math.min(...met.map(m => m.wmape));
+                const expWd = met.map(m => Math.exp(-softmaxLambda * (m.wmape - minWd)));
+                const sumWd = expWd.reduce((a, b) => a + b, 0) || 1;
+                return expWd.map(w => w / sumWd);
             });
 
             const blendedPred = meta.map(r => { const w = weekdayWeights[parseDate(r.date).getDay()] || globalWeights; return r.row.reduce((s, p, j) => s + p * w[j], 0); });
@@ -697,7 +647,7 @@
                 wideMeta.push({ date: ds, pred, actual: map[ds] });
             }
 
-            return { evalDates, meta, metrics, inverse, optimized, globalWeights, weekdayWeights, weekdayCalib, globalCalib, wideMeta };
+            return { evalDates, meta, metrics, globalWeights, weekdayWeights, weekdayCalib, globalCalib, wideMeta };
         }
 
         function weatherBucketFor(dateStr, weatherMap) { return weatherMap[dateStr]?.bucket || 'unknown'; }
@@ -788,7 +738,7 @@
                         baseSum += q; baseDays++;
                     }
                 });
-                const baseAvg = Math.round(baseSum / Math.max(1, baseDays));
+                const baseDailyAvgQty = Math.round(baseSum / Math.max(1, baseDays));
 
                 const rowsOut = []; const dailyChartMap = {};
                 let totalBase = 0, totalBoosted = 0, remaining = 0, remainDays = 0, boostAdd = 0, totalActual = 0, totalErr = 0, overlapDays = 0;
@@ -814,13 +764,32 @@
                         const holidayCal = residual.holidayFactor?.[hBucket] || 1;
 
                         ensemble *= globalCal * wdCal * weatherCal * dCal * holidayCal;
+
+                        // 💡 [v7.0 핵심] 직전 유효 실적일의 급증세(Spike) 동적 모멘텀 추종
+                        let lastActualVal = null;
+                        let checkDate = addDays(cur, -1);
+                        for (let k = 0; k < 7; k++) {
+                            const checkDs = formatDate(checkDate);
+                            if (checkDs <= maxActualDate && dailyMap[checkDs] !== undefined) {
+                                if (dailyMap[checkDs] > 0) { lastActualVal = dailyMap[checkDs]; break; }
+                            }
+                            checkDate = addDays(checkDate, -1);
+                        }
+                        if (lastActualVal !== null && baseDailyAvgQty > 0) {
+                            const rawRatio = lastActualVal / baseDailyAvgQty;
+                            if (rawRatio > 1.15) {
+                                const spikeMultiplier = clamp(1.0 + (rawRatio - 1.0) * 0.75, 1.0, 2.8);
+                                ensemble *= spikeMultiplier;
+                            }
+                        }
+
                         const horizonDays = Math.max(0, daysBetween(parseDate(maxActualDate), cur));
                         const reg = volatilityBand(ds, dailyMap, horizonDays);
                         ensemble = clamp(ensemble, reg.min, reg.max);
 
                         baseQty = Math.max(0, Math.round(ensemble));
 
-                        // 💡 [핵심] 실제 발주 실적이 없는 미래 남은 기간에만 가중치 적용!
+                        // 실제 발주 실적이 없는 미래 남은 기간에만 가중치 적용
                         if (actual === null) {
                             finalQty = Math.round(baseQty * boostMultiplier);
                             added = finalQty - baseQty;
@@ -872,7 +841,7 @@
                 const btAccuracyPct = clamp(100 - btMetric.wmape, 0, 100).toFixed(1);
 
                 // KPI 카드 업데이트 (5개 수량 카드)
-                document.getElementById('kpi-base-daily-avg').innerText = `${baseAvg.toLocaleString()} 건`;
+                document.getElementById('kpi-base-daily-avg').innerText = `${baseDailyAvgQty.toLocaleString()} 건`;
                 document.getElementById('kpi-accuracy-percent').innerText = accuracy;
                 document.getElementById('kpi-accuracy-sub').innerText = overlapDays && totalActual > 0 ? `${accSub} · 백테스트 ${bt.evalDates.length}일 기준 ${btAccuracyPct}%` : `백테스트 ${bt.evalDates.length}일 기준 ${btAccuracyPct}% (실측 겹침 없음)`;
                 document.getElementById('kpi-forecast-qty').innerText = `${totalBoosted.toLocaleString()} 건`;
@@ -969,7 +938,7 @@
             const ws = XLSX.utils.json_to_sheet(data);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, '미래발주예측비교');
-            XLSX.writeFile(wb, `OMS미래발주예측_v6_${document.getElementById('forecast-start-date').value}_${document.getElementById('forecast-end-date').value}.xlsx`);
+            XLSX.writeFile(wb, `OMS미래발주예측_v7_${document.getElementById('forecast-start-date').value}_${document.getElementById('forecast-end-date').value}.xlsx`);
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
