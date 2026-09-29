@@ -259,7 +259,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 대시보드</h1>
-            <span class="version-tag">v31.1 Gemini API Fixed</span>
+            <span class="version-tag">v32.0 Gemini Auto-Fallback</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -817,7 +817,46 @@
             msgContainer.scrollTop = msgContainer.scrollHeight;
         }
 
-        /* 🤖 Gemini Function Calling 연산 메인 로직 (v31.1 모델명 gemini-1.5-flash 표준 수정) */
+        /* 🤖 404 방지용 Gemini API 자동 폴백(Auto-Fallback) 호출 함수 */
+        async function callGeminiApiWithFallback(apiKey, payload) {
+            const modelCandidates = [
+                'gemini-2.0-flash',
+                'gemini-1.5-flash',
+                'gemini-2.5-flash',
+                'gemini-1.5-pro'
+            ];
+            let lastError = null;
+
+            for (const model of modelCandidates) {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+                try {
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (res.status === 404) {
+                        console.warn(`모델 ${model} 404 반환. 다음 모델 후보 시도...`);
+                        continue;
+                    }
+
+                    if (!res.ok) {
+                        const errJson = await res.json().catch(() => ({}));
+                        throw new Error(errJson?.error?.message || `Gemini API Error (${res.status})`);
+                    }
+
+                    return await res.json();
+                } catch (err) {
+                    lastError = err;
+                    if (err.message && err.message.includes('404')) continue;
+                    throw err;
+                }
+            }
+            throw lastError || new Error("사용 가능한 Gemini API 모델을 찾지 못했습니다 (404). API 키 권한을 확인하세요.");
+        }
+
+        /* 🤖 Gemini Function Calling 연산 메인 로직 (v32.0 REST 스키마 카멜케이스 및 Auto-Fallback 이식) */
         async function sendAiMessage() {
             const inputEl = document.getElementById('ai-user-input');
             const userText = inputEl.value.trim();
@@ -835,12 +874,10 @@
             aiChatHistory.push({ role: 'user', parts: [{ text: userText }] });
 
             try {
-                // 💡 [핵심 보정] 표준 공식 지원 모델인 gemini-1.5-flash 로 지정 (404 에러 원인 해결)
-                const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-                
+                // 💡 [카멜케이스 스키마 준수] REST API 규격에 완벽히 맞춘 요청 구조
                 const requestPayload = {
                     contents: aiChatHistory,
-                    system_instruction: {
+                    systemInstruction: {
                         parts: [{
                             text: `당신은 더본 OMS(주문관리시스템) 발주 데이터 전문 AI 비서입니다. 
 현재 연도는 2026년입니다. 사용자가 기간별 발주 수량, 금액, 브랜드, 품목 데이터에 대해 질문하면 'query_order_summary' 함수를 호출하여 DB 수치를 조회하세요.
@@ -848,7 +885,7 @@
                         }]
                     },
                     tools: [{
-                        function_declarations: [{
+                        functionDeclarations: [{
                             name: "query_order_summary",
                             description: "Supabase DB에서 기간, 브랜드, 품목별 발주 수량 및 금액을 조회합니다.",
                             parameters: {
@@ -865,14 +902,7 @@
                     }]
                 };
 
-                const res = await fetch(geminiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestPayload)
-                });
-
-                if (!res.ok) throw new Error(`Gemini API Error (${res.status})`);
-                const resData = await res.json();
+                const resData = await callGeminiApiWithFallback(apiKey, requestPayload);
                 const candidate = resData?.candidates?.[0]?.content;
 
                 if (candidate) {
@@ -894,19 +924,11 @@
                             }]
                         });
 
-                        const res2 = await fetch(geminiUrl, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ contents: aiChatHistory })
-                        });
-
-                        if (res2.ok) {
-                            const resData2 = await res2.json();
-                            const finalAnswer = resData2?.candidates?.[0]?.content?.parts?.[0]?.text;
-                            if (finalAnswer) {
-                                appendChatBubble(finalAnswer, 'ai');
-                                aiChatHistory.push(resData2.candidates[0].content);
-                            }
+                        const resData2 = await callGeminiApiWithFallback(apiKey, { contents: aiChatHistory });
+                        const finalAnswer = resData2?.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (finalAnswer) {
+                            appendChatBubble(finalAnswer, 'ai');
+                            aiChatHistory.push(resData2.candidates[0].content);
                         }
                     } else {
                         const directText = candidate.parts?.find(p => p.text)?.text;
