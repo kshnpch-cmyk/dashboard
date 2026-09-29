@@ -56,9 +56,11 @@
         .btn-cal { background-color: #0f766e; padding: 4px 8px; font-size: 11px; border-radius: 4px; }
         .btn-excel { background-color: #16a34a; padding: 5px 10px; font-size: 12px; }
         
-        /* 🚀 수요 예측 이동 버튼 스타일 */
         .btn-forecast-link { background-color: #8b5cf6; }
         .btn-forecast-link:hover { background-color: #7c3aed; }
+
+        .btn-ai-chat { background-color: #7c3aed; }
+        .btn-ai-chat:hover { background-color: #6d28d9; }
 
         .btn-search-icon {
             background-color: #475569; color: white; border: none; padding: 6px 9px;
@@ -208,6 +210,48 @@
         .rows-per-page-selector {
             display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #475569;
         }
+
+        /* 🤖 AI 대화 모달 전용 스타일 */
+        .ai-chat-content {
+            background: white; border-radius: 12px; width: 560px; max-width: 92%;
+            height: 80vh; max-height: 700px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .ai-chat-header {
+            background: #0f172a; color: white; padding: 15px 20px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .ai-key-box {
+            background: #1e293b; border: 1px solid #334155; padding: 8px 15px;
+            display: flex; align-items: center; gap: 8px; font-size: 12px; color: #94a3b8;
+        }
+        .ai-key-box input {
+            background: #0f172a; border: 1px solid #475569; color: white;
+            padding: 4px 8px; border-radius: 4px; font-size: 12px; width: 220px;
+        }
+        .ai-chat-messages {
+            flex: 1; overflow-y: auto; padding: 15px; background: #f8fafc;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .chat-bubble {
+            max-width: 85%; padding: 10px 14px; border-radius: 10px; font-size: 13.5px; line-height: 1.5; word-break: break-word;
+        }
+        .chat-bubble.user {
+            align-self: flex-end; background-color: #2563eb; color: white; border-bottom-right-radius: 2px;
+        }
+        .chat-bubble.ai {
+            align-self: flex-start; background-color: white; border: 1px solid #e2e8f0; color: #0f172a; border-bottom-left-radius: 2px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+        }
+        .chat-bubble.system {
+            align-self: center; background-color: #f1f5f9; color: #64748b; font-size: 11.5px; border-radius: 12px; padding: 4px 10px;
+        }
+        .ai-chat-input-area {
+            padding: 12px; background: white; border-top: 1px solid #e2e8f0; display: flex; gap: 8px;
+        }
+        .ai-chat-input-area input {
+            flex: 1; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13.5px; outline: none;
+        }
     </style>
 </head>
 <body>
@@ -215,7 +259,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 대시보드</h1>
-            <span class="version-tag">v30.0 Forecast Added</span>
+            <span class="version-tag">v31.0 Gemini AI Integrated</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -228,8 +272,33 @@
                 <input type="date" id="sync-target-date" class="date-input">
             </div>
             <button id="run-btn" class="btn" onclick="triggerBot()">🚀 OMS 수동 동기화</button>
-            <!-- 💡 수요 예측 이동 버튼 추가 -->
+            <button class="btn btn-ai-chat" onclick="openAiChatModal()">🤖 AI 질의응답</button>
             <button class="btn btn-forecast-link" onclick="window.open('forecast.html', '_blank')">🔮 수요 예측 (Forecast)</button>
+        </div>
+    </div>
+
+    <!-- 🤖 AI 질의응답 모달 -->
+    <div class="modal-overlay" id="ai-chat-modal">
+        <div class="ai-chat-content">
+            <div class="ai-chat-header">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 18px;">🤖</span>
+                    <span style="font-weight: bold; font-size: 15px;">OMS AI 수치 질의응답</span>
+                </div>
+                <span class="close-btn" style="color: white;" onclick="closeAiChatModal()">✕</span>
+            </div>
+            <div class="ai-key-box">
+                <label>Gemini API Key:</label>
+                <input type="password" id="gemini-key-input" placeholder="Gemini API Key 입력">
+                <button class="btn btn-cal" style="background:#2563eb;" onclick="saveGeminiKey()">저장</button>
+            </div>
+            <div class="ai-chat-messages" id="ai-chat-messages">
+                <div class="chat-bubble system">Gemini AI가 연결되었습니다. 기간/브랜드/품목별 발주 수량을 편하게 물어보세요!</div>
+            </div>
+            <div class="ai-chat-input-area">
+                <input type="text" id="ai-user-input" placeholder="예: 9월 1일부터 9월 20일까지 빽다방 생크림 발주량은?" onkeydown="if(event.key==='Enter') sendAiMessage()">
+                <button class="btn btn-ai-chat" id="ai-send-btn" onclick="sendAiMessage()">전송</button>
+            </div>
         </div>
     </div>
 
@@ -470,7 +539,7 @@
 
         let allBrandList = [], allItemList = [];
         let activeBrandTarget = 'chart';
-        let currentBrandStoreMap = {}; // 브랜드별 점포 Set Map
+        let currentBrandStoreMap = {};
 
         let currentPage = 1;
         let rowsPerPage = 10;
@@ -478,6 +547,8 @@
 
         let currentMaxPercent = 0;
         let activeFetchToken = 0;
+
+        let aiChatHistory = [];
 
         /* 💾 IndexedDB 캐시 */
         const DB_NAME = "OmsLocalCacheDB";
@@ -604,7 +675,6 @@
             return true;
         }
 
-        /* 🧹 입력창 비우기(✕) 기능 */
         function clearInputField(inputId, storageKey) {
             const el = document.getElementById(inputId);
             if (el) {
@@ -622,7 +692,6 @@
             }
         }
 
-        /* 🚀 마스터 데이터 목록 로드 */
         async function loadMasterLists() {
             try {
                 const res = await fetchWithUltraCache(`${SUPABASE_URL}/rest/v1/daily_order_summary?select=brand_name,item_code,item_name`, {
@@ -643,7 +712,6 @@
             } catch (err) {}
         }
 
-        /* 🔍 실시간 브랜드 자동완성 처리 */
         function handleBrandInput(val) {
             safeSetStorage('cached_brand_input', val);
             toggleClearBtn('chart-brand-input');
@@ -677,7 +745,6 @@
             document.getElementById('brand-autocomplete-list').style.display = 'none';
         }
 
-        /* 🔍 실시간 품목 자동완성 처리 */
         function handleItemInput(val) {
             safeSetStorage('cached_item_input', val);
             toggleClearBtn('chart-item-input');
@@ -723,6 +790,188 @@
             }
         });
 
+        /* 🤖 AI 질의응답 모달 제어 및 연동 */
+        function openAiChatModal() {
+            document.getElementById('ai-chat-modal').style.display = 'flex';
+            const savedKey = localStorage.getItem('gemini_api_key') || '';
+            document.getElementById('gemini-key-input').value = savedKey;
+        }
+
+        function closeAiChatModal() {
+            document.getElementById('ai-chat-modal').style.display = 'none';
+        }
+
+        function saveGeminiKey() {
+            const keyVal = document.getElementById('gemini-key-input').value.trim();
+            if (!keyVal) return alert("Gemini API Key를 입력하세요.");
+            localStorage.setItem('gemini_api_key', keyVal);
+            alert("✅ Gemini API Key가 저장되었습니다!");
+        }
+
+        function appendChatBubble(text, sender = 'ai') {
+            const msgContainer = document.getElementById('ai-chat-messages');
+            const bubble = document.createElement('div');
+            bubble.className = `chat-bubble ${sender}`;
+            bubble.innerText = text;
+            msgContainer.appendChild(bubble);
+            msgContainer.scrollTop = msgContainer.scrollHeight;
+        }
+
+        /* 🤖 Gemini Function Calling 연산 메인 로직 */
+        async function sendAiMessage() {
+            const inputEl = document.getElementById('ai-user-input');
+            const userText = inputEl.value.trim();
+            const apiKey = localStorage.getItem('gemini_api_key') || document.getElementById('gemini-key-input').value.trim();
+
+            if (!userText) return;
+            if (!apiKey) return alert("Gemini API Key를 먼저 입력하고 저장하세요.");
+
+            appendChatBubble(userText, 'user');
+            inputEl.value = '';
+
+            const sendBtn = document.getElementById('ai-send-btn');
+            sendBtn.disabled = true; sendBtn.innerText = "생성중...";
+
+            aiChatHistory.push({ role: 'user', parts: [{ text: userText }] });
+
+            try {
+                const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+                
+                const requestPayload = {
+                    contents: aiChatHistory,
+                    systemInstruction: {
+                        parts: [{
+                            text: `당신은 더본 OMS(주문관리시스템) 발주 데이터 전문 AI 비서입니다. 
+현재 연도는 2026년입니다. 사용자가 기간별 발주 수량, 금액, 브랜드, 품목 데이터에 대해 질문하면 'query_order_summary' 함수를 호출하여 DB 수치를 조회하세요.
+조회 결과 수치를 바탕으로 친절하고 명확하게 한국어로 답변하세요.`
+                        }]
+                    },
+                    tools: [{
+                        functionDeclarations: [{
+                            name: "query_order_summary",
+                            description: "Supabase DB에서 기간, 브랜드, 품목별 발주 수량 및 금액을 조회합니다.",
+                            parameters: {
+                                type: "OBJECT",
+                                properties: {
+                                    startDate: { type: "STRING", description: "YYYY-MM-DD 형식의 시작일자. 명시 안될 시 2026년 현재월 기준 설정." },
+                                    endDate: { type: "STRING", description: "YYYY-MM-DD 형식의 종료일자." },
+                                    brandName: { type: "STRING", description: "브랜드명 키워드 (예: 빽다방, 홍콩반점 등). 없으면 빈값" },
+                                    itemName: { type: "STRING", description: "품목명 키워드 (예: 생크림, 서울우유 등). 없으면 빈값" }
+                                },
+                                required: ["startDate", "endDate"]
+                            }
+                        }]
+                    }]
+                };
+
+                const res = await fetch(geminiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestPayload)
+                });
+
+                if (!res.ok) throw new Error(`Gemini API Error (${res.status})`);
+                const resData = await res.json();
+                const candidate = resData?.candidates?.[0]?.content;
+
+                if (candidate) {
+                    aiChatHistory.push(candidate);
+
+                    const functionCall = candidate.parts?.find(p => p.functionCall)?.functionCall;
+
+                    if (functionCall && functionCall.name === "query_order_summary") {
+                        appendChatBubble("🔍 DB 수치를 조회하고 있습니다...", 'system');
+                        const dbResult = await executeDbQueryForAi(functionCall.args);
+
+                        aiChatHistory.push({
+                            role: 'user',
+                            parts: [{
+                                functionResponse: {
+                                    name: "query_order_summary",
+                                    response: dbResult
+                                }
+                            }]
+                        });
+
+                        // 2차 호출 (DB 조회 결과 전달 후 최종 답변 생성)
+                        const res2 = await fetch(geminiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ contents: aiChatHistory })
+                        });
+
+                        if (res2.ok) {
+                            const resData2 = await res2.json();
+                            const finalAnswer = resData2?.candidates?.[0]?.content?.parts?.[0]?.text;
+                            if (finalAnswer) {
+                                appendChatBubble(finalAnswer, 'ai');
+                                aiChatHistory.push(resData2.candidates[0].content);
+                            }
+                        }
+                    } else {
+                        const directText = candidate.parts?.find(p => p.text)?.text;
+                        if (directText) appendChatBubble(directText, 'ai');
+                    }
+                }
+            } catch (err) {
+                console.error("AI 응답 오류:", err);
+                appendChatBubble(`❌ 오류가 발생했습니다: ${err.message}`, 'system');
+            } finally {
+                sendBtn.disabled = false; sendBtn.innerText = "전송";
+            }
+        }
+
+        /* 🤖 AI용 Supabase DB 조회 전용 함수 */
+        async function executeDbQueryForAi(args) {
+            let { startDate, endDate, brandName, itemName } = args;
+            if (!startDate) startDate = "2026-09-01";
+            if (!endDate) endDate = "2026-09-30";
+
+            let queryUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,brand_name,item_name,item_code`;
+
+            if (brandName) {
+                queryUrl += `&brand_name=ilike.*${encodeURIComponent(brandName)}*`;
+            }
+            if (itemName) {
+                queryUrl += `&or=(item_code.ilike.*${encodeURIComponent(itemName)}*,item_name.ilike.*${encodeURIComponent(itemName)}*)`;
+            }
+
+            try {
+                const res = await fetchWithUltraCache(queryUrl, {
+                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    let totalQty = 0, totalAmount = 0;
+                    const items = new Set();
+                    const brands = new Set();
+
+                    data.forEach(r => {
+                        const q = cleanNumber(r.total_qty || r.qty);
+                        const amt = cleanNumber(r.total_amount);
+                        totalQty += q;
+                        totalAmount += amt;
+                        if (r.item_name) items.add(r.item_name);
+                        if (r.brand_name) brands.add(r.brand_name);
+                    });
+
+                    return {
+                        status: "success",
+                        queryPeriod: `${startDate} ~ ${endDate}`,
+                        filterBrand: brandName || "전체 브랜드",
+                        filterItem: itemName || "전체 품목",
+                        totalQty: totalQty,
+                        totalAmount: totalAmount,
+                        recordCount: data.length,
+                        itemTypesCount: items.size,
+                        brandTypesCount: brands.size
+                    };
+                }
+            } catch (err) {}
+            return { status: "error", message: "DB 조회 중 오류 발생" };
+        }
+
         /* 🚀 브랜드별 점포수 상세 모달 관련 함수 */
         function openBrandStoreModal() {
             document.getElementById('brand-store-modal').style.display = 'flex';
@@ -746,7 +995,6 @@
             document.getElementById('brand-store-modal').style.display = 'none';
         }
 
-        /* 🏢 브랜드 다중 선택 모달 */
         async function openBrandModal(target = 'chart') {
             activeBrandTarget = target;
             document.getElementById('brand-modal').style.display = 'flex';
@@ -800,7 +1048,6 @@
             updateStoreListAndSummary(selectedBrands);
         }
 
-        /* 📦 품목 모달 */
         async function openItemModal() {
             document.getElementById('item-modal').style.display = 'flex';
             if (allItemList.length === 0) await loadMasterLists();
@@ -845,7 +1092,6 @@
             closeItemModal();
         }
 
-        /* 📅 캘린더 모달 */
         function openCalendarModal() { document.getElementById('calendar-modal').style.display = 'flex'; loadCalendarData(); }
         function closeCalendarModal() { document.getElementById('calendar-modal').style.display = 'none'; }
 
@@ -922,7 +1168,6 @@
             }
         }
 
-        /* 🌤️ 기상 데이터 연동 */
         async function fetchKoreaWeatherData(startDate, endDate) {
             const weatherMap = {};
 
@@ -1026,7 +1271,6 @@
             return weatherMap;
         }
 
-        /* 🚀 대시보드 종합 조회 */
         async function fetchAllDashboardData() {
             if (!validateDates('start')) return;
             activeFetchToken++;
@@ -1048,7 +1292,6 @@
             }
         }
 
-        /* 🚀 0.1초 만에 백엔드 한 줄 응답으로 완벽 고정 집계하는 fetchChartData */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
@@ -1060,10 +1303,7 @@
             safeSetStorage('cached_chart_start_date', startDate);
             safeSetStorage('cached_chart_end_date', endDate);
 
-            // 1. 차트/수량/금액용 일별 요약 뷰
             let dailyUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
-            
-            // 2. ⚡ 하단 청크 로딩 상태와 전혀 별개로 단 1번 만에 전체 고유 점포 추출
             let storeFastUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_name,brand_name`;
 
             if (brandInputValue) {
@@ -1106,7 +1346,6 @@
             }
         }
 
-        /* 📊 대시보드 차트 및 KPI 표출 */
         async function renderChartAndKPI(data, storeFastData = []) {
             if (!data || !Array.isArray(data) || data.length === 0) {
                 document.getElementById('kpi-total-qty').innerText = "0 건";
@@ -1137,7 +1376,6 @@
                 dailyMap[dateKey].amount += amt;
             });
 
-            // 💡 0.1초 원샷 확정 고정 계산
             recalculateFilteredStores(storeFastData);
 
             document.getElementById('kpi-total-qty').innerText = `${totalQty.toLocaleString()} 건`;
@@ -1220,7 +1458,6 @@
             });
         }
 
-        /* 🚀 하단 상세 청크 로딩 상태와 독립적으로 상단 점포 수 원샷 고정 확정 */
         function recalculateFilteredStores(storeFastData = []) {
             const uniqueStores = new Set();
             currentBrandStoreMap = {};
@@ -1262,7 +1499,6 @@
             } catch (err) {}
         }
 
-        /* 🚀 누락 방지 청크 수집 함수 */
         async function fetchAllOrdersInChunksForRange(startDate, endDate) {
             const currentToken = activeFetchToken;
             let offset = 0;
