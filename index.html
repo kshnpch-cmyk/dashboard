@@ -259,7 +259,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 대시보드</h1>
-            <span class="version-tag">v31.0 Gemini AI Integrated</span>
+            <span class="version-tag">v31.1 Gemini API Fixed</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -817,7 +817,7 @@
             msgContainer.scrollTop = msgContainer.scrollHeight;
         }
 
-        /* 🤖 Gemini Function Calling 연산 메인 로직 */
+        /* 🤖 Gemini Function Calling 연산 메인 로직 (v31.1 모델명 gemini-1.5-flash 표준 수정) */
         async function sendAiMessage() {
             const inputEl = document.getElementById('ai-user-input');
             const userText = inputEl.value.trim();
@@ -835,11 +835,12 @@
             aiChatHistory.push({ role: 'user', parts: [{ text: userText }] });
 
             try {
-                const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+                // 💡 [핵심 보정] 표준 공식 지원 모델인 gemini-1.5-flash 로 지정 (404 에러 원인 해결)
+                const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
                 
                 const requestPayload = {
                     contents: aiChatHistory,
-                    systemInstruction: {
+                    system_instruction: {
                         parts: [{
                             text: `당신은 더본 OMS(주문관리시스템) 발주 데이터 전문 AI 비서입니다. 
 현재 연도는 2026년입니다. 사용자가 기간별 발주 수량, 금액, 브랜드, 품목 데이터에 대해 질문하면 'query_order_summary' 함수를 호출하여 DB 수치를 조회하세요.
@@ -847,7 +848,7 @@
                         }]
                     },
                     tools: [{
-                        functionDeclarations: [{
+                        function_declarations: [{
                             name: "query_order_summary",
                             description: "Supabase DB에서 기간, 브랜드, 품목별 발주 수량 및 금액을 조회합니다.",
                             parameters: {
@@ -893,7 +894,6 @@
                             }]
                         });
 
-                        // 2차 호출 (DB 조회 결과 전달 후 최종 답변 생성)
                         const res2 = await fetch(geminiUrl, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -1764,7 +1764,6 @@
             XLSX.writeFile(wb, `OMS주문상세_${document.getElementById('chart-start-date').value}_${document.getElementById('chart-end-date').value}.xlsx`);
         }
 
-        /* ⚡ 초기 실행 */
         document.addEventListener('DOMContentLoaded', async () => {
             const today = new Date();
             const past7 = new Date(); past7.setDate(today.getDate() - 7);
