@@ -208,9 +208,7 @@
             display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #475569;
         }
 
-        /* ------------------------------------------------------------- */
-        /* ✨ [v33.0 신규] 갤럭시 AI 모티브 우측 하단 플로팅 버튼 & 챗 위젯 */
-        /* ------------------------------------------------------------- */
+        /* ✨ 갤럭시 AI 모티브 우측 하단 플로팅 버튼 & 챗 위젯 */
         .ai-floating-btn {
             position: fixed;
             bottom: 28px;
@@ -228,7 +226,7 @@
             align-items: center;
             justify-content: center;
             font-size: 26px;
-            transition: all 0.3초 cubic-bezier(0.34, 1.56, 0.64, 1);
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
             animation: floatingPulse 2.8s infinite;
         }
         .ai-floating-btn:hover {
@@ -244,7 +242,6 @@
             100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
         }
 
-        /* 챗 위젯 팝업 상자 */
         .ai-chat-widget {
             display: none;
             position: fixed;
@@ -395,7 +392,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 대시보드</h1>
-            <span class="version-tag">v33.0 Floating AI Widget</span>
+            <span class="version-tag">v32.7 Daily Breakdown & Strict Korean</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -412,12 +409,12 @@
         </div>
     </div>
 
-    <!-- ✨ [v33.0 신규] 갤럭시 AI 모티브 우측 하단 플로팅 버튼 -->
+    <!-- ✨ 갤럭시 AI 모티브 우측 하단 플로팅 버튼 -->
     <button class="ai-floating-btn" id="ai-floating-btn" onclick="toggleAiChatWidget()" title="AI 주문 질의응답 열기">
         ✨
     </button>
 
-    <!-- 🤖 [v33.0 신규] 우측 하단 챗 위젯 상자 -->
+    <!-- 🤖 우측 하단 챗 위젯 상자 -->
     <div class="ai-chat-widget" id="ai-chat-modal">
         <div class="ai-chat-header">
             <div class="ai-chat-title">
@@ -435,7 +432,7 @@
             <div class="chat-bubble system">✨ Gemini AI가 연결되었습니다. 수량을 편하게 물어보세요!</div>
         </div>
         <div class="ai-chat-input-area">
-            <input type="text" id="ai-user-input" placeholder="예: 9월 1일 생크림 발주량은?" onkeydown="if(event.key==='Enter') sendAiMessage()">
+            <input type="text" id="ai-user-input" placeholder="예: 9월 1일부터 9월 2일까지 일자별 생크림 수량" onkeydown="if(event.key==='Enter') sendAiMessage()">
             <button class="btn-ai-send" id="ai-send-btn" onclick="sendAiMessage()">전송</button>
         </div>
     </div>
@@ -928,7 +925,7 @@
             }
         });
 
-        /* 🤖 [v33.0 신규] 우측 하단 AI 위젯 토글 토글 제어 */
+        /* 🤖 AI 위젯 토글 제어 */
         function toggleAiChatWidget() {
             const widget = document.getElementById('ai-chat-modal');
             const isVisible = widget.style.display === 'flex';
@@ -1060,18 +1057,23 @@
 
             aiChatHistory.push({ role: 'user', parts: [{ text: userText }] });
 
+            // 💡 [v32.7 엄격한 한국어 강제 및 답변 출력 지침]
             const systemInstruction = {
                 parts: [{
                     text: `당신은 더본 OMS(주문관리시스템) 발주 데이터 전문 AI 비서입니다. 
-현재 연도는 2026년입니다. 사용자가 기간별 발주 수량, 금액, 브랜드, 품목 데이터에 대해 질문하면 'query_order_summary' 함수를 호출하여 DB 수치를 조회하세요.
-DB 조회가 완료된 후에는 'The user wants to know...' 같은 영어 요약문이나 생각 과정을 절대로 그대로 출력하지 마시고, 반드시 최종 사용자를 위한 친절하고 완벽한 한국어 문장으로 발주 수치(수량, 금액 등)를 직접 답변하세요.`
+현재 연도는 2026년입니다. 
+
+[중요 지침]
+1. 사용자가 질문하면 먼저 'query_order_summary' 함수를 호출하여 DB에서 실제 수치를 조회하세요.
+2. DB 조회가 완료되면, 'The user wants to know...' 등 영문 생각 과정을 절대로 화면에 출력하지 마세요!
+3. 무조건 100% 한국어로만 친절하게 최종 발주 수치(일자별 수량 및 총 수량, 금액 등)를 직접 정리하여 답변하세요.`
                 }]
             };
 
             const tools = [{
                 functionDeclarations: [{
                     name: "query_order_summary",
-                    description: "Supabase DB에서 기간, 브랜드, 품목별 발주 수량 및 금액을 조회합니다.",
+                    description: "Supabase DB에서 기간, 브랜드, 품목별 일자별/통합 발주 수량 및 금액을 조회합니다.",
                     parameters: {
                         type: "OBJECT",
                         properties: {
@@ -1139,6 +1141,7 @@ DB 조회가 완료된 후에는 'The user wants to know...' 같은 영어 요�
             }
         }
 
+        /* 🤖 [v32.7 핵심] 일자별 상세 수량(dailyBreakdown)을 함께 반환하도록 DB 조회 보정 */
         async function executeDbQueryForAi(args) {
             let { startDate, endDate, brandName, itemName } = args;
             if (!startDate) startDate = "2026-09-01";
@@ -1163,6 +1166,7 @@ DB 조회가 완료된 후에는 'The user wants to know...' 같은 영어 요�
                     let totalQty = 0, totalAmount = 0;
                     const items = new Set();
                     const brands = new Set();
+                    const dailyMap = {};
 
                     data.forEach(r => {
                         const q = cleanNumber(r.total_qty || r.qty);
@@ -1171,7 +1175,19 @@ DB 조회가 완료된 후에는 'The user wants to know...' 같은 영어 요�
                         totalAmount += amt;
                         if (r.item_name) items.add(r.item_name);
                         if (r.brand_name) brands.add(r.brand_name);
+
+                        const dKey = formatDisplayDate(r.delivery_date).replace(/\//g, '-');
+                        if (!dailyMap[dKey]) dailyMap[dKey] = { qty: 0, amount: 0 };
+                        dailyMap[dKey].qty += q;
+                        dailyMap[dKey].amount += amt;
                     });
+
+                    // 💡 날짜별 상세 수량 배열 생성
+                    const dailyBreakdown = Object.keys(dailyMap).sort().map(d => ({
+                        date: d,
+                        qty: dailyMap[d].qty,
+                        amount: dailyMap[d].amount
+                    }));
 
                     return {
                         status: "success",
@@ -1180,6 +1196,7 @@ DB 조회가 완료된 후에는 'The user wants to know...' 같은 영어 요�
                         filterItem: itemName || "전체 품목",
                         totalQty: totalQty,
                         totalAmount: totalAmount,
+                        dailyBreakdown: dailyBreakdown,
                         recordCount: data.length,
                         itemTypesCount: items.size,
                         brandTypesCount: brands.size
@@ -1420,7 +1437,7 @@ DB 조회가 완료된 후에는 'The user wants to know...' 같은 영어 요�
                                 const ddMefs = parseFloat(r.ddMefs || 0);
                                 const avgTca = parseFloat(r.avgTca || 0);
 
-                                let statusIcon = "☀️️";
+                                let statusIcon = "☀️";
                                 let statusText = "맑음";
 
                                 if (ddMefs > 0) { statusIcon = "❄️"; statusText = "눈"; }
