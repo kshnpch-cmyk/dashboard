@@ -392,7 +392,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 대시보드</h1>
-            <span class="version-tag">v33.2 Fixed Complete Integrated</span>
+            <span class="version-tag">v34.0 AI Detail Store Order Access</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -432,7 +432,7 @@
             <div class="chat-bubble system">✨ Gemini AI가 연결되었습니다. 수량을 편하게 물어보세요!</div>
         </div>
         <div class="ai-chat-input-area">
-            <input type="text" id="ai-user-input" placeholder="예: 9월 1일부터 9월 2일까지 생크림 수량" onkeydown="if(event.key==='Enter') sendAiMessage()">
+            <input type="text" id="ai-user-input" placeholder="예: 빽다방 수원정자시장점 9월 1일 발주 내역" onkeydown="if(event.key==='Enter') sendAiMessage()">
             <button class="btn-ai-send" id="ai-send-btn" onclick="sendAiMessage()">전송</button>
         </div>
     </div>
@@ -1057,44 +1057,46 @@
 
             aiChatHistory.push({ role: 'user', parts: [{ text: userText }] });
 
+            // 💡 [v34.0] 점포 상세 데이터(storeName) 및 점포별 내역 답변 가능하도록 프롬프트 확장
             const systemInstruction = {
                 parts: [{
-                    text: `당신은 더본 OMS(주문관리시스템) 발주 데이터 전문 AI 비서입니다. 
-현재 연도는 2026년입니다. 
+                    text: `[🔥최고 우선순위 절대 규칙🔥]
+1. 당신은 어떠한 경우에도 영어로 된 생각 과정("The tool returned...", "I will now summarize...", "The user asked for...")을 출력해서는 안 됩니다.
+2. 오직 사용자에게 보여질 '최종 한국어 답변' 딱 하나만 즉시 출력하십시오.
 
-[답변 스타일 지침 - 필수 준수]
+[역할 및 지침]
+당신은 더본 OMS(주문관리시스템) 발주 데이터 전문 AI 비서입니다. (현재 연도: 2026년)
+사용자가 질문하면 먼저 'query_order_summary' 함수를 호출하여 DB를 조회하세요.
+특정 점포(예: 수원정자시장점)의 주문 내역이나 점포별 수량을 물어볼 경우 'storeName' 파라미터를 활용하세요.
+
+[답변 스타일 지침]
 1. 과도한 볼드체(**), 번잡한 서론("조회값이 실제... 다음과 같습니다"), 과도하게 중첩된 리스트(- **주문 수량:** **3,211개**)를 절대 사용하지 마세요.
 2. 군더더기 없이 깔끔하고 간결한 한국어로 직관적으로 답변하세요.
    - 단일 일자 예시: "2026년 9월 17일 생크림 주문량은 3,211개(12,844,000원)입니다."
-   - 일자별 예시:
-     "9월 1일~2일 생크림 주문량입니다.
-     • 9월 1일: 1,468개 (5,872,000원)
-     • 9월 2일: 1,767개 (7,068,000원)
-     총합: 3,235개 (12,940,000원)"
+   - 점포별 내역 예시: "빽다방 수원정자시장점 9월 1일 발주 내역입니다.
+     • 서울우유 바리스타: 10개 (35,000원)
+     • 서울우유 생크림: 5개 (24,000원)"
 
 [품목 검색 및 후보 추천 지침]
-1. 사용자가 질문하면 먼저 'query_order_summary' 함수를 호출하여 DB를 조회하세요.
-2. 사용자가 검색한 품목 키워드로 매칭된 품목(matchedItems)이 여러 개(matchedItemCount > 1)인 경우:
-   - 만약 사용자가 단일 특정 품목을 지정한 게 아니라 유사 검색어(예: "24온즈 컵바디")를 입력한 것이라면, 수량을 억지로 합산하지 말고 유사 품목 목록을 나열하며 어떤 품목을 조회할지 고르도록 물어보세요.
-   - 예시: "'24온스 컵바디' 검색 결과 아래 유사 품목이 있습니다. 어떤 품목을 조회할까요?
-     1. 24온스 컵바디(투명)
-     2. 24온스 컵바디(블랙)"
-3. 연관 품목이 딱 1개(matchedItemCount === 1)만 발견된 경우:
-   - 다른 되묻기 없이 해당 품목의 결과를 즉시 간결하고 명확하게 한국어로 답변하세요.`
+1. 매칭된 품목(matchedItems)이 여러 개(matchedItemCount > 1)인 경우:
+   - 만약 사용자가 "24온즈 컵바디"처럼 특정되지 않은 검색어를 입력했다면, 수량을 임의로 합산하지 말고 유사 품목 목록을 나열하며 어떤 품목을 조회할지 되물어보세요.
+2. 연관 품목이 딱 1개(matchedItemCount === 1)만 발견된 경우:
+   - 다른 되묻기 없이 해당 품목의 결과를 즉시 간결한 한국어로 답변하세요.`
                 }]
             };
 
             const tools = [{
                 functionDeclarations: [{
                     name: "query_order_summary",
-                    description: "Supabase DB에서 기간, 브랜드, 품목별 일자별/통합 발주 수량 및 금액을 조회합니다.",
+                    description: "Supabase DB에서 기간, 브랜드, 품목, 점포별 발주 수량 및 금액 상세를 조회합니다.",
                     parameters: {
                         type: "OBJECT",
                         properties: {
                             startDate: { type: "STRING", description: "YYYY-MM-DD 형식의 시작일자. 명시 안될 시 2026년 현재월 기준 설정." },
                             endDate: { type: "STRING", description: "YYYY-MM-DD 형식의 종료일자." },
                             brandName: { type: "STRING", description: "브랜드명 키워드 (예: 빽다방, 홍콩반점 등). 없으면 빈값" },
-                            itemName: { type: "STRING", description: "품목명 키워드 (예: 생크림, 24온스, 컵바디 등). 없으면 빈값" }
+                            itemName: { type: "STRING", description: "품목명 키워드 (예: 생크림, 24온스, 컵바디 등). 없으면 빈값" },
+                            storeName: { type: "STRING", description: "점포명 키워드 (예: 수원정자시장점, 강남점 등 점포명). 없으면 빈값" }
                         },
                         required: ["startDate", "endDate"]
                     }
@@ -1141,13 +1143,13 @@
                         });
                         
                         const finalCandidate = resData2?.candidates?.[0]?.content;
-                        const finalAnswer = finalCandidate?.parts?.find(p => p.text)?.text;
+                        const finalAnswer = finalCandidate?.parts?.filter(p => p.text).map(p => p.text).join('\n').trim();
                         if (finalAnswer) {
                             appendChatBubble(finalAnswer, 'ai');
                             aiChatHistory.push(finalCandidate);
                         }
                     } else {
-                        const directText = candidate.parts?.find(p => p.text)?.text;
+                        const directText = candidate.parts?.filter(p => p.text).map(p => p.text).join('\n').trim();
                         if (directText) appendChatBubble(directText, 'ai');
                         aiChatHistory.push(candidate);
                     }
@@ -1160,22 +1162,37 @@
             }
         }
 
+        /* 🤖 [v34.0 핵심] 점포 상세 데이터(oms_orders)까지 AI가 조회할 수 있도록 확장 */
         async function executeDbQueryForAi(args) {
-            let { startDate, endDate, brandName, itemName } = args;
+            let { startDate, endDate, brandName, itemName, storeName } = args;
             if (!startDate) startDate = "2026-09-01";
             if (!endDate) endDate = "2026-09-30";
 
             let searchItem = (itemName || "").trim();
+            let searchStore = (storeName || "").trim();
+
+            // 💡 특정 점포가 지정되었으면 상세 oms_orders 테이블을 바로 조회!
+            let useOmsOrders = !!searchStore;
+            let tableName = useOmsOrders ? 'oms_orders' : 'daily_order_summary';
 
             async function doQuery(itemTerm) {
-                let queryUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,brand_name,item_name,item_code`;
+                let queryUrl = `${SUPABASE_URL}/rest/v1/${tableName}?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}`;
+                if (useOmsOrders) {
+                    queryUrl += `&select=delivery_date,order_date,qty,price,total_amount,brand_name,item_name,item_code,store_name,store_code,distribution_center`;
+                } else {
+                    queryUrl += `&select=delivery_date,total_qty,total_amount,brand_name,item_name,item_code`;
+                }
 
                 if (brandName) {
                     queryUrl += `&brand_name=ilike.*${encodeURIComponent(brandName)}*`;
                 }
+                if (searchStore) {
+                    queryUrl += `&store_name=ilike.*${encodeURIComponent(searchStore)}*`;
+                }
                 if (itemTerm) {
                     queryUrl += `&or=(item_code.ilike.*${encodeURIComponent(itemTerm)}*,item_name.ilike.*${encodeURIComponent(itemTerm)}*)`;
                 }
+                queryUrl += `&limit=1000`;
 
                 const res = await fetchWithUltraCache(queryUrl, {
                     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
@@ -1204,23 +1221,42 @@
                 let totalQty = 0, totalAmount = 0;
                 const items = new Set();
                 const brands = new Set();
+                const stores = new Set();
                 const dailyMap = {};
+                const storeItemsList = [];
 
                 data.forEach(r => {
                     const q = cleanNumber(r.total_qty || r.qty);
-                    const amt = cleanNumber(r.total_amount);
+                    const amt = cleanNumber(r.total_amount || (q * cleanNumber(r.price)));
                     totalQty += q;
                     totalAmount += amt;
                     if (r.item_name) items.add(r.item_name);
                     if (r.brand_name) brands.add(r.brand_name);
+                    if (r.store_name) stores.add(r.store_name);
 
                     const dKey = formatDisplayDate(r.delivery_date).replace(/\//g, '-');
                     if (!dailyMap[dKey]) dailyMap[dKey] = { qty: 0, amount: 0 };
                     dailyMap[dKey].qty += q;
                     dailyMap[dKey].amount += amt;
+
+                    if (useOmsOrders) {
+                        storeItemsList.push({
+                            storeName: r.store_name,
+                            storeCode: cleanCode(r.store_code),
+                            centerName: r.distribution_center || r.center_name || '-',
+                            orderDate: formatDisplayDate(r.order_date),
+                            deliveryDate: formatDisplayDate(r.delivery_date),
+                            itemName: r.item_name,
+                            itemCode: cleanCode(r.item_code),
+                            qty: q,
+                            price: cleanNumber(r.price),
+                            totalAmount: amt
+                        });
+                    }
                 });
 
                 const matchedItemList = Array.from(items);
+                const matchedStoreList = Array.from(stores);
                 const dailyBreakdown = Object.keys(dailyMap).sort().map(d => ({
                     date: d,
                     qty: dailyMap[d].qty,
@@ -1231,12 +1267,16 @@
                     status: "success",
                     queryPeriod: `${startDate} ~ ${endDate}`,
                     filterBrand: brandName || "전체 브랜드",
+                    filterStore: searchStore || "전체 점포",
                     searchedKeyword: searchItem,
                     matchedItems: matchedItemList,
                     matchedItemCount: matchedItemList.length,
+                    matchedStores: matchedStoreList.slice(0, 10),
+                    matchedStoreCount: matchedStoreList.length,
                     totalQty: totalQty,
                     totalAmount: totalAmount,
                     dailyBreakdown: dailyBreakdown,
+                    detailedStoreOrders: useOmsOrders ? storeItemsList.slice(0, 30) : null,
                     recordCount: data.length
                 };
             } catch (err) {}
@@ -1522,7 +1562,7 @@
                                 let statusIcon = "☀️";
                                 let statusText = "맑음";
 
-                                if (snow > 0 || [71, 73, 75, 77, 85, 86].includes(wCode)) { statusIcon = "❄️"; statusText = "눈"; }
+                                if (snow > 0 || [71, 73, 75, 77, 85, 86].includes(wCode)) { statusIcon = "❄️️"; statusText = "눈"; }
                                 else if (precip > 0 || [51, 53, 55, 61, 63, 65, 80, 81, 82].includes(wCode)) { statusIcon = "🌧️"; statusText = "비"; }
                                 else if ([1, 2, 3, 45, 48].includes(wCode)) { statusIcon = "⛅"; statusText = "흐림"; }
 
@@ -2034,7 +2074,7 @@
             XLSX.writeFile(wb, `OMS주문상세_${document.getElementById('chart-start-date').value}_${document.getElementById('chart-end-date').value}.xlsx`);
         }
 
-        /* ⚡ 페이지 로드 시 대시보드 및 AI 자동 초기화 */
+        /* ⚡ 페이지 로드 시 대시보드 초기화 */
         document.addEventListener('DOMContentLoaded', async () => {
             const today = new Date();
             const past7 = new Date(); past7.setDate(today.getDate() - 7);
