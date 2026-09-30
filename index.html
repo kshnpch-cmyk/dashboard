@@ -16,7 +16,7 @@
         * { box-sizing: border-box; }
         body {
             margin: 0; padding: 0;
-            font-family: 'Pretendard', 'Malgun Gothic', sans-serif;
+            font-family: 'Pretendard', 'Malgun Gothic', -apple-system, BlinkMacSystemFont, sans-serif;
             background-color: #f1f5f9;
             color: #1e293b;
         }
@@ -58,9 +58,6 @@
         
         .btn-forecast-link { background-color: #8b5cf6; }
         .btn-forecast-link:hover { background-color: #7c3aed; }
-
-        .btn-ai-chat { background-color: #7c3aed; }
-        .btn-ai-chat:hover { background-color: #6d28d9; }
 
         .btn-search-icon {
             background-color: #475569; color: white; border: none; padding: 6px 9px;
@@ -211,47 +208,186 @@
             display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #475569;
         }
 
-        /* 🤖 AI 대화 모달 전용 스타일 */
-        .ai-chat-content {
-            background: white; border-radius: 12px; width: 560px; max-width: 92%;
-            height: 80vh; max-height: 700px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);
-            display: flex; flex-direction: column; overflow: hidden;
+        /* ------------------------------------------------------------- */
+        /* ✨ [v33.0 신규] 갤럭시 AI 모티브 우측 하단 플로팅 버튼 & 챗 위젯 */
+        /* ------------------------------------------------------------- */
+        .ai-floating-btn {
+            position: fixed;
+            bottom: 28px;
+            right: 28px;
+            width: 62px;
+            height: 62px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
+            color: white;
+            border: none;
+            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.45);
+            cursor: pointer;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            transition: all 0.3초 cubic-bezier(0.34, 1.56, 0.64, 1);
+            animation: floatingPulse 2.8s infinite;
         }
+        .ai-floating-btn:hover {
+            transform: scale(1.1) translateY(-3px);
+            box-shadow: 0 12px 30px rgba(139, 92, 246, 0.6);
+        }
+        .ai-floating-btn:active {
+            transform: scale(0.95);
+        }
+        @keyframes floatingPulse {
+            0% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.5); }
+            70% { box-shadow: 0 0 0 16px rgba(139, 92, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
+        }
+
+        /* 챗 위젯 팝업 상자 */
+        .ai-chat-widget {
+            display: none;
+            position: fixed;
+            bottom: 102px;
+            right: 28px;
+            width: 410px;
+            max-width: calc(100vw - 36px);
+            height: 590px;
+            max-height: calc(100vh - 130px);
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.22), 0 0 0 1px rgba(226, 232, 240, 0.8);
+            z-index: 9998;
+            flex-direction: column;
+            overflow: hidden;
+            animation: widgetPopUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            transform-origin: bottom right;
+        }
+        @keyframes widgetPopUp {
+            0% { opacity: 0; transform: scale(0.8) translateY(20px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
         .ai-chat-header {
-            background: #0f172a; color: white; padding: 15px 20px;
-            display: flex; justify-content: space-between; align-items: center;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            color: white;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
+        .ai-chat-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 800;
+            font-size: 15px;
+            letter-spacing: -0.3px;
+        }
+        .ai-chat-close-btn {
+            cursor: pointer;
+            font-size: 18px;
+            color: #94a3b8;
+            transition: color 0.2s;
+            font-weight: bold;
+        }
+        .ai-chat-close-btn:hover { color: #ffffff; }
+
         .ai-key-box {
-            background: #1e293b; border: 1px solid #334155; padding: 8px 15px;
-            display: flex; align-items: center; gap: 8px; font-size: 12px; color: #94a3b8;
+            background: #1e293b;
+            padding: 8px 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11.5px;
+            color: #cbd5e1;
+            border-bottom: 1px solid #334155;
         }
         .ai-key-box input {
-            background: #0f172a; border: 1px solid #475569; color: white;
-            padding: 4px 8px; border-radius: 4px; font-size: 12px; width: 220px;
+            background: #0f172a;
+            border: 1px solid #475569;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 5px;
+            font-size: 11.5px;
+            flex: 1;
+            outline: none;
         }
+
         .ai-chat-messages {
-            flex: 1; overflow-y: auto; padding: 15px; background: #f8fafc;
-            display: flex; flex-direction: column; gap: 12px;
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            background: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
         .chat-bubble {
-            max-width: 85%; padding: 10px 14px; border-radius: 10px; font-size: 13.5px; line-height: 1.5; word-break: break-word;
+            max-width: 85%;
+            padding: 11px 15px;
+            font-size: 13px;
+            line-height: 1.55;
+            word-break: break-word;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }
         .chat-bubble.user {
-            align-self: flex-end; background-color: #2563eb; color: white; border-bottom-right-radius: 2px;
+            align-self: flex-end;
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            color: white;
+            border-radius: 18px 18px 2px 18px;
+            font-weight: 500;
         }
         .chat-bubble.ai {
-            align-self: flex-start; background-color: white; border: 1px solid #e2e8f0; color: #0f172a; border-bottom-left-radius: 2px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+            align-self: flex-start;
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+            color: #0f172a;
+            border-radius: 18px 18px 18px 2px;
         }
         .chat-bubble.system {
-            align-self: center; background-color: #f1f5f9; color: #64748b; font-size: 11.5px; border-radius: 12px; padding: 4px 10px;
+            align-self: center;
+            background-color: #e2e8f0;
+            color: #475569;
+            font-size: 11px;
+            border-radius: 12px;
+            padding: 4px 10px;
+            font-weight: 600;
+            box-shadow: none;
         }
+
         .ai-chat-input-area {
-            padding: 12px; background: white; border-top: 1px solid #e2e8f0; display: flex; gap: 8px;
+            padding: 12px 14px;
+            background: #ffffff;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            gap: 8px;
+            align-items: center;
         }
         .ai-chat-input-area input {
-            flex: 1; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13.5px; outline: none;
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid #cbd5e1;
+            border-radius: 20px;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
         }
+        .ai-chat-input-area input:focus {
+            border-color: #8b5cf6;
+        }
+        .btn-ai-send {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+            padding: 9px 16px;
+            border-radius: 20px;
+            font-weight: 800;
+            font-size: 12.5px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .btn-ai-send:hover { opacity: 0.9; }
     </style>
 </head>
 <body>
@@ -259,7 +395,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 대시보드</h1>
-            <span class="version-tag">v32.5 TTS/Audio Filter Fixed</span>
+            <span class="version-tag">v33.0 Floating AI Widget</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -272,33 +408,35 @@
                 <input type="date" id="sync-target-date" class="date-input">
             </div>
             <button id="run-btn" class="btn" onclick="triggerBot()">🚀 OMS 수동 동기화</button>
-            <button class="btn btn-ai-chat" onclick="openAiChatModal()">🤖 AI 질의응답</button>
             <button class="btn btn-forecast-link" onclick="window.open('forecast.html', '_blank')">🔮 수요 예측 (Forecast)</button>
         </div>
     </div>
 
-    <!-- 🤖 AI 질의응답 모달 -->
-    <div class="modal-overlay" id="ai-chat-modal">
-        <div class="ai-chat-content">
-            <div class="ai-chat-header">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 18px;">🤖</span>
-                    <span style="font-weight: bold; font-size: 15px;">OMS AI 수치 질의응답</span>
-                </div>
-                <span class="close-btn" style="color: white;" onclick="closeAiChatModal()">✕</span>
+    <!-- ✨ [v33.0 신규] 갤럭시 AI 모티브 우측 하단 플로팅 버튼 -->
+    <button class="ai-floating-btn" id="ai-floating-btn" onclick="toggleAiChatWidget()" title="AI 주문 질의응답 열기">
+        ✨
+    </button>
+
+    <!-- 🤖 [v33.0 신규] 우측 하단 챗 위젯 상자 -->
+    <div class="ai-chat-widget" id="ai-chat-modal">
+        <div class="ai-chat-header">
+            <div class="ai-chat-title">
+                <span>✨</span>
+                <span>OMS AI 수치 질의응답</span>
             </div>
-            <div class="ai-key-box">
-                <label>Gemini API Key:</label>
-                <input type="password" id="gemini-key-input" placeholder="Gemini API Key 입력">
-                <button class="btn btn-cal" style="background:#2563eb;" onclick="saveGeminiKey()">저장</button>
-            </div>
-            <div class="ai-chat-messages" id="ai-chat-messages">
-                <div class="chat-bubble system">Gemini AI가 연결되었습니다. 기간/브랜드/품목별 발주 수량을 편하게 물어보세요!</div>
-            </div>
-            <div class="ai-chat-input-area">
-                <input type="text" id="ai-user-input" placeholder="예: 9월 1일부터 9월 20일까지 빽다방 생크림 발주량은?" onkeydown="if(event.key==='Enter') sendAiMessage()">
-                <button class="btn btn-ai-chat" id="ai-send-btn" onclick="sendAiMessage()">전송</button>
-            </div>
+            <span class="ai-chat-close-btn" onclick="toggleAiChatWidget()">✕</span>
+        </div>
+        <div class="ai-key-box">
+            <label>API Key:</label>
+            <input type="password" id="gemini-key-input" placeholder="Gemini API Key">
+            <button class="btn btn-cal" style="background:#2563eb;" onclick="saveGeminiKey()">저장</button>
+        </div>
+        <div class="ai-chat-messages" id="ai-chat-messages">
+            <div class="chat-bubble system">✨ Gemini AI가 연결되었습니다. 수량을 편하게 물어보세요!</div>
+        </div>
+        <div class="ai-chat-input-area">
+            <input type="text" id="ai-user-input" placeholder="예: 9월 1일 생크림 발주량은?" onkeydown="if(event.key==='Enter') sendAiMessage()">
+            <button class="btn-ai-send" id="ai-send-btn" onclick="sendAiMessage()">전송</button>
         </div>
     </div>
 
@@ -790,15 +928,19 @@
             }
         });
 
-        /* 🤖 AI 질의응답 모달 제어 및 연동 */
-        function openAiChatModal() {
-            document.getElementById('ai-chat-modal').style.display = 'flex';
-            const savedKey = localStorage.getItem('gemini_api_key') || '';
-            document.getElementById('gemini-key-input').value = savedKey;
-        }
-
-        function closeAiChatModal() {
-            document.getElementById('ai-chat-modal').style.display = 'none';
+        /* 🤖 [v33.0 신규] 우측 하단 AI 위젯 토글 토글 제어 */
+        function toggleAiChatWidget() {
+            const widget = document.getElementById('ai-chat-modal');
+            const isVisible = widget.style.display === 'flex';
+            
+            if (isVisible) {
+                widget.style.display = 'none';
+            } else {
+                widget.style.display = 'flex';
+                const savedKey = localStorage.getItem('gemini_api_key') || '';
+                document.getElementById('gemini-key-input').value = savedKey;
+                document.getElementById('ai-user-input').focus();
+            }
         }
 
         function saveGeminiKey() {
@@ -817,7 +959,6 @@
             msgContainer.scrollTop = msgContainer.scrollHeight;
         }
 
-        /* 🤖 [v32.5 핵심] 음성/TTS/임베딩 모델을 완벽 차단하는 실시간 사용 가능 텍스트 모델 탐색 */
         async function fetchAvailableTextModels(apiKey) {
             const cleanKey = encodeURIComponent(apiKey.trim());
             try {
@@ -830,7 +971,6 @@
                             const name = (m.name || '').toLowerCase();
                             const methods = m.supportedGenerationMethods || [];
                             const supportsGen = methods.includes("generateContent");
-                            // 💡 음성(TTS/Audio), 임베딩, 이미지 모델을 엄격히 차단
                             const isNotTextMode = name.includes("-tts") || name.includes("-audio") || name.includes("embedding") || name.includes("imagen") || name.includes("aqa");
                             return supportsGen && !isNotTextMode;
                         })
@@ -844,8 +984,6 @@
 
         async function callGeminiApiWithFallback(apiKey, payload) {
             const cleanKey = encodeURIComponent(apiKey.trim());
-            
-            // 1. 내 계정의 텍스트 전용 호환 모델 목록 조회
             let availableModels = await fetchAvailableTextModels(apiKey);
             let candidateModels = [];
 
@@ -862,7 +1000,6 @@
 
                 candidateModels = [...new Set([...candidateModels, ...availableModels])];
             } else {
-                // 백업 후보군 (TTS 제외)
                 candidateModels = [
                     'gemini-1.5-flash',
                     'gemini-1.5-pro'
@@ -884,14 +1021,10 @@
 
                     if (!res.ok) {
                         const errMsg = resJson?.error?.message || `API HTTP 오류 (${res.status})`;
-                        
-                        // 404나 400(모달리티 미지원/TTS에러) 발생 시 다음 후보 모델로 계속 시도
                         if (res.status === 404 || (res.status === 400 && errMsg.includes("modalities"))) {
-                            console.warn(`[Gemini API] 모델 ${model} 미지원 (${res.status}). 다음 모델 시도...`);
                             lastError = new Error(errMsg);
                             continue;
                         }
-
                         if (res.status === 400 || res.status === 403) {
                             throw new Error(`API 키 인증 또는 권한 오류 (${res.status}): ${errMsg}`);
                         }
@@ -908,7 +1041,7 @@
                 }
             }
             
-            throw lastError || new Error("사용 가능한 Gemini AI 모델을 찾지 못했습니다. Google AI Studio(aistudio.google.com)에서 발급받은 API 키인지 확인해주세요.");
+            throw lastError || new Error("사용 가능한 Gemini AI 모델을 찾지 못했습니다.");
         }
 
         async function sendAiMessage() {
@@ -927,32 +1060,36 @@
 
             aiChatHistory.push({ role: 'user', parts: [{ text: userText }] });
 
+            const systemInstruction = {
+                parts: [{
+                    text: `당신은 더본 OMS(주문관리시스템) 발주 데이터 전문 AI 비서입니다. 
+현재 연도는 2026년입니다. 사용자가 기간별 발주 수량, 금액, 브랜드, 품목 데이터에 대해 질문하면 'query_order_summary' 함수를 호출하여 DB 수치를 조회하세요.
+DB 조회가 완료된 후에는 'The user wants to know...' 같은 영어 요약문이나 생각 과정을 절대로 그대로 출력하지 마시고, 반드시 최종 사용자를 위한 친절하고 완벽한 한국어 문장으로 발주 수치(수량, 금액 등)를 직접 답변하세요.`
+                }]
+            };
+
+            const tools = [{
+                functionDeclarations: [{
+                    name: "query_order_summary",
+                    description: "Supabase DB에서 기간, 브랜드, 품목별 발주 수량 및 금액을 조회합니다.",
+                    parameters: {
+                        type: "OBJECT",
+                        properties: {
+                            startDate: { type: "STRING", description: "YYYY-MM-DD 형식의 시작일자. 명시 안될 시 2026년 현재월 기준 설정." },
+                            endDate: { type: "STRING", description: "YYYY-MM-DD 형식의 종료일자." },
+                            brandName: { type: "STRING", description: "브랜드명 키워드 (예: 빽다방, 홍콩반점 등). 없으면 빈값" },
+                            itemName: { type: "STRING", description: "품목명 키워드 (예: 생크림, 서울우유 등). 없으면 빈값" }
+                        },
+                        required: ["startDate", "endDate"]
+                    }
+                }]
+            }];
+
             try {
                 const requestPayload = {
                     contents: aiChatHistory,
-                    systemInstruction: {
-                        parts: [{
-                            text: `당신은 더본 OMS(주문관리시스템) 발주 데이터 전문 AI 비서입니다. 
-현재 연도는 2026년입니다. 사용자가 기간별 발주 수량, 금액, 브랜드, 품목 데이터에 대해 질문하면 'query_order_summary' 함수를 호출하여 DB 수치를 조회하세요.
-조회 결과 수치를 바탕으로 친절하고 명확하게 한국어로 답변하세요.`
-                        }]
-                    },
-                    tools: [{
-                        functionDeclarations: [{
-                            name: "query_order_summary",
-                            description: "Supabase DB에서 기간, 브랜드, 품목별 발주 수량 및 금액을 조회합니다.",
-                            parameters: {
-                                type: "OBJECT",
-                                properties: {
-                                    startDate: { type: "STRING", description: "YYYY-MM-DD 형식의 시작일자. 명시 안될 시 2026년 현재월 기준 설정." },
-                                    endDate: { type: "STRING", description: "YYYY-MM-DD 형식의 종료일자." },
-                                    brandName: { type: "STRING", description: "브랜드명 키워드 (예: 빽다방, 홍콩반점 등). 없으면 빈값" },
-                                    itemName: { type: "STRING", description: "품목명 키워드 (예: 생크림, 서울우유 등). 없으면 빈값" }
-                                },
-                                required: ["startDate", "endDate"]
-                            }
-                        }]
-                    }]
+                    systemInstruction,
+                    tools
                 };
 
                 const resData = await callGeminiApiWithFallback(apiKey, requestPayload);
@@ -977,11 +1114,17 @@
                             }]
                         });
 
-                        const resData2 = await callGeminiApiWithFallback(apiKey, { contents: aiChatHistory });
-                        const finalAnswer = resData2?.candidates?.[0]?.content?.parts?.[0]?.text;
+                        const resData2 = await callGeminiApiWithFallback(apiKey, { 
+                            contents: aiChatHistory,
+                            systemInstruction,
+                            tools
+                        });
+                        
+                        const finalCandidate = resData2?.candidates?.[0]?.content;
+                        const finalAnswer = finalCandidate?.parts?.find(p => p.text)?.text;
                         if (finalAnswer) {
                             appendChatBubble(finalAnswer, 'ai');
-                            aiChatHistory.push(resData2.candidates[0].content);
+                            aiChatHistory.push(finalCandidate);
                         }
                     } else {
                         const directText = candidate.parts?.find(p => p.text)?.text;
@@ -1277,7 +1420,7 @@
                                 const ddMefs = parseFloat(r.ddMefs || 0);
                                 const avgTca = parseFloat(r.avgTca || 0);
 
-                                let statusIcon = "☀️";
+                                let statusIcon = "☀️️";
                                 let statusText = "맑음";
 
                                 if (ddMefs > 0) { statusIcon = "❄️"; statusText = "눈"; }
