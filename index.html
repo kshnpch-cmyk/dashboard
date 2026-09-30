@@ -259,7 +259,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 대시보드</h1>
-            <span class="version-tag">v32.4 Dynamic Model Discovery</span>
+            <span class="version-tag">v32.5 TTS/Audio Filter Fixed</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -817,16 +817,23 @@
             msgContainer.scrollTop = msgContainer.scrollHeight;
         }
 
-        /* 🤖 [v32.4 핵심] 사용 가능한 전체 모델을 동적 조회한 뒤 우선순위대로 Fallback 적용 */
-        async function fetchAvailableModels(apiKey) {
+        /* 🤖 [v32.5 핵심] 음성/TTS/임베딩 모델을 완벽 차단하는 실시간 사용 가능 텍스트 모델 탐색 */
+        async function fetchAvailableTextModels(apiKey) {
             const cleanKey = encodeURIComponent(apiKey.trim());
             try {
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${cleanKey}`);
                 if (!res.ok) return null;
                 const data = await res.json();
-                if (data && data.models) {
+                if (data && data.models && Array.isArray(data.models)) {
                     return data.models
-                        .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"))
+                        .filter(m => {
+                            const name = (m.name || '').toLowerCase();
+                            const methods = m.supportedGenerationMethods || [];
+                            const supportsGen = methods.includes("generateContent");
+                            // 💡 음성(TTS/Audio), 임베딩, 이미지 모델을 엄격히 차단
+                            const isNotTextMode = name.includes("-tts") || name.includes("-audio") || name.includes("embedding") || name.includes("imagen") || name.includes("aqa");
+                            return supportsGen && !isNotTextMode;
+                        })
                         .map(m => m.name.replace(/^models\//, ''));
                 }
             } catch (e) {
@@ -838,20 +845,14 @@
         async function callGeminiApiWithFallback(apiKey, payload) {
             const cleanKey = encodeURIComponent(apiKey.trim());
             
-            // 1. 사용자 키로 사용 가능한 전체 모델 목록을 실시간으로 가져옵니다.
-            let availableModels = await fetchAvailableModels(apiKey);
-            
+            // 1. 내 계정의 텍스트 전용 호환 모델 목록 조회
+            let availableModels = await fetchAvailableTextModels(apiKey);
             let candidateModels = [];
 
-            // 2. 계정 전용 모델이 정상 조회되었을 경우: 우선순위 필터링 적용
             if (availableModels && availableModels.length > 0) {
-                // 1순위: 최신 플래시 모델 (속도+비용+성능 균형) - exp 제외
-                const flashModel = availableModels.find(m => m.includes("flash") && !m.includes("exp"));
-                // 2순위: 1순위가 없다면 아무 플래시 모델이나
+                const flashModel = availableModels.find(m => m.includes("flash") && !m.includes("exp") && !m.includes("preview"));
                 const anyFlash = availableModels.find(m => m.includes("flash"));
-                // 3순위: 프로 모델
                 const proModel = availableModels.find(m => m.includes("pro"));
-                // 4순위: 리스트의 첫 번째 모델
                 const fallbackModel = availableModels[0];
 
                 if (flashModel) candidateModels.push(flashModel);
@@ -859,11 +860,9 @@
                 else if (proModel) candidateModels.push(proModel);
                 else candidateModels.push(fallbackModel);
 
-                // 안전망으로 혹시나 실패할 경우를 대비해 사용 가능한 전체 모델을 시도 대기열에 추가
                 candidateModels = [...new Set([...candidateModels, ...availableModels])];
-            } 
-            // 3. 모델 조회를 실패했을 경우 (CORS나 일시적 통신에러 등): 절대 404가 안 뜨는 가장 구형 표준 모델들만 강제 사용
-            else {
+            } else {
+                // 백업 후보군 (TTS 제외)
                 candidateModels = [
                     'gemini-1.5-flash',
                     'gemini-1.5-pro'
@@ -881,16 +880,18 @@
                         body: JSON.stringify(payload)
                     });
 
-                    // 404 에러 시 조용히 넘어가서 다음 후보 모델로 재시도
-                    if (res.status === 404) {
-                        lastError = new Error(`404: ${model} 모델을 찾을 수 없습니다.`);
-                        continue;
-                    }
-
                     const resJson = await res.json().catch(() => ({}));
 
                     if (!res.ok) {
                         const errMsg = resJson?.error?.message || `API HTTP 오류 (${res.status})`;
+                        
+                        // 404나 400(모달리티 미지원/TTS에러) 발생 시 다음 후보 모델로 계속 시도
+                        if (res.status === 404 || (res.status === 400 && errMsg.includes("modalities"))) {
+                            console.warn(`[Gemini API] 모델 ${model} 미지원 (${res.status}). 다음 모델 시도...`);
+                            lastError = new Error(errMsg);
+                            continue;
+                        }
+
                         if (res.status === 400 || res.status === 403) {
                             throw new Error(`API 키 인증 또는 권한 오류 (${res.status}): ${errMsg}`);
                         }
@@ -900,14 +901,14 @@
                     return resJson;
                 } catch (err) {
                     lastError = err;
-                    if (err.message && (err.message.includes('404') || err.message.includes('NOT_FOUND'))) {
+                    if (err.message && (err.message.includes('404') || err.message.includes('NOT_FOUND') || err.message.includes('modalities'))) {
                         continue;
                     }
                     throw err;
                 }
             }
             
-            throw lastError || new Error("Gemini API 호출에 실패했습니다. 유효한 API 키인지 Google AI Studio에서 확인해주세요.");
+            throw lastError || new Error("사용 가능한 Gemini AI 모델을 찾지 못했습니다. Google AI Studio(aistudio.google.com)에서 발급받은 API 키인지 확인해주세요.");
         }
 
         async function sendAiMessage() {
