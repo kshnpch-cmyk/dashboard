@@ -392,7 +392,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 대시보드</h1>
-            <span class="version-tag">v32.7 Daily Breakdown & Strict Korean</span>
+            <span class="version-tag">v33.1 Clean AI Assistant</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -432,7 +432,7 @@
             <div class="chat-bubble system">✨ Gemini AI가 연결되었습니다. 수량을 편하게 물어보세요!</div>
         </div>
         <div class="ai-chat-input-area">
-            <input type="text" id="ai-user-input" placeholder="예: 9월 1일부터 9월 2일까지 일자별 생크림 수량" onkeydown="if(event.key==='Enter') sendAiMessage()">
+            <input type="text" id="ai-user-input" placeholder="예: 9월 1일부터 9월 2일까지 생크림 수량" onkeydown="if(event.key==='Enter') sendAiMessage()">
             <button class="btn-ai-send" id="ai-send-btn" onclick="sendAiMessage()">전송</button>
         </div>
     </div>
@@ -1057,16 +1057,31 @@
 
             aiChatHistory.push({ role: 'user', parts: [{ text: userText }] });
 
-            // 💡 [v32.7 엄격한 한국어 강제 및 답변 출력 지침]
+            // 💡 [v33.1 핵심 수정] 깔끔한 답변 스타일 및 유사 품목 후보 추천 가이드라인
             const systemInstruction = {
                 parts: [{
                     text: `당신은 더본 OMS(주문관리시스템) 발주 데이터 전문 AI 비서입니다. 
 현재 연도는 2026년입니다. 
 
-[중요 지침]
-1. 사용자가 질문하면 먼저 'query_order_summary' 함수를 호출하여 DB에서 실제 수치를 조회하세요.
-2. DB 조회가 완료되면, 'The user wants to know...' 등 영문 생각 과정을 절대로 화면에 출력하지 마세요!
-3. 무조건 100% 한국어로만 친절하게 최종 발주 수치(일자별 수량 및 총 수량, 금액 등)를 직접 정리하여 답변하세요.`
+[답변 스타일 지침 - 필수 준수]
+1. 과도한 볼드체(**), 번잡한 서론("조회값이 실제... 다음과 같습니다"), 과도하게 중첩된 리스트(- **주문 수량:** **3,211개**)를 절대 사용하지 마세요.
+2. 군더더기 없이 깔끔하고 간결한 한국어로 직관적으로 답변하세요.
+   - 단일 일자 예시: "2026년 9월 17일 생크림 주문량은 3,211개(12,844,000원)입니다."
+   - 일자별 예시:
+     "9월 1일~2일 생크림 주문량입니다.
+     • 9월 1일: 1,468개 (5,872,000원)
+     • 9월 2일: 1,767개 (7,068,000원)
+     총합: 3,235개 (12,940,000원)"
+
+[품목 검색 및 후보 추천 지침]
+1. 사용자가 질문하면 먼저 'query_order_summary' 함수를 호출하여 DB를 조회하세요.
+2. 사용자가 검색한 품목 키워드로 매칭된 품목(`matchedItems`)이 여러 개(`matchedItemCount > 1`)인 경우:
+   - 만약 사용자가 단일 특정 품목을 지정한 게 아니라 유사 검색어(예: "24온즈 컵바디")를 입력한 것이라면, 수량을 억지로 합산하지 말고 유사 품목 목록을 나열하며 어떤 품목을 조회할지 고르도록 물어보세요.
+   - 예시: "'24온스 컵바디' 검색 결과 아래 유사 품목이 있습니다. 어떤 품목을 조회할까요?
+     1. 24온스 컵바디(투명)
+     2. 24온스 컵바디(블랙)"
+3. 연관 품목이 딱 1개(`matchedItemCount === 1`)만 발견된 경우:
+   - 다른 되묻기 없이 해당 품목의 결과를 즉시 간결하고 명확하게 한국어로 답변하세요.`
                 }]
             };
 
@@ -1080,7 +1095,7 @@
                             startDate: { type: "STRING", description: "YYYY-MM-DD 형식의 시작일자. 명시 안될 시 2026년 현재월 기준 설정." },
                             endDate: { type: "STRING", description: "YYYY-MM-DD 형식의 종료일자." },
                             brandName: { type: "STRING", description: "브랜드명 키워드 (예: 빽다방, 홍콩반점 등). 없으면 빈값" },
-                            itemName: { type: "STRING", description: "품목명 키워드 (예: 생크림, 서울우유 등). 없으면 빈값" }
+                            itemName: { type: "STRING", description: "품목명 키워드 (예: 생크림, 24온스, 컵바디 등). 없으면 빈값" }
                         },
                         required: ["startDate", "endDate"]
                     }
@@ -1098,13 +1113,17 @@
                 const candidate = resData?.candidates?.[0]?.content;
 
                 if (candidate) {
-                    aiChatHistory.push(candidate);
-
                     const functionCall = candidate.parts?.find(p => p.functionCall)?.functionCall;
 
                     if (functionCall && functionCall.name === "query_order_summary") {
                         appendChatBubble("🔍 DB 수치를 조회하고 있습니다...", 'system');
                         const dbResult = await executeDbQueryForAi(functionCall.args);
+
+                        const cleanCandidate = {
+                            role: 'model',
+                            parts: candidate.parts.filter(p => p.functionCall)
+                        };
+                        aiChatHistory.push(cleanCandidate);
 
                         aiChatHistory.push({
                             role: 'user',
@@ -1131,6 +1150,7 @@
                     } else {
                         const directText = candidate.parts?.find(p => p.text)?.text;
                         if (directText) appendChatBubble(directText, 'ai');
+                        aiChatHistory.push(candidate);
                     }
                 }
             } catch (err) {
@@ -1141,67 +1161,88 @@
             }
         }
 
-        /* 🤖 [v32.7 핵심] 일자별 상세 수량(dailyBreakdown)을 함께 반환하도록 DB 조회 보정 */
+        /* 🤖 [v33.1 핵심] 스마트 유사 품목 검색 및 후보 반환 백엔드 함수 */
         async function executeDbQueryForAi(args) {
             let { startDate, endDate, brandName, itemName } = args;
             if (!startDate) startDate = "2026-09-01";
             if (!endDate) endDate = "2026-09-30";
 
-            let queryUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,brand_name,item_name,item_code`;
+            let searchItem = (itemName || "").trim();
 
-            if (brandName) {
-                queryUrl += `&brand_name=ilike.*${encodeURIComponent(brandName)}*`;
-            }
-            if (itemName) {
-                queryUrl += `&or=(item_code.ilike.*${encodeURIComponent(itemName)}*,item_name.ilike.*${encodeURIComponent(itemName)}*)`;
-            }
+            async function doQuery(itemTerm) {
+                let queryUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,brand_name,item_name,item_code`;
 
-            try {
+                if (brandName) {
+                    queryUrl += `&brand_name=ilike.*${encodeURIComponent(brandName)}*`;
+                }
+                if (itemTerm) {
+                    queryUrl += `&or=(item_code.ilike.*${encodeURIComponent(itemTerm)}*,item_name.ilike.*${encodeURIComponent(itemTerm)}*)`;
+                }
+
                 const res = await fetchWithUltraCache(queryUrl, {
                     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
                 });
+                return res.ok ? await res.json() : [];
+            }
 
-                if (res.ok) {
-                    const data = await res.json();
-                    let totalQty = 0, totalAmount = 0;
-                    const items = new Set();
-                    const brands = new Set();
-                    const dailyMap = {};
+            try {
+                let data = await doQuery(searchItem);
 
-                    data.forEach(r => {
-                        const q = cleanNumber(r.total_qty || r.qty);
-                        const amt = cleanNumber(r.total_amount);
-                        totalQty += q;
-                        totalAmount += amt;
-                        if (r.item_name) items.add(r.item_name);
-                        if (r.brand_name) brands.add(r.brand_name);
-
-                        const dKey = formatDisplayDate(r.delivery_date).replace(/\//g, '-');
-                        if (!dailyMap[dKey]) dailyMap[dKey] = { qty: 0, amount: 0 };
-                        dailyMap[dKey].qty += q;
-                        dailyMap[dKey].amount += amt;
-                    });
-
-                    // 💡 날짜별 상세 수량 배열 생성
-                    const dailyBreakdown = Object.keys(dailyMap).sort().map(d => ({
-                        date: d,
-                        qty: dailyMap[d].qty,
-                        amount: dailyMap[d].amount
-                    }));
-
-                    return {
-                        status: "success",
-                        queryPeriod: `${startDate} ~ ${endDate}`,
-                        filterBrand: brandName || "전체 브랜드",
-                        filterItem: itemName || "전체 품목",
-                        totalQty: totalQty,
-                        totalAmount: totalAmount,
-                        dailyBreakdown: dailyBreakdown,
-                        recordCount: data.length,
-                        itemTypesCount: items.size,
-                        brandTypesCount: brands.size
-                    };
+                // 💡 [유사어 보정 1] 오타나 단위차이(예: 온즈 -> 온스) 자동 대체 검색
+                if (data.length === 0 && searchItem) {
+                    let altTerm = searchItem.replace(/온즈/g, '온스').replace(/온스/g, '온즈');
+                    if (altTerm !== searchItem) {
+                        data = await doQuery(altTerm);
+                    }
                 }
+
+                // 💡 [유사어 보정 2] 단어 띄어쓰기 복합어 분하 탐색
+                if (data.length === 0 && searchItem.includes(' ')) {
+                    let parts = searchItem.split(' ').filter(p => p.length > 1);
+                    for (let part of parts) {
+                        data = await doQuery(part);
+                        if (data.length > 0) break;
+                    }
+                }
+
+                let totalQty = 0, totalAmount = 0;
+                const items = new Set();
+                const brands = new Set();
+                const dailyMap = {};
+
+                data.forEach(r => {
+                    const q = cleanNumber(r.total_qty || r.qty);
+                    const amt = cleanNumber(r.total_amount);
+                    totalQty += q;
+                    totalAmount += amt;
+                    if (r.item_name) items.add(r.item_name);
+                    if (r.brand_name) brands.add(r.brand_name);
+
+                    const dKey = formatDisplayDate(r.delivery_date).replace(/\//g, '-');
+                    if (!dailyMap[dKey]) dailyMap[dKey] = { qty: 0, amount: 0 };
+                    dailyMap[dKey].qty += q;
+                    dailyMap[dKey].amount += amt;
+                });
+
+                const matchedItemList = Array.from(items);
+                const dailyBreakdown = Object.keys(dailyMap).sort().map(d => ({
+                    date: d,
+                    qty: dailyMap[d].qty,
+                    amount: dailyMap[d].amount
+                }));
+
+                return {
+                    status: "success",
+                    queryPeriod: `${startDate} ~ ${endDate}`,
+                    filterBrand: brandName || "전체 브랜드",
+                    searchedKeyword: searchItem,
+                    matchedItems: matchedItemList,
+                    matchedItemCount: matchedItemList.length,
+                    totalQty: totalQty,
+                    totalAmount: totalAmount,
+                    dailyBreakdown: dailyBreakdown,
+                    recordCount: data.length
+                };
             } catch (err) {}
             return { status: "error", message: "DB 조회 중 오류 발생" };
         }
