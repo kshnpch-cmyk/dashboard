@@ -392,7 +392,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 대시보드</h1>
-            <span class="version-tag">v33.1 Clean AI Assistant</span>
+            <span class="version-tag">v33.2 Fixed Complete Integrated</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -1057,7 +1057,6 @@
 
             aiChatHistory.push({ role: 'user', parts: [{ text: userText }] });
 
-            // 💡 [v33.1 핵심 수정] 깔끔한 답변 스타일 및 유사 품목 후보 추천 가이드라인
             const systemInstruction = {
                 parts: [{
                     text: `당신은 더본 OMS(주문관리시스템) 발주 데이터 전문 AI 비서입니다. 
@@ -1075,12 +1074,12 @@
 
 [품목 검색 및 후보 추천 지침]
 1. 사용자가 질문하면 먼저 'query_order_summary' 함수를 호출하여 DB를 조회하세요.
-2. 사용자가 검색한 품목 키워드로 매칭된 품목(`matchedItems`)이 여러 개(`matchedItemCount > 1`)인 경우:
+2. 사용자가 검색한 품목 키워드로 매칭된 품목(matchedItems)이 여러 개(matchedItemCount > 1)인 경우:
    - 만약 사용자가 단일 특정 품목을 지정한 게 아니라 유사 검색어(예: "24온즈 컵바디")를 입력한 것이라면, 수량을 억지로 합산하지 말고 유사 품목 목록을 나열하며 어떤 품목을 조회할지 고르도록 물어보세요.
    - 예시: "'24온스 컵바디' 검색 결과 아래 유사 품목이 있습니다. 어떤 품목을 조회할까요?
      1. 24온스 컵바디(투명)
      2. 24온스 컵바디(블랙)"
-3. 연관 품목이 딱 1개(`matchedItemCount === 1`)만 발견된 경우:
+3. 연관 품목이 딱 1개(matchedItemCount === 1)만 발견된 경우:
    - 다른 되묻기 없이 해당 품목의 결과를 즉시 간결하고 명확하게 한국어로 답변하세요.`
                 }]
             };
@@ -1161,7 +1160,6 @@
             }
         }
 
-        /* 🤖 [v33.1 핵심] 스마트 유사 품목 검색 및 후보 반환 백엔드 함수 */
         async function executeDbQueryForAi(args) {
             let { startDate, endDate, brandName, itemName } = args;
             if (!startDate) startDate = "2026-09-01";
@@ -1188,7 +1186,6 @@
             try {
                 let data = await doQuery(searchItem);
 
-                // 💡 [유사어 보정 1] 오타나 단위차이(예: 온즈 -> 온스) 자동 대체 검색
                 if (data.length === 0 && searchItem) {
                     let altTerm = searchItem.replace(/온즈/g, '온스').replace(/온스/g, '온즈');
                     if (altTerm !== searchItem) {
@@ -1196,7 +1193,6 @@
                     }
                 }
 
-                // 💡 [유사어 보정 2] 단어 띄어쓰기 복합어 분하 탐색
                 if (data.length === 0 && searchItem.includes(' ')) {
                     let parts = searchItem.split(' ').filter(p => p.length > 1);
                     for (let part of parts) {
@@ -2038,6 +2034,7 @@
             XLSX.writeFile(wb, `OMS주문상세_${document.getElementById('chart-start-date').value}_${document.getElementById('chart-end-date').value}.xlsx`);
         }
 
+        /* ⚡ 페이지 로드 시 대시보드 및 AI 자동 초기화 */
         document.addEventListener('DOMContentLoaded', async () => {
             const today = new Date();
             const past7 = new Date(); past7.setDate(today.getDate() - 7);
