@@ -259,7 +259,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 대시보드</h1>
-            <span class="version-tag">v32.0 Gemini Auto-Fallback</span>
+            <span class="version-tag">v32.1 Gemini Model Discovery Fix</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -817,18 +817,62 @@
             msgContainer.scrollTop = msgContainer.scrollHeight;
         }
 
-        /* 🤖 404 방지용 Gemini API 자동 폴백(Auto-Fallback) 호출 함수 */
+        /* 🤖 사용 가능한 제미나이 모델을 실시간 자동 탐색 */
+        async function getAvailableGeminiModel(apiKey) {
+            const cleanKey = encodeURIComponent(apiKey.trim());
+            try {
+                const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${cleanKey}`;
+                const res = await fetch(listUrl);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.models && Array.isArray(data.models)) {
+                        const validModels = data.models
+                            .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"))
+                            .map(m => m.name.replace(/^models\//, ''));
+                        
+                        const preferred = validModels.find(m => m.includes("flash") && !m.includes("exp")) 
+                                       || validModels.find(m => m.includes("flash")) 
+                                       || validModels.find(m => m.includes("pro"))
+                                       || validModels[0];
+                        if (preferred) return preferred;
+                    }
+                } else {
+                    const errJson = await res.json().catch(() => ({}));
+                    if (res.status === 404) {
+                        throw new Error("Google AI Studio (aistudio.google.com)에서 발급한 유효한 Gemini API Key인지 확인하세요.");
+                    } else if (res.status === 400 || res.status === 403) {
+                        throw new Error(`API 키 인증 실패 (${res.status}): ${errJson?.error?.message || 'API 키 권한이 없습니다.'}`);
+                    }
+                }
+            } catch (e) {
+                if (e.message && e.message.includes("API")) throw e;
+            }
+            return 'gemini-1.5-flash';
+        }
+
+        /* 🤖 동적 모델 지원 Gemini API 연산 메인 로직 */
         async function callGeminiApiWithFallback(apiKey, payload) {
-            const modelCandidates = [
-                'gemini-2.0-flash',
+            const cleanKey = encodeURIComponent(apiKey.trim());
+            
+            let targetModel = 'gemini-1.5-flash';
+            try {
+                targetModel = await getAvailableGeminiModel(apiKey);
+            } catch (e) {
+                throw e;
+            }
+
+            const candidateModels = [
+                targetModel,
                 'gemini-1.5-flash',
-                'gemini-2.5-flash',
+                'gemini-1.5-flash-latest',
+                'gemini-2.0-flash',
                 'gemini-1.5-pro'
             ];
+            const uniqueCandidates = [...new Set(candidateModels)];
             let lastError = null;
 
-            for (const model of modelCandidates) {
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            for (const model of uniqueCandidates) {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`;
                 try {
                     const res = await fetch(url, {
                         method: 'POST',
@@ -837,7 +881,7 @@
                     });
 
                     if (res.status === 404) {
-                        console.warn(`모델 ${model} 404 반환. 다음 모델 후보 시도...`);
+                        console.warn(`모델 ${model} 404 반환. 다음 모델 시도...`);
                         continue;
                     }
 
@@ -853,14 +897,13 @@
                     throw err;
                 }
             }
-            throw lastError || new Error("사용 가능한 Gemini API 모델을 찾지 못했습니다 (404). API 키 권한을 확인하세요.");
+            throw lastError || new Error("사용 가능한 Gemini API 모델을 찾지 못했습니다 (404). Google AI Studio(aistudio.google.com)에서 발급한 API 키인지 확인해주세요.");
         }
 
-        /* 🤖 Gemini Function Calling 연산 메인 로직 (v32.0 REST 스키마 카멜케이스 및 Auto-Fallback 이식) */
         async function sendAiMessage() {
             const inputEl = document.getElementById('ai-user-input');
             const userText = inputEl.value.trim();
-            const apiKey = localStorage.getItem('gemini_api_key') || document.getElementById('gemini-key-input').value.trim();
+            const apiKey = (localStorage.getItem('gemini_api_key') || document.getElementById('gemini-key-input').value).trim();
 
             if (!userText) return;
             if (!apiKey) return alert("Gemini API Key를 먼저 입력하고 저장하세요.");
@@ -874,7 +917,6 @@
             aiChatHistory.push({ role: 'user', parts: [{ text: userText }] });
 
             try {
-                // 💡 [카멜케이스 스키마 준수] REST API 규격에 완벽히 맞춘 요청 구조
                 const requestPayload = {
                     contents: aiChatHistory,
                     systemInstruction: {
@@ -943,7 +985,6 @@
             }
         }
 
-        /* 🤖 AI용 Supabase DB 조회 전용 함수 */
         async function executeDbQueryForAi(args) {
             let { startDate, endDate, brandName, itemName } = args;
             if (!startDate) startDate = "2026-09-01";
@@ -994,7 +1035,6 @@
             return { status: "error", message: "DB 조회 중 오류 발생" };
         }
 
-        /* 🚀 브랜드별 점포수 상세 모달 관련 함수 */
         function openBrandStoreModal() {
             document.getElementById('brand-store-modal').style.display = 'flex';
             const listEl = document.getElementById('brand-store-modal-list');
@@ -1229,7 +1269,7 @@
                                 let statusIcon = "☀️";
                                 let statusText = "맑음";
 
-                                if (ddMefs > 0) { statusIcon = "❄️"; statusText = "눈"; }
+                                if (ddMefs > 0) { statusIcon = "❄️️"; statusText = "눈"; }
                                 else if (sumRn > 0) { statusIcon = "🌧️"; statusText = "비"; }
                                 else if (avgTca >= 6.0) { statusIcon = "⛅"; statusText = "흐림"; }
 
