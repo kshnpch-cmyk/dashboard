@@ -1164,6 +1164,7 @@
         }
 
         /* 🤖 [실제 DB 컬럼 기반 조회 쿼리 매핑] */
+        /* 🤖 [PostgREST and=(or(...),or(...)) 쿼리 충돌 수정 완료] */
         async function executeDbQueryForAi(args) {
             let { startDate, endDate, brandName, itemName, storeName, centerName } = args;
             if (!startDate) startDate = "2026-09-01";
@@ -1177,18 +1178,30 @@
             let tableName = useOmsOrders ? 'oms_orders' : 'daily_order_summary';
 
             async function doQuery(itemTerm) {
-                let queryUrl = `${SUPABASE_URL}/rest/v1/${tableName}?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}`;
-                if (useOmsOrders) {
-                    queryUrl += `&select=id,order_date,delivery_date,store_code,store_name,brand_name,item_code,item_name,qty,price,total_amount,center_name,distribution_center`;
-                } else {
-                    queryUrl += `&select=delivery_date,total_qty,total_amount,brand_name,item_name,item_code`;
+                let baseUrl = `${SUPABASE_URL}/rest/v1/${tableName}?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}`;
+                let selectFields = useOmsOrders 
+                    ? `id,order_date,delivery_date,store_code,store_name,brand_name,item_code,item_name,qty,price,total_amount,center_name,distribution_center`
+                    : `delivery_date,total_qty,total_amount,brand_name,item_name,item_code`;
+
+                // PostgREST 쿼리 파라미터 충돌 방지를 위한 and() 조건 배열 구성
+                let andConds = [];
+
+                if (brandName) {
+                    andConds.push(`brand_name.ilike.*${encodeURIComponent(brandName)}*`);
+                }
+                if (searchStore) {
+                    andConds.push(`store_name.ilike.*${encodeURIComponent(searchStore)}*`);
+                }
+                if (searchCenter) {
+                    andConds.push(`or(center_name.ilike.*${encodeURIComponent(searchCenter)}*,distribution_center.ilike.*${encodeURIComponent(searchCenter)}*)`);
+                }
+                if (itemTerm) {
+                    andConds.push(`or(item_code.ilike.*${encodeURIComponent(itemTerm)}*,item_name.ilike.*${encodeURIComponent(itemTerm)}*)`);
                 }
 
-                if (brandName) queryUrl += `&brand_name=ilike.*${encodeURIComponent(brandName)}*`;
-                if (searchStore) queryUrl += `&store_name=ilike.*${encodeURIComponent(searchStore)}*`;
-                if (searchCenter) queryUrl += `&or=(distribution_center.ilike.*${encodeURIComponent(searchCenter)}*,center_name.ilike.*${encodeURIComponent(searchCenter)}*)`;
-                if (itemTerm) {
-                    queryUrl += `&or=(item_code.ilike.*${encodeURIComponent(itemTerm)}*,item_name.ilike.*${encodeURIComponent(itemTerm)}*)`;
+                let queryUrl = `${baseUrl}&select=${selectFields}`;
+                if (andConds.length > 0) {
+                    queryUrl += `&and=(${andConds.join(',')})`;
                 }
                 queryUrl += `&limit=1000`;
 
