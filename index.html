@@ -1165,6 +1165,7 @@
 
         /* 🤖 [실제 DB 컬럼 기반 조회 쿼리 매핑] */
         /* 🤖 [PostgREST and=(or(...),or(...)) 쿼리 충돌 수정 완료] */
+        /* 🤖 [v34.1] AI DB 조회 1,000건 누락 방지(Chunking) 및 센터 키워드 자동 정제 */
         async function executeDbQueryForAi(args) {
             let { startDate, endDate, brandName, itemName, storeName, centerName } = args;
             if (!startDate) startDate = "2026-09-01";
@@ -1174,57 +1175,69 @@
             let searchStore = (storeName || "").trim();
             let searchCenter = (centerName || "").trim();
 
+            // 💡 "이천센터" -> "이천"으로 정제하여 "이천물류센터", "이천" 등 DB 포괄 매칭
+            if (searchCenter.endsWith("센터") && searchCenter.length > 2) {
+                searchCenter = searchCenter.replace(/센터$/, "").trim();
+            }
+
             let useOmsOrders = !!(searchStore || searchCenter);
             let tableName = useOmsOrders ? 'oms_orders' : 'daily_order_summary';
 
-            async function doQuery(itemTerm) {
+            // 💡 UI와 동일하게 1,000건씩 전체 데이터를 루프 순회하며 가져오는 함수
+            async function doQueryAllChunks(itemTerm) {
                 let baseUrl = `${SUPABASE_URL}/rest/v1/${tableName}?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}`;
                 let selectFields = useOmsOrders 
                     ? `id,order_date,delivery_date,store_code,store_name,brand_name,item_code,item_name,qty,price,total_amount,center_name,distribution_center`
                     : `delivery_date,total_qty,total_amount,brand_name,item_name,item_code`;
 
-                // PostgREST 쿼리 파라미터 충돌 방지를 위한 and() 조건 배열 구성
                 let andConds = [];
+                if (brandName) andConds.push(`brand_name.ilike.*${encodeURIComponent(brandName)}*`);
+                if (searchStore) andConds.push(`store_name.ilike.*${encodeURIComponent(searchStore)}*`);
+                if (searchCenter) andConds.push(`or(center_name.ilike.*${encodeURIComponent(searchCenter)}*,distribution_center.ilike.*${encodeURIComponent(searchCenter)}*)`);
+                if (itemTerm) andConds.push(`or(item_code.ilike.*${encodeURIComponent(itemTerm)}*,item_name.ilike.*${encodeURIComponent(itemTerm)}*)`);
 
-                if (brandName) {
-                    andConds.push(`brand_name.ilike.*${encodeURIComponent(brandName)}*`);
-                }
-                if (searchStore) {
-                    andConds.push(`store_name.ilike.*${encodeURIComponent(searchStore)}*`);
-                }
-                if (searchCenter) {
-                    andConds.push(`or(center_name.ilike.*${encodeURIComponent(searchCenter)}*,distribution_center.ilike.*${encodeURIComponent(searchCenter)}*)`);
-                }
-                if (itemTerm) {
-                    andConds.push(`or(item_code.ilike.*${encodeURIComponent(itemTerm)}*,item_name.ilike.*${encodeURIComponent(itemTerm)}*)`);
-                }
-
-                let queryUrl = `${baseUrl}&select=${selectFields}`;
+                let queryUrlBase = `${baseUrl}&select=${selectFields}`;
                 if (andConds.length > 0) {
-                    queryUrl += `&and=(${andConds.join(',')})`;
+                    queryUrlBase += `&and=(${andConds.join(',')})`;
                 }
-                queryUrl += `&limit=1000`;
 
-                const res = await fetchWithUltraCache(queryUrl, {
-                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
-                });
-                return res.ok ? await res.json() : [];
+                let allRows = [];
+                let offset = 0;
+                const limit = 1000;
+                let hasMore = true;
+
+                while (hasMore) {
+                    let chunkUrl = `${queryUrlBase}&limit=${limit}&offset=${offset}`;
+                    const res = await fetchWithUltraCache(chunkUrl, {
+                        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                    });
+                    if (res.ok) {
+                        const chunk = await res.json();
+                        if (!chunk || chunk.length === 0) break;
+                        allRows = allRows.concat(chunk);
+                        if (chunk.length < limit) hasMore = false;
+                        else offset += limit;
+                    } else {
+                        hasMore = false;
+                    }
+                }
+                return allRows;
             }
 
             try {
-                let data = await doQuery(searchItem);
+                let data = await doQueryAllChunks(searchItem);
 
                 if (data.length === 0 && searchItem) {
                     let altTerm = searchItem.replace(/온즈/g, '온스').replace(/온스/g, '온즈');
                     if (altTerm !== searchItem) {
-                        data = await doQuery(altTerm);
+                        data = await doQueryAllChunks(altTerm);
                     }
                 }
 
                 if (data.length === 0 && searchItem.includes(' ')) {
                     let parts = searchItem.split(' ').filter(p => p.length > 1);
                     for (let part of parts) {
-                        data = await doQuery(part);
+                        data = await doQueryAllChunks(part);
                         if (data.length > 0) break;
                     }
                 }
