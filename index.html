@@ -221,7 +221,7 @@
             display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #475569;
         }
 
-        /* ✨ 플로팅 버튼 & 챗 위젯 */
+        /* ✨ 갤럭시 AI 모티브 우측 하단 플로팅 버튼 & 챗 위젯 */
         .ai-floating-btn {
             position: fixed;
             bottom: 28px;
@@ -405,7 +405,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 대시보드</h1>
-            <span class="version-tag">v34.3 Independent Fast Query</span>
+            <span class="version-tag">v34.4 Perfect Detail Filter</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -422,18 +422,13 @@
         </div>
     </div>
 
-    <!-- ✨ 갤럭시 AI 모티브 플로팅 버튼 -->
-    <button class="ai-floating-btn" id="ai-floating-btn" onclick="toggleAiChatWidget()" title="AI 주문 질의응답 열기">
-        ✨
-    </button>
+    <!-- ✨ 갤럭시 AI 모티브 우측 하단 플로팅 버튼 -->
+    <button class="ai-floating-btn" id="ai-floating-btn" onclick="toggleAiChatWidget()" title="AI 주문 질의응답 열기">✨</button>
 
-    <!-- 🤖 AI 챗 위젯 상자 -->
+    <!-- 🤖 우측 하단 챗 위젯 상자 -->
     <div class="ai-chat-widget" id="ai-chat-modal">
         <div class="ai-chat-header">
-            <div class="ai-chat-title">
-                <span>✨</span>
-                <span>OMS AI 수치 질의응답</span>
-            </div>
+            <div class="ai-chat-title"><span>✨</span><span>OMS AI 수치 질의응답</span></div>
             <span class="ai-chat-close-btn" onclick="toggleAiChatWidget()">✕</span>
         </div>
         <div class="ai-key-box">
@@ -450,18 +445,15 @@
         </div>
     </div>
 
-    <!-- 📅 캘린더 모달 -->
+    <!-- 📅 각종 모달 창 -->
     <div class="modal-overlay" id="calendar-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">📅 배송일자 데이터 존재 현황</span><span class="close-btn" onclick="closeCalendarModal()">✕</span></div><div style="display: flex; gap: 8px; margin-bottom: 10px; align-items: center;"><label style="font-size: 12px; font-weight: bold;">월 선택:</label><input type="month" id="calendar-month-picker" class="input-box" onchange="loadCalendarData()"></div><div class="calendar-grid" id="calendar-grid"></div></div></div>
-    <!-- 🏢 브랜드 모달 -->
     <div class="modal-overlay" id="brand-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">🏢 브랜드 다중 선택</span><span class="close-btn" onclick="closeBrandModal()">✕</span></div><div style="display: flex; gap: 8px; margin-bottom: 8px;"><input type="text" id="modal-brand-search" class="input-box" style="flex:1;" placeholder="브랜드명 검색 (Enter)" onkeydown="if(event.key==='Enter') filterBrandModalList()"><button class="btn btn-cal" style="background:#2563eb;" onclick="filterBrandModalList()">검색</button><button class="btn btn-cal" style="background:#475569;" onclick="toggleAllBrandCheck(true)">전체선택</button><button class="btn btn-cal" style="background:#64748b;" onclick="toggleAllBrandCheck(false)">해제</button></div><div class="modal-body-scroll" id="brand-modal-list"></div><div style="margin-top: 15px; text-align: right;"><button class="btn" onclick="applyBrandSelection()">확인 적용</button></div></div></div>
-    <!-- 📦 품목 모달 -->
     <div class="modal-overlay" id="item-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">📦 품목 다중 선택</span><span class="close-btn" onclick="closeItemModal()">✕</span></div><div style="display: flex; gap: 8px; margin-bottom: 8px;"><input type="text" id="modal-item-search" class="input-box" style="flex:1;" placeholder="품목코드 또는 품목명 검색 (Enter)" onkeydown="if(event.key==='Enter') filterItemModalList()"><button class="btn btn-cal" style="background:#2563eb;" onclick="filterItemModalList()">검색</button><button class="btn btn-cal" style="background:#475569;" onclick="toggleAllItemCheck(true)">전체선택</button><button class="btn btn-cal" style="background:#64748b;" onclick="toggleAllItemCheck(false)">해제</button></div><div class="modal-body-scroll" id="item-modal-list"></div><div style="margin-top: 15px; text-align: right;"><button class="btn" onclick="applyItemSelection()">확인 적용</button></div></div></div>
-    <!-- 🏢 점포수 상세 모달 -->
     <div class="modal-overlay" id="brand-store-modal"><div class="modal-content" style="width: 420px;"><div class="modal-header"><span class="modal-title">🏢 브랜드별 주문 점포수 상세</span><span class="close-btn" onclick="closeBrandStoreModal()">✕</span></div><div class="modal-body-scroll" id="brand-store-modal-list"></div><div style="margin-top: 15px; text-align: right;"><button class="btn" onclick="closeBrandStoreModal()">닫기</button></div></div></div>
 
     <div class="container">
         
-        <!-- 📑 탭 메뉴 -->
+        <!-- 📑 탭 네비게이션 -->
         <div class="tab-container">
             <button class="tab-btn active" id="tab-btn-dashboard" onclick="switchTab('dashboard')">📈 요약 대시보드</button>
             <button class="tab-btn" id="tab-btn-detail" onclick="switchTab('detail')">🛒 점포별 상세 내역</button>
@@ -494,7 +486,7 @@
                     <button class="btn-search-icon" onclick="openItemModal()" title="품목 다중 선택 모달 열기">🔍</button>
                     <div id="item-autocomplete-list" class="autocomplete-dropdown"></div>
                 </div>
-                <!-- 💡 [독립 실행 단일 버튼] 현재 열려 있는 탭의 데이터만 조회 -->
+                <!-- 💡 활성화된 탭의 내용만 독립적으로 실행하는 단일 조회 버튼 -->
                 <button class="btn btn-query" id="tab-query-btn" onclick="executeTabSearch()">🔍 대시보드 종합 조회</button>
             </div>
         </div>
@@ -645,7 +637,6 @@
         let activeFetchToken = 0;
         let aiChatHistory = [];
 
-        // 💡 현재 활성화된 탭
         let activeTab = 'dashboard';
 
         /* 💾 IndexedDB 캐시 */
@@ -729,14 +720,13 @@
             return str || '-';
         }
 
-        /* 💡 탭 전환: 화면만 변경하고 자동 쿼리는 일절 돌리지 않음 */
+        /* 💡 탭 전환 로직 */
         function switchTab(tabId) {
             activeTab = tabId;
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(content => content.style.display = 'none');
             
             const btnQuery = document.getElementById('tab-query-btn');
-
             if (tabId === 'dashboard') {
                 document.getElementById('tab-btn-dashboard').classList.add('active');
                 document.getElementById('tab-dashboard').style.display = 'block';
@@ -748,18 +738,12 @@
             }
         }
 
-        /* 💡 [핵심] 활성화된 탭의 내용만 독립적으로 실행 */
+        /* 💡 활성화된 탭의 내용만 정확히 실행 */
         async function executeTabSearch() {
             if (!validateDates('start')) return;
             activeFetchToken++;
-
-            if (activeTab === 'dashboard') {
-                // 요약 대시보드가 선택되어 있으면 요약 대시보드만 조회 (1초 미만 쾌속 실행)
-                await fetchChartData();
-            } else {
-                // 점포별 상세내역이 선택되어 있으면 상세 데이터만 조회 (요약 대시보드는 절대 동작 안 함)
-                await fetchDetailDataForRange();
-            }
+            if (activeTab === 'dashboard') { await fetchChartData(); } 
+            else { await fetchDetailDataForRange(); }
         }
 
         function validateDates(type) {
@@ -802,8 +786,7 @@
         }
 
         function handleBrandInput(val) {
-            safeSetStorage('cached_brand_input', val);
-            toggleClearBtn('chart-brand-input');
+            safeSetStorage('cached_brand_input', val); toggleClearBtn('chart-brand-input');
             const dropEl = document.getElementById('brand-autocomplete-list');
             const keyword = val.toLowerCase().trim();
             if (!keyword || allBrandList.length === 0) return dropEl.style.display = 'none';
@@ -819,8 +802,7 @@
             document.getElementById('brand-autocomplete-list').style.display = 'none';
         }
         function handleItemInput(val) {
-            safeSetStorage('cached_item_input', val);
-            toggleClearBtn('chart-item-input');
+            safeSetStorage('cached_item_input', val); toggleClearBtn('chart-item-input');
             const dropEl = document.getElementById('item-autocomplete-list');
             const keyword = val.toLowerCase().trim();
             if (!keyword || allItemList.length === 0) return dropEl.style.display = 'none';
@@ -1212,21 +1194,43 @@
             const startDate = document.getElementById('chart-start-date').value, endDate = document.getElementById('chart-end-date').value;
             if (!startDate || !endDate) return;
 
-            const summaryUrl = `${SUPABASE_URL}/rest/v1/store_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_code,store_name,brand_name,order_count,total_qty,total_amount`;
+            // 💡 [핵심] 요약된 왼쪽 점포 목록을 가져올 때도 상단 브랜드, 품목 검색어가 반영되도록 URL 수정
+            const brandInputValue = document.getElementById('chart-brand-input').value.trim();
+            const itemKeyword = document.getElementById('chart-item-input').value.trim();
+            
+            let summaryUrl = `${SUPABASE_URL}/rest/v1/store_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_code,store_name,brand_name,order_count,total_qty,total_amount`;
+            
+            let summaryAndConds = [];
+            if (brandInputValue) {
+                const brandList = brandInputValue.split(',').map(b => b.trim()).filter(Boolean);
+                if (brandList.length === 1) summaryAndConds.push(`brand_name.ilike.*${encodeURIComponent(brandList[0])}*`);
+                else if (brandList.length > 1) summaryAndConds.push(`or(${brandList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`);
+            }
+            // store_order_summary 뷰에는 item_name 컬럼이 없기 때문에, 품목 검색어가 있을 경우 oms_orders 에서 직접 추출합니다.
+            
             try {
-                const res = await fetchWithUltraCache(summaryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
-                if (res.ok) {
-                    storeSummaryList = await res.json(); rawDetailOrders = []; updateStoreListAndSummary(); fetchAllOrdersInChunksForRange(startDate, endDate);
+                // 품목 검색어가 없을 때는 가벼운 store_order_summary 사용, 있을 때는 oms_orders 전체 스캔
+                if (!itemKeyword) {
+                    if (summaryAndConds.length > 0) summaryUrl += `&and=(${summaryAndConds.join(',')})`;
+                    const res = await fetchWithUltraCache(summaryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                    if (res.ok) {
+                        storeSummaryList = await res.json(); 
+                    }
+                } else {
+                    storeSummaryList = []; // 전체 스캔 후 채워짐
                 }
+
+                rawDetailOrders = []; 
+                if (!itemKeyword) updateStoreListAndSummary(); // 품목 검색이 없을 때만 미리 사이드바 렌더링
+                fetchAllOrdersInChunksForRange(startDate, endDate, itemKeyword);
             } catch (err) {}
         }
 
-        async function fetchAllOrdersInChunksForRange(startDate, endDate) {
+        async function fetchAllOrdersInChunksForRange(startDate, endDate, itemKeyword) {
             const currentToken = activeFetchToken; let offset = 0, limit = 1000, hasMore = true; rawDetailOrders = [];
-            let totalExpectedRows = storeSummaryList.reduce((sum, r) => sum + cleanNumber(r.order_count), 0) || 5000;
+            let totalExpectedRows = storeSummaryList.length > 0 ? storeSummaryList.reduce((sum, r) => sum + cleanNumber(r.order_count), 0) : 5000;
 
             const brandInputValue = document.getElementById('chart-brand-input').value.trim();
-            const itemKeyword = document.getElementById('chart-item-input').value.trim();
             let baseSelect = `select=store_code,store_name,distribution_center,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name`;
             let andConds = [];
 
@@ -1265,6 +1269,20 @@
             }
             if (currentToken === activeFetchToken) {
                 currentMaxPercent = 100;
+
+                // 💡 [핵심] 품목 검색어가 있을 경우, 가져온 전체 라인아이템 데이터를 바탕으로 좌측 점포 리스트(storeSummaryList)를 재구성합니다.
+                if (itemKeyword) {
+                    const tempStoreMap = {};
+                    rawDetailOrders.forEach(r => {
+                        const sName = r.store_name;
+                        if (!sName) return;
+                        if (!tempStoreMap[sName]) tempStoreMap[sName] = { store_name: sName, brand_name: r.brand_name, order_count: 0 };
+                        tempStoreMap[sName].order_count++;
+                    });
+                    storeSummaryList = Object.values(tempStoreMap);
+                    updateStoreListAndSummary(); // 사이드바 재렌더링
+                }
+
                 const activeStore = document.querySelector('#store-list .active');
                 if (activeStore && activeStore.innerText.includes('전체 점포 합산')) { baseDetailOrders = filteredDetailOrders; applyColumnFilters(); } 
                 else renderDetailTable();
@@ -1273,7 +1291,27 @@
 
         async function fetchStoreDetailOrders(storeName) {
             const startDate = document.getElementById('chart-start-date').value, endDate = document.getElementById('chart-end-date').value;
-            const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&store_name=eq.${encodeURIComponent(storeName)}&select=store_code,store_name,distribution_center,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name`;
+            
+            // 점포 개별 조회 시에도 브랜드/품목 조건 유지
+            const brandInputValue = document.getElementById('chart-brand-input').value.trim();
+            const itemKeyword = document.getElementById('chart-item-input').value.trim();
+            let baseSelect = `select=store_code,store_name,distribution_center,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name`;
+            let andConds = [`store_name.eq.${encodeURIComponent(storeName)}`];
+
+            if (brandInputValue) {
+                const brandList = brandInputValue.split(',').map(b => b.trim()).filter(Boolean);
+                if (brandList.length === 1) andConds.push(`brand_name.ilike.*${encodeURIComponent(brandList[0])}*`);
+                else if (brandList.length > 1) andConds.push(`or(${brandList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`);
+            }
+            if (itemKeyword) {
+                const itemList = itemKeyword.split(',').map(i => i.trim()).filter(Boolean);
+                if (itemList.length === 1) { const kw = encodeURIComponent(itemList[0]); andConds.push(`or(item_code.ilike.*${kw}*,item_name.ilike.*${kw}*)`); }
+                else if (itemList.length > 1) { const orConds = itemList.map(i => `item_code.ilike.*${encodeURIComponent(i)}*,item_name.ilike.*${encodeURIComponent(i)}*`).join(','); andConds.push(`or(${orConds})`); }
+            }
+
+            let extraFilters = `&and=(${andConds.join(',')})`;
+            const queryUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&${baseSelect}${extraFilters}`;
+            
             try {
                 const res = await fetchWithUltraCache(queryUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                 if (res.ok) { const data = await res.json(); data.forEach(r => { r.center_name = r.distribution_center || r.center_name || '-'; }); baseDetailOrders = data; applyColumnFilters(); }
@@ -1356,7 +1394,7 @@
             XLSX.writeFile(wb, `OMS주문상세_${document.getElementById('chart-start-date').value}_${document.getElementById('chart-end-date').value}.xlsx`);
         }
 
-        /* ⚡ 페이지 로드 시 초기화 */
+        /* ⚡ 초기화 */
         document.addEventListener('DOMContentLoaded', async () => {
             const today = new Date(), past7 = new Date(); past7.setDate(today.getDate() - 7);
             document.getElementById('chart-start-date').value = localStorage.getItem('cached_chart_start_date') || formatDate(past7);
@@ -1373,7 +1411,7 @@
             await loadMasterLists();
             loadCalendarData();
             
-            // 첫 진입 시 '요약 대시보드' 탭만 단독 실행 (1초 미만 쾌속 완료)
+            // 첫 진입 시 '요약 대시보드' 탭만 단독 실행
             activeTab = 'dashboard';
             fetchChartData();
         });
