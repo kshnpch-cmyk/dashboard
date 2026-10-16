@@ -26,6 +26,13 @@
         .close-btn { cursor: pointer; font-size: 18px; font-weight: bold; color: #64748b; }
         .modal-body-scroll { flex: 1; overflow-y: auto; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; }
         .brand-store-modal-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13.5px; }
+
+        @keyframes pulse-text {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .loading-text { font-size: 15px; color: #2563eb; animation: pulse-text 1.5s infinite; }
     </style>
 </head>
 <body>
@@ -59,52 +66,75 @@
         const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN";
         let trendChart = null;
         let currentBrandStoreMap = {};
+        // 고유 호출 토큰 (새로 검색 시 이전 백그라운드 작업 취소용)
+        let fetchToken = 0;
 
         function cleanNumber(val) { return parseFloat(String(val).replace(/[^0-9.-]/g, '')) || 0; }
         function formatDisplayDate(dateStr) { return !dateStr || dateStr === '-' ? '-' : String(dateStr).split('T')[0].replace(/-/g, '/'); }
 
-       async function fetchChartData(params) {
+        async function fetchChartData(params) {
+            const currentToken = ++fetchToken;
             const { startDate, endDate, brandName, itemName } = params;
             if (!startDate || !endDate) return;
 
             let dailyUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
             
             // 💡 품목 검색어가 없을 때는 가벼운 store_order_summary 사용, 있을 때만 oms_orders 조회
-            let storeFastUrl = itemName
+            let storeFastBaseUrl = itemName
                 ? `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_name,brand_name`
                 : `${SUPABASE_URL}/rest/v1/store_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_name,brand_name`;
 
             if (brandName) {
                 const bList = brandName.split(',').map(b => b.trim()).filter(Boolean);
-                if (bList.length === 1) { 
-                    const cond = `&brand_name=ilike.*${encodeURIComponent(bList[0])}*`; 
-                    dailyUrl += cond; storeFastUrl += cond; 
-                } else if (bList.length > 1) { 
-                    const cond = `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`; 
-                    dailyUrl += cond; storeFastUrl += cond; 
-                }
+                if (bList.length === 1) { const cond = `&brand_name=ilike.*${encodeURIComponent(bList[0])}*`; dailyUrl += cond; storeFastBaseUrl += cond; }
+                else if (bList.length > 1) { const cond = `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`; dailyUrl += cond; storeFastBaseUrl += cond; }
             }
             if (itemName) {
                 const iList = itemName.split(',').map(i => i.trim()).filter(Boolean);
-                if (iList.length === 1) { 
-                    const cond = `&or=(item_code.ilike.*${encodeURIComponent(iList[0])}*,item_name.ilike.*${encodeURIComponent(iList[0])}*)`; 
-                    dailyUrl += cond; storeFastUrl += cond; 
-                } else if (iList.length > 1) { 
-                    const cond = `&or=(${iList.map(i => `item_code.ilike.*${encodeURIComponent(i)}*,item_name.ilike.*${encodeURIComponent(i)}*`).join(',')})`; 
-                    dailyUrl += cond; storeFastUrl += cond; 
-                }
+                if (iList.length === 1) { const cond = `&or=(item_code.ilike.*${encodeURIComponent(iList[0])}*,item_name.ilike.*${encodeURIComponent(iList[0])}*)`; dailyUrl += cond; storeFastBaseUrl += cond; }
+                else if (iList.length > 1) { const cond = `&or=(${iList.map(i => `item_code.ilike.*${encodeURIComponent(i)}*,item_name.ilike.*${encodeURIComponent(i)}*`).join(',')})`; dailyUrl += cond; storeFastBaseUrl += cond; }
             }
 
             try {
-                const [resDaily, resStore] = await Promise.all([
-                    fetch(dailyUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } }),
-                    fetch(storeFastUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } })
-                ]);
+                // 1. 차트 및 총액/수량용 뷰 데이터 먼저 1초 만에 가져와 화면 렌더링
+                const resDaily = await fetch(dailyUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                 const dailyData = resDaily.ok ? await resDaily.json() : [];
-                const storeData = resStore.ok ? await resStore.json() : [];
-                renderDashboard(dailyData, storeData, startDate, endDate);
+                
+                // 화면 즉각 렌더링 (점포수는 일단 0개로 표시 후 백그라운드 갱신)
+                document.getElementById('kpi-total-stores').innerHTML = `<span class="loading-text">⚡ 집계중...</span>`;
+                currentBrandStoreMap = {}; // 초기화
+                renderDashboard(dailyData, [], startDate, endDate);
+
+                // 2. 점포수 집계를 위해 Chunk(1000개 단위) 스트리밍 로딩 (화면 멈춤 방지)
+                let offset = 0, limit = 1000, hasMore = true;
+                let storeDataAccumulated = [];
+
+                while (hasMore) {
+                    if (fetchToken !== currentToken) return; // 중간에 다른 검색을 누르면 기존 루프 중단
+
+                    const chunkRes = await fetch(`${storeFastBaseUrl}&limit=${limit}&offset=${offset}`, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                    if (chunkRes.ok) {
+                        const chunk = await chunkRes.json();
+                        if (!chunk || chunk.length === 0) break;
+                        
+                        storeDataAccumulated = storeDataAccumulated.concat(chunk);
+                        
+                        // 실시간 점포수 재계산 후 UI 즉시 업데이트 (라이브 카운팅)
+                        recalculateFilteredStores(storeDataAccumulated);
+
+                        if (chunk.length < limit) hasMore = false; 
+                        else offset += limit;
+                    } else {
+                        hasMore = false;
+                    }
+                }
+                
+                // 루프가 끝난 뒤 최종 집계 표시 (더 이상 ⚡집계중 애니메이션이 아님)
+                recalculateFilteredStores(storeDataAccumulated, true);
+
             } catch (e) {
                 console.error("대시보드 조회 실패:", e);
+                document.getElementById('kpi-total-stores').innerText = "0 개점";
             }
         }
 
@@ -119,20 +149,8 @@
                 dailyMap[dKey].qty += q; dailyMap[dKey].amount += amt;
             });
 
-            // 점포수 집계
-            const uniqueStores = new Set(); currentBrandStoreMap = {};
-            storeData.forEach(r => {
-                if (r.store_name && r.store_name !== '-') {
-                    uniqueStores.add(r.store_name);
-                    const b = r.brand_name || '기타';
-                    if (!currentBrandStoreMap[b]) currentBrandStoreMap[b] = new Set();
-                    currentBrandStoreMap[b].add(r.store_name);
-                }
-            });
-
             document.getElementById('kpi-total-qty').innerText = `${totalQty.toLocaleString()} 건`;
             document.getElementById('kpi-total-items').innerText = `${items.size.toLocaleString()} 종`;
-            document.getElementById('kpi-total-stores').innerText = `${uniqueStores.size.toLocaleString()} 개점`;
             document.getElementById('kpi-total-amount').innerText = `${totalAmount.toLocaleString()} 원`;
 
             // 그래프 렌더링
@@ -162,10 +180,37 @@
             });
         }
 
+        // 실시간 점포수 재계산 (라이브 카운팅)
+        function recalculateFilteredStores(storeDataList, isFinished = false) {
+            const uniqueStores = new Set(); 
+            currentBrandStoreMap = {};
+            
+            storeDataList.forEach(r => {
+                if (r.store_name && r.store_name !== '-') {
+                    uniqueStores.add(r.store_name);
+                    const b = r.brand_name || '기타';
+                    if (!currentBrandStoreMap[b]) currentBrandStoreMap[b] = new Set();
+                    currentBrandStoreMap[b].add(r.store_name);
+                }
+            });
+
+            const countStr = uniqueStores.size.toLocaleString();
+            if (isFinished) {
+                document.getElementById('kpi-total-stores').innerHTML = `${countStr} 개점`;
+            } else {
+                // 스트리밍 도중에는 실시간으로 올라가는 숫자를 보여줌
+                document.getElementById('kpi-total-stores').innerHTML = `<span class="loading-text">⚡ ${countStr} 개점</span>`;
+            }
+        }
+
         function openBrandStoreModal() {
             document.getElementById('brand-store-modal').style.display = 'flex';
             const listEl = document.getElementById('brand-store-modal-list');
             const sorted = Object.keys(currentBrandStoreMap).sort((a,b) => currentBrandStoreMap[b].size - currentBrandStoreMap[a].size);
+            if(sorted.length === 0) {
+                listEl.innerHTML = '<div style="padding: 20px; text-align: center; color: #94a3b8;">점포 집계가 완료되지 않았거나 데이터가 없습니다.</div>';
+                return;
+            }
             listEl.innerHTML = sorted.map(b => `<div class="brand-store-modal-row"><span>🏢 ${b}</span><b>${currentBrandStoreMap[b].size.toLocaleString()} 개점</b></div>`).join('');
         }
         function closeBrandStoreModal() { document.getElementById('brand-store-modal').style.display = 'none'; }
