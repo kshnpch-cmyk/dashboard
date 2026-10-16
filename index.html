@@ -67,7 +67,7 @@
 
         .container { padding: 20px; max-width: 98%; margin: 0 auto; }
         
-        /* ✨ 탭 메뉴 스타일 추가 */
+        /* 📑 탭 네비게이션 스타일 */
         .tab-container {
             display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0;
         }
@@ -77,7 +77,7 @@
         }
         .tab-btn:hover { color: #2563eb; }
         .tab-btn.active { color: #2563eb; border-bottom: 3px solid #2563eb; }
-        .tab-content { display: none; } /* 자바스크립트로 제어 */
+        .tab-content { display: none; }
 
         .section-panel {
             background: white; padding: 20px; border-radius: 12px;
@@ -221,7 +221,7 @@
             display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #475569;
         }
 
-        /* ✨ 갤럭시 AI 모티브 우측 하단 플로팅 버튼 & 챗 위젯 */
+        /* ✨ 플로팅 버튼 & 챗 위젯 */
         .ai-floating-btn {
             position: fixed;
             bottom: 28px;
@@ -405,7 +405,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 대시보드</h1>
-            <span class="version-tag">v34.2 Tab Layout & Lazy Load</span>
+            <span class="version-tag">v34.3 Independent Fast Query</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -422,12 +422,12 @@
         </div>
     </div>
 
-    <!-- ✨ 갤럭시 AI 모티브 우측 하단 플로팅 버튼 -->
+    <!-- ✨ 갤럭시 AI 모티브 플로팅 버튼 -->
     <button class="ai-floating-btn" id="ai-floating-btn" onclick="toggleAiChatWidget()" title="AI 주문 질의응답 열기">
         ✨
     </button>
 
-    <!-- 🤖 우측 하단 챗 위젯 상자 -->
+    <!-- 🤖 AI 챗 위젯 상자 -->
     <div class="ai-chat-widget" id="ai-chat-modal">
         <div class="ai-chat-header">
             <div class="ai-chat-title">
@@ -450,21 +450,24 @@
         </div>
     </div>
 
-    <!-- 📅 캘린더 모달 등 (이전과 동일) -->
+    <!-- 📅 캘린더 모달 -->
     <div class="modal-overlay" id="calendar-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">📅 배송일자 데이터 존재 현황</span><span class="close-btn" onclick="closeCalendarModal()">✕</span></div><div style="display: flex; gap: 8px; margin-bottom: 10px; align-items: center;"><label style="font-size: 12px; font-weight: bold;">월 선택:</label><input type="month" id="calendar-month-picker" class="input-box" onchange="loadCalendarData()"></div><div class="calendar-grid" id="calendar-grid"></div></div></div>
+    <!-- 🏢 브랜드 모달 -->
     <div class="modal-overlay" id="brand-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">🏢 브랜드 다중 선택</span><span class="close-btn" onclick="closeBrandModal()">✕</span></div><div style="display: flex; gap: 8px; margin-bottom: 8px;"><input type="text" id="modal-brand-search" class="input-box" style="flex:1;" placeholder="브랜드명 검색 (Enter)" onkeydown="if(event.key==='Enter') filterBrandModalList()"><button class="btn btn-cal" style="background:#2563eb;" onclick="filterBrandModalList()">검색</button><button class="btn btn-cal" style="background:#475569;" onclick="toggleAllBrandCheck(true)">전체선택</button><button class="btn btn-cal" style="background:#64748b;" onclick="toggleAllBrandCheck(false)">해제</button></div><div class="modal-body-scroll" id="brand-modal-list"></div><div style="margin-top: 15px; text-align: right;"><button class="btn" onclick="applyBrandSelection()">확인 적용</button></div></div></div>
+    <!-- 📦 품목 모달 -->
     <div class="modal-overlay" id="item-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">📦 품목 다중 선택</span><span class="close-btn" onclick="closeItemModal()">✕</span></div><div style="display: flex; gap: 8px; margin-bottom: 8px;"><input type="text" id="modal-item-search" class="input-box" style="flex:1;" placeholder="품목코드 또는 품목명 검색 (Enter)" onkeydown="if(event.key==='Enter') filterItemModalList()"><button class="btn btn-cal" style="background:#2563eb;" onclick="filterItemModalList()">검색</button><button class="btn btn-cal" style="background:#475569;" onclick="toggleAllItemCheck(true)">전체선택</button><button class="btn btn-cal" style="background:#64748b;" onclick="toggleAllItemCheck(false)">해제</button></div><div class="modal-body-scroll" id="item-modal-list"></div><div style="margin-top: 15px; text-align: right;"><button class="btn" onclick="applyItemSelection()">확인 적용</button></div></div></div>
+    <!-- 🏢 점포수 상세 모달 -->
     <div class="modal-overlay" id="brand-store-modal"><div class="modal-content" style="width: 420px;"><div class="modal-header"><span class="modal-title">🏢 브랜드별 주문 점포수 상세</span><span class="close-btn" onclick="closeBrandStoreModal()">✕</span></div><div class="modal-body-scroll" id="brand-store-modal-list"></div><div style="margin-top: 15px; text-align: right;"><button class="btn" onclick="closeBrandStoreModal()">닫기</button></div></div></div>
 
     <div class="container">
         
-        <!-- ✨ 탭 네비게이션 추가 -->
+        <!-- 📑 탭 메뉴 -->
         <div class="tab-container">
-            <button class="tab-btn active" onclick="switchTab('dashboard')">📈 요약 대시보드</button>
-            <button class="tab-btn" onclick="switchTab('detail')">🛒 점포별 상세 내역</button>
+            <button class="tab-btn active" id="tab-btn-dashboard" onclick="switchTab('dashboard')">📈 요약 대시보드</button>
+            <button class="tab-btn" id="tab-btn-detail" onclick="switchTab('detail')">🛒 점포별 상세 내역</button>
         </div>
 
-        <!-- 📊 통합 검색 컨트롤 패널 (모든 탭 공통) -->
+        <!-- 📊 통합 검색 컨트롤 패널 -->
         <div class="section-panel" style="margin-bottom: 15px;">
             <div class="filter-row" style="margin-bottom: 0; padding: 0; background: transparent; border: none;">
                 <div class="filter-group">
@@ -476,7 +479,7 @@
                 <div class="filter-group">
                     <label>브랜드:</label>
                     <div class="input-wrapper">
-                        <input type="text" id="chart-brand-input" class="input-box" placeholder="브랜드 선택/검색" style="width: 140px;" oninput="handleBrandInput(this.value)" onfocus="handleBrandInput(this.value)" onkeydown="if(event.key==='Enter') fetchAllDashboardData()">
+                        <input type="text" id="chart-brand-input" class="input-box" placeholder="브랜드 선택/검색" style="width: 140px;" oninput="handleBrandInput(this.value)" onfocus="handleBrandInput(this.value)" onkeydown="if(event.key==='Enter') executeTabSearch()">
                         <span class="clear-btn" id="btn-clear-brand" onclick="clearInputField('chart-brand-input', 'cached_brand_input')">✕</span>
                     </div>
                     <button class="btn-search-icon" onclick="openBrandModal('chart')" title="브랜드 다중 선택">🔍</button>
@@ -485,17 +488,18 @@
                 <div class="filter-group">
                     <label>품목코드/명:</label>
                     <div class="input-wrapper">
-                        <input type="text" id="chart-item-input" class="input-box" placeholder="품목 선택/검색" style="width: 150px;" oninput="handleItemInput(this.value)" onfocus="handleItemInput(this.value)" onkeydown="if(event.key==='Enter') fetchAllDashboardData()">
+                        <input type="text" id="chart-item-input" class="input-box" placeholder="품목 선택/검색" style="width: 150px;" oninput="handleItemInput(this.value)" onfocus="handleItemInput(this.value)" onkeydown="if(event.key==='Enter') executeTabSearch()">
                         <span class="clear-btn" id="btn-clear-item" onclick="clearInputField('chart-item-input', 'cached_item_input')">✕</span>
                     </div>
                     <button class="btn-search-icon" onclick="openItemModal()" title="품목 다중 선택 모달 열기">🔍</button>
                     <div id="item-autocomplete-list" class="autocomplete-dropdown"></div>
                 </div>
-                <button class="btn btn-query" onclick="fetchAllDashboardData()">🔍 대시보드 종합 조회</button>
+                <!-- 💡 [독립 실행 단일 버튼] 현재 열려 있는 탭의 데이터만 조회 -->
+                <button class="btn btn-query" id="tab-query-btn" onclick="executeTabSearch()">🔍 대시보드 종합 조회</button>
             </div>
         </div>
 
-        <!-- 🚀 탭 1: 요약 대시보드 (즉시 로딩) -->
+        <!-- 🚀 탭 1: 요약 대시보드 (1초 쾌속 로딩) -->
         <div id="tab-dashboard" class="tab-content" style="display: block;">
             <div class="section-panel">
                 <div class="kpi-grid">
@@ -525,7 +529,7 @@
             </div>
         </div>
 
-        <!-- 🚀 탭 2: 점포별 상세 내역 (지연 로딩 Lazy Loading) -->
+        <!-- 🚀 탭 2: 점포별 상세 내역 (독립 조회) -->
         <div id="tab-detail" class="tab-content dashboard-layout" style="display: none;">
             <div class="panel">
                 <div class="panel-title"><span>🏢 브랜드 필터</span></div>
@@ -541,7 +545,7 @@
                     점포수: <b id="brand-store-count">0개</b> | 품목수: <b id="brand-item-count">-</b>
                 </div>
                 <ul class="store-list" id="store-list">
-                    <li style="padding:15px; text-align:center; color:#94a3b8; font-size:13px;">상세 데이터를 로드해 주세요.</li>
+                    <li style="padding:15px; text-align:center; color:#94a3b8; font-size:13px;">상단 [점포별 상세 조회] 버튼을 누르면 점포 목록을 가져옵니다.</li>
                 </ul>
             </div>
 
@@ -580,7 +584,7 @@
                             </tr>
                         </thead>
                         <tbody id="order-detail-table">
-                            <tr><td colspan="10" style="text-align:center; padding:30px; color:#94a3b8;">데이터를 불러오는 중이거나 결과가 없습니다.</td></tr>
+                            <tr><td colspan="10" style="text-align:center; padding:30px; color:#94a3b8;">상단 [점포별 상세 조회] 버튼을 누르면 데이터를 불러옵니다.</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -595,14 +599,17 @@
                             <option value="1000">1000개씩</option>
                         </select>
                     </div>
+
                     <div class="pagination-controls">
                         <button class="page-btn" id="btn-first-page" onclick="goToPage(1)">« 처음</button>
                         <button class="page-btn" id="btn-prev-page" onclick="goToPage(currentPage - 1)">‹ 이전</button>
+                        
                         <div class="page-info">
                             <input type="number" id="page-input-box" class="page-input" value="1" min="1" onkeydown="if(event.key==='Enter') handlePageInput(this.value)" onblur="handlePageInput(this.value)">
                             <span>/ <b id="total-page-text">1</b> 페이지</span>
                             <span style="font-weight:normal; color:#94a3b8; font-size:11px;" id="total-rows-text">(총 0건)</span>
                         </div>
+
                         <button class="page-btn" id="btn-next-page" onclick="goToPage(currentPage + 1)">다음 ›</button>
                         <button class="page-btn" id="btn-last-page" onclick="goToPage(totalPages)">끝 »</button>
                     </div>
@@ -638,11 +645,10 @@
         let activeFetchToken = 0;
         let aiChatHistory = [];
 
-        // ✨ 탭 지연 로딩을 위한 변수
-        let isDetailLoaded = false;
-        let lastQueriedDates = { start: '', end: '', brand: '', item: '' };
+        // 💡 현재 활성화된 탭
+        let activeTab = 'dashboard';
 
-        /* 💾 IndexedDB 캐시 (기존 코드 유지) */
+        /* 💾 IndexedDB 캐시 */
         const DB_NAME = "OmsLocalCacheDB";
         const STORE_NAME = "query_cache";
 
@@ -723,33 +729,39 @@
             return str || '-';
         }
 
-        /* ✨ 탭 전환 기능 추가 */
+        /* 💡 탭 전환: 화면만 변경하고 자동 쿼리는 일절 돌리지 않음 */
         function switchTab(tabId) {
+            activeTab = tabId;
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(content => content.style.display = 'none');
             
+            const btnQuery = document.getElementById('tab-query-btn');
+
             if (tabId === 'dashboard') {
-                document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
+                document.getElementById('tab-btn-dashboard').classList.add('active');
                 document.getElementById('tab-dashboard').style.display = 'block';
+                btnQuery.innerText = "🔍 대시보드 종합 조회";
             } else {
-                document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
+                document.getElementById('tab-btn-detail').classList.add('active');
                 document.getElementById('tab-detail').style.display = 'grid';
-                
-                // 지연 로딩 로직: 검색 조건이 바뀌었거나 한 번도 로드되지 않았다면 상세 표 로딩 시작!
-                const cStart = document.getElementById('chart-start-date').value;
-                const cEnd = document.getElementById('chart-end-date').value;
-                const cBrand = document.getElementById('chart-brand-input').value;
-                const cItem = document.getElementById('chart-item-input').value;
-                
-                if (!isDetailLoaded || lastQueriedDates.start !== cStart || lastQueriedDates.end !== cEnd || lastQueriedDates.brand !== cBrand || lastQueriedDates.item !== cItem) {
-                    lastQueriedDates = { start: cStart, end: cEnd, brand: cBrand, item: cItem };
-                    isDetailLoaded = true;
-                    fetchDetailDataForRange(); 
-                }
+                btnQuery.innerText = "🔍 점포별 상세 조회";
             }
         }
 
-        // --- 기타 모달 및 UI 로직 (기존과 동일) ---
+        /* 💡 [핵심] 활성화된 탭의 내용만 독립적으로 실행 */
+        async function executeTabSearch() {
+            if (!validateDates('start')) return;
+            activeFetchToken++;
+
+            if (activeTab === 'dashboard') {
+                // 요약 대시보드가 선택되어 있으면 요약 대시보드만 조회 (1초 미만 쾌속 실행)
+                await fetchChartData();
+            } else {
+                // 점포별 상세내역이 선택되어 있으면 상세 데이터만 조회 (요약 대시보드는 절대 동작 안 함)
+                await fetchDetailDataForRange();
+            }
+        }
+
         function validateDates(type) {
             const sDate = document.getElementById('chart-start-date').value;
             const eDate = document.getElementById('chart-end-date').value;
@@ -833,7 +845,7 @@
             }
         });
 
-        /* 🤖 AI 위젯 로직 */
+        /* 🤖 AI 위젯 기능 */
         function toggleAiChatWidget() {
             const widget = document.getElementById('ai-chat-modal');
             if (widget.style.display === 'flex') { widget.style.display = 'none'; } 
@@ -907,12 +919,12 @@
 
             const systemInstruction = {
                 parts: [{
-                    text: `[🔥최고 우선순위 규칙🔥] 내부 동작 영문 혼잣말을 절대 출력하지 말고 간결한 한국어로 답변하세요. 사용자가 물으면 'query_order_summary' 도구를 호출하세요.`
+                    text: `[🔥최고 우선순위 절대 규칙🔥] 당신은 어떠한 경우에도 영어로 된 생각 과정을 출력해서는 안 됩니다. 간결한 한국어로 직관적으로 답변하세요. 사용자가 물으면 'query_order_summary' 도구를 호출하세요.`
                 }]
             };
             const tools = [{
                 functionDeclarations: [{
-                    name: "query_order_summary", description: "DB 발주 조회",
+                    name: "query_order_summary", description: "DB 발주 수량 조회",
                     parameters: { type: "OBJECT", properties: {
                         startDate: { type: "STRING", description: "YYYY-MM-DD" }, endDate: { type: "STRING" },
                         brandName: { type: "STRING" }, itemName: { type: "STRING" }, storeName: { type: "STRING" }, centerName: { type: "STRING" }
@@ -1087,7 +1099,7 @@
                 const dString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`, qty = dateQtyMap[dString] || 0;
                 const badgeHtml = qty > 0 ? `<span class="data-status-badge badge-has-data">${qty.toLocaleString()}</span>` : `<span class="data-status-badge badge-no-data">0</span>`;
                 const cell = document.createElement('div'); cell.className = 'calendar-day-cell';
-                cell.onclick = () => { document.getElementById('chart-start-date').value = dString; document.getElementById('chart-end-date').value = dString; validateDates('start'); closeCalendarModal(); fetchAllDashboardData(); };
+                cell.onclick = () => { document.getElementById('chart-start-date').value = dString; document.getElementById('chart-end-date').value = dString; validateDates('start'); closeCalendarModal(); executeTabSearch(); };
                 cell.innerHTML = `<span class="day-number">${day}</span>${badgeHtml}`; grid.appendChild(cell);
             }
         }
@@ -1114,39 +1126,7 @@
             } catch (e) {} return weatherMap;
         }
 
-        /* ✨ 메인 대시보드 조회 (차트 분리 1초 로딩 구현) */
-        async function fetchAllDashboardData() {
-            if (!validateDates('start')) return;
-            activeFetchToken++;
-            
-            // 1. 차트와 요약 KPI만 무조건 먼저 호출 (즉시 렌더링)
-            await fetchChartData();
-            
-            // 2. 탭 지연 로딩을 위해 현재 조회한 파라미터를 저장해두고 플래그 리셋
-            isDetailLoaded = false;
-            lastQueriedDates.start = document.getElementById('chart-start-date').value;
-            lastQueriedDates.end = document.getElementById('chart-end-date').value;
-            lastQueriedDates.brand = document.getElementById('chart-brand-input').value;
-            lastQueriedDates.item = document.getElementById('chart-item-input').value;
-
-            // 만약 현재 "상세 내역" 탭이 열려있는 상태에서 검색을 눌렀다면, 즉시 상세 데이터도 로드
-            if (document.getElementById('tab-detail').style.display !== 'none') {
-                isDetailLoaded = true;
-                fetchDetailDataForRange();
-            } else {
-                // 백그라운드 표 초기화 (숨어있는 상태일 때 안내 텍스트)
-                document.getElementById('order-detail-table').innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:#94a3b8;">상세 데이터를 보려면 탭을 눌러주세요.</td></tr>`;
-            }
-        }
-
-        function updateBadgePercent(percent) {
-            if (percent < currentMaxPercent) return;
-            currentMaxPercent = percent;
-            const pText = `⏳ 로딩중 (${currentMaxPercent}%)`;
-            document.getElementById('list-total-qty').innerText = pText; document.getElementById('list-total-amount').innerText = pText;
-            if (rawDetailOrders.length === 0) document.getElementById('order-detail-table').innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:#2563eb;">⚡ 상세 데이터를 로딩 중입니다 (${currentMaxPercent}%)...</td></tr>`;
-        }
-
+        /* 💡 1. 요약 대시보드만 조회 (1초 미만 쾌속 실행) */
         async function fetchChartData() {
             const startDate = document.getElementById('chart-start-date').value, endDate = document.getElementById('chart-end-date').value;
             const brandInputValue = document.getElementById('chart-brand-input').value.trim(), itemKeyword = document.getElementById('chart-item-input').value.trim();
@@ -1218,7 +1198,15 @@
             } else document.getElementById('kpi-total-stores').innerText = "0 개점";
         }
 
-        /* ✨ 상세 데이터 지연 로딩 함수 */
+        /* 💡 2. 점포별 상세 내역만 독립 조회 (차트는 건드리지 않음) */
+        function updateBadgePercent(percent) {
+            if (percent < currentMaxPercent) return;
+            currentMaxPercent = percent;
+            const pText = `⏳ 로딩중 (${currentMaxPercent}%)`;
+            document.getElementById('list-total-qty').innerText = pText; document.getElementById('list-total-amount').innerText = pText;
+            if (rawDetailOrders.length === 0) document.getElementById('order-detail-table').innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:#2563eb;">⚡ 상세 데이터를 로딩 중입니다 (${currentMaxPercent}%)...</td></tr>`;
+        }
+
         async function fetchDetailDataForRange() {
             currentMaxPercent = 0; updateBadgePercent(1);
             const startDate = document.getElementById('chart-start-date').value, endDate = document.getElementById('chart-end-date').value;
@@ -1237,7 +1225,6 @@
             const currentToken = activeFetchToken; let offset = 0, limit = 1000, hasMore = true; rawDetailOrders = [];
             let totalExpectedRows = storeSummaryList.reduce((sum, r) => sum + cleanNumber(r.order_count), 0) || 5000;
 
-            // 추가된 검색 필터 파라미터 적용 (상세 데이터에도 검색어 반영)
             const brandInputValue = document.getElementById('chart-brand-input').value.trim();
             const itemKeyword = document.getElementById('chart-item-input').value.trim();
             let baseSelect = `select=store_code,store_name,distribution_center,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name`;
@@ -1369,7 +1356,7 @@
             XLSX.writeFile(wb, `OMS주문상세_${document.getElementById('chart-start-date').value}_${document.getElementById('chart-end-date').value}.xlsx`);
         }
 
-        /* ⚡ 페이지 로드 시 대시보드 초기화 */
+        /* ⚡ 페이지 로드 시 초기화 */
         document.addEventListener('DOMContentLoaded', async () => {
             const today = new Date(), past7 = new Date(); past7.setDate(today.getDate() - 7);
             document.getElementById('chart-start-date').value = localStorage.getItem('cached_chart_start_date') || formatDate(past7);
@@ -1385,7 +1372,10 @@
 
             await loadMasterLists();
             loadCalendarData();
-            fetchAllDashboardData(); // 차트만 먼저 1초 컷 조회
+            
+            // 첫 진입 시 '요약 대시보드' 탭만 단독 실행 (1초 미만 쾌속 완료)
+            activeTab = 'dashboard';
+            fetchChartData();
         });
 
         async function triggerBot() {
@@ -1402,7 +1392,7 @@
                             await fetch(`${SUPABASE_URL}/rest/v1/rpc/refresh_daily_summary`, { method: 'POST', headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                             await fetch(`${SUPABASE_URL}/rest/v1/rpc/refresh_store_summary`, { method: 'POST', headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                         } catch(e) {}
-                        btn.disabled = false; btn.innerText = "🚀 OMS 수동 동기화"; loadCalendarData(); fetchAllDashboardData(); 
+                        btn.disabled = false; btn.innerText = "🚀 OMS 수동 동기화"; loadCalendarData(); executeTabSearch(); 
                     }, 35000);
                 } else { alert("❌ 동기화 요청 실패"); btn.disabled = false; btn.innerText = "🚀 OMS 수동 동기화"; }
             } catch (err) { alert("❌ 네트워크 오류"); btn.disabled = false; btn.innerText = "🚀 OMS 수동 동기화"; }
