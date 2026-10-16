@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>요약 대시보드 프레임</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Pretendard', 'Malgun Gothic', sans-serif; background: transparent; color: #1e293b; padding: 5px 0; }
+        .section-panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 15px; }
+        .kpi-card { background: #f8fafc; padding: 15px 20px; border-radius: 8px; border-left: 5px solid #2563eb; }
+        .kpi-card.green { border-left-color: #10b981; }
+        .kpi-card.orange { border-left-color: #f59e0b; }
+        .kpi-card.purple { border-left-color: #8b5cf6; }
+        .kpi-title { font-size: 13px; color: #64748b; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+        .kpi-value { font-size: 22px; font-weight: 800; margin-top: 4px; color: #0f172a; }
+        .btn-view-stores { background-color: #f59e0b; color: white; border: none; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; cursor: pointer; }
+        .chart-container { position: relative; height: 350px; width: 100%; margin-top: 15px; }
+        
+        /* 점포 모달 */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 20px; border-radius: 12px; width: 420px; max-width: 90%; max-height: 85vh; display: flex; flex-direction: column; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .modal-title { font-size: 16px; font-weight: 700; }
+        .close-btn { cursor: pointer; font-size: 18px; font-weight: bold; color: #64748b; }
+        .modal-body-scroll { flex: 1; overflow-y: auto; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; }
+        .brand-store-modal-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13.5px; }
+    </style>
+</head>
+<body>
+
+    <div class="section-panel">
+        <div class="kpi-grid">
+            <div class="kpi-card"><div class="kpi-title">기간 내 총 주문수량</div><div class="kpi-value" id="kpi-total-qty">0 건</div></div>
+            <div class="kpi-card green"><div class="kpi-title">기간 내 취급 품목수</div><div class="kpi-value" id="kpi-total-items">0 종</div></div>
+            <div class="kpi-card orange">
+                <div class="kpi-title"><span>기간 내 주문 점포수</span><button class="btn-view-stores" onclick="openBrandStoreModal()">상세보기 📋</button></div>
+                <div class="kpi-value" id="kpi-total-stores">0 개점</div>
+            </div>
+            <div class="kpi-card purple"><div class="kpi-title">기간 내 총 주문금액</div><div class="kpi-value" id="kpi-total-amount">0 원</div></div>
+        </div>
+        <div class="chart-container">
+            <canvas id="dailyTrendChart"></canvas>
+        </div>
+    </div>
+
+    <!-- 🏢 브랜드별 점포 모달 -->
+    <div class="modal-overlay" id="brand-store-modal">
+        <div class="modal-content">
+            <div class="modal-header"><span class="modal-title">🏢 브랜드별 주문 점포수 상세</span><span class="close-btn" onclick="closeBrandStoreModal()">✕</span></div>
+            <div class="modal-body-scroll" id="brand-store-modal-list"></div>
+            <div style="margin-top: 15px; text-align: right;"><button style="padding: 6px 14px; background:#2563eb; color:white; border:none; border-radius:6px; cursor:pointer;" onclick="closeBrandStoreModal()">닫기</button></div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co"; 
+        const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN";
+        let trendChart = null;
+        let currentBrandStoreMap = {};
+
+        function cleanNumber(val) { return parseFloat(String(val).replace(/[^0-9.-]/g, '')) || 0; }
+        function formatDisplayDate(dateStr) { return !dateStr || dateStr === '-' ? '-' : String(dateStr).split('T')[0].replace(/-/g, '/'); }
+
+        async function fetchChartData(params) {
+            const { startDate, endDate, brandName, itemName } = params;
+            if (!startDate || !endDate) return;
+
+            let dailyUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
+            let storeFastUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_name,brand_name`;
+
+            if (brandName) {
+                const bList = brandName.split(',').map(b => b.trim()).filter(Boolean);
+                if (bList.length === 1) { const cond = `&brand_name=ilike.*${encodeURIComponent(bList[0])}*`; dailyUrl += cond; storeFastUrl += cond; }
+                else if (bList.length > 1) { const cond = `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`; dailyUrl += cond; storeFastUrl += cond; }
+            }
+            if (itemName) {
+                const iList = itemName.split(',').map(i => i.trim()).filter(Boolean);
+                if (iList.length === 1) { const cond = `&or=(item_code.ilike.*${encodeURIComponent(iList[0])}*,item_name.ilike.*${encodeURIComponent(iList[0])}*)`; dailyUrl += cond; storeFastUrl += cond; }
+                else if (iList.length > 1) { const cond = `&or=(${iList.map(i => `item_code.ilike.*${encodeURIComponent(i)}*,item_name.ilike.*${encodeURIComponent(i)}*`).join(',')})`; dailyUrl += cond; storeFastUrl += cond; }
+            }
+
+            try {
+                const [resDaily, resStore] = await Promise.all([
+                    fetch(dailyUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } }),
+                    fetch(storeFastUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } })
+                ]);
+                const dailyData = resDaily.ok ? await resDaily.json() : [];
+                const storeData = resStore.ok ? await resStore.json() : [];
+                renderDashboard(dailyData, storeData, startDate, endDate);
+            } catch (e) {}
+        }
+
+        async function renderDashboard(data, storeData, startDate, endDate) {
+            let totalQty = 0, totalAmount = 0; const items = new Set(), dailyMap = {};
+            data.forEach(r => {
+                const q = cleanNumber(r.total_qty || r.qty), amt = cleanNumber(r.total_amount) || (q * cleanNumber(r.price));
+                totalQty += q; totalAmount += amt;
+                if (r.item_name) items.add(r.item_name);
+                const dKey = formatDisplayDate(r.delivery_date);
+                if (!dailyMap[dKey]) dailyMap[dKey] = { qty: 0, amount: 0 };
+                dailyMap[dKey].qty += q; dailyMap[dKey].amount += amt;
+            });
+
+            // 점포수 집계
+            const uniqueStores = new Set(); currentBrandStoreMap = {};
+            storeData.forEach(r => {
+                if (r.store_name && r.store_name !== '-') {
+                    uniqueStores.add(r.store_name);
+                    const b = r.brand_name || '기타';
+                    if (!currentBrandStoreMap[b]) currentBrandStoreMap[b] = new Set();
+                    currentBrandStoreMap[b].add(r.store_name);
+                }
+            });
+
+            document.getElementById('kpi-total-qty').innerText = `${totalQty.toLocaleString()} 건`;
+            document.getElementById('kpi-total-items').innerText = `${items.size.toLocaleString()} 종`;
+            document.getElementById('kpi-total-stores').innerText = `${uniqueStores.size.toLocaleString()} 개점`;
+            document.getElementById('kpi-total-amount').innerText = `${totalAmount.toLocaleString()} 원`;
+
+            // 그래프 렌더링
+            const labels = Object.keys(dailyMap).sort();
+            const qtyData = labels.map(k => dailyMap[k].qty);
+            const amtData = labels.map(k => dailyMap[k].amount);
+
+            const ctx = document.getElementById('dailyTrendChart').getContext('2d');
+            if (trendChart) trendChart.destroy();
+            trendChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: '주문수량', data: qtyData, backgroundColor: 'rgba(37, 99, 235, 0.6)', yAxisID: 'y1' },
+                        { label: '주문금액', data: amtData, type: 'line', borderColor: '#8b5cf6', borderWidth: 2, yAxisID: 'y2' }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { font: { size: 11, weight: 'bold' } } },
+                        y1: { type: 'linear', position: 'left', beginAtZero: true, grace: '20%' },
+                        y2: { type: 'linear', position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, grace: '20%' }
+                    }
+                }
+            });
+        }
+
+        function openBrandStoreModal() {
+            document.getElementById('brand-store-modal').style.display = 'flex';
+            const listEl = document.getElementById('brand-store-modal-list');
+            const sorted = Object.keys(currentBrandStoreMap).sort((a,b) => currentBrandStoreMap[b].size - currentBrandStoreMap[a].size);
+            listEl.innerHTML = sorted.map(b => `<div class="brand-store-modal-row"><span>🏢 ${b}</span><b>${currentBrandStoreMap[b].size.toLocaleString()} 개점</b></div>`).join('');
+        }
+        function closeBrandStoreModal() { document.getElementById('brand-store-modal').style.display = 'none'; }
+
+        // 💡 부모창 통신 수신
+        window.addEventListener('message', (e) => {
+            if (e.data && (e.data.action === 'SEARCH' || e.data.action === 'INIT_SEARCH')) {
+                fetchChartData(e.data.params);
+            }
+        });
+        window.addEventListener('DOMContentLoaded', () => {
+            window.parent.postMessage({ action: 'FRAME_READY', tab: 'dashboard' }, '*');
+        });
+    </script>
+</body>
+</html>
