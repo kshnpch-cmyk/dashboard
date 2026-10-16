@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>피벗 분석 프레임</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Pretendard', 'Malgun Gothic', sans-serif; background: transparent; color: #1e293b; padding: 5px 0; }
+        .section-panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-bottom: 15px; }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 12px; }
+        .panel-title-text { font-size: 16px; font-weight: 700; color: #0f172a; }
+        .btn-excel { background-color: #16a34a; color: white; border: none; padding: 5px 12px; font-size: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; }
+        .checkbox-row { display: flex; gap: 20px; flex-wrap: wrap; align-items: center; padding: 4px 0; }
+        .checkbox-label { display: flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; cursor: pointer; color: #1e293b; }
+        .summary-badge-group { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+        .summary-badge { background-color: #f1f5f9; padding: 4px 10px; border-radius: 6px; border: 1px solid #cbd5e1; color: #475569; }
+        .summary-badge b { color: #2563eb; }
+        .table-container { width: 100%; overflow-x: auto; max-height: 550px; }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 13px; white-space: nowrap; }
+        th { background-color: #f8fafc; color: #475569; position: sticky; top: 0; z-index: 2; }
+        .text-right { text-align: right; }
+    </style>
+</head>
+<body>
+
+    <!-- 1. 그룹 기준 체크박스 패널 -->
+    <div class="section-panel">
+        <div class="panel-header">
+            <span class="panel-title-text">🧩 피벗 그룹핑 기준 (집계할 컬럼을 자유롭게 선택하세요)</span>
+            <button class="btn-excel" onclick="exportPivotToExcel()">📥 피벗 엑셀 저장</button>
+        </div>
+        <div class="checkbox-row">
+            <label class="checkbox-label"><input type="checkbox" id="col-date" onchange="runPivot()"> 📅 배송일자</label>
+            <label class="checkbox-label"><input type="checkbox" id="col-brand" onchange="runPivot()"> 🏢 브랜드</label>
+            <label class="checkbox-label"><input type="checkbox" id="col-center" onchange="runPivot()"> 🏬 센터명</label>
+            <label class="checkbox-label"><input type="checkbox" id="col-store" onchange="runPivot()"> 🏪 점포명</label>
+            <label class="checkbox-label"><input type="checkbox" id="col-item" checked onchange="runPivot()"> 📦 품목명</label>
+            <label class="checkbox-label"><input type="checkbox" id="col-itemcode" onchange="runPivot()"> 🏷️ 품목코드</label>
+            <span style="font-size: 12px; color: #64748b; margin-left: auto;">💡 체크 즉시 0.01초 만에 실시간 재계산됩니다.</span>
+        </div>
+    </div>
+
+    <!-- 2. 피벗 집계 결과 테이블 -->
+    <div class="section-panel">
+        <div class="panel-header">
+            <span class="panel-title-text">📊 피벗 집계 결과</span>
+            <div class="summary-badge-group">
+                <span class="summary-badge">수량합계: <b id="pivot-total-qty">0개</b></span>
+                <span class="summary-badge">금액합계: <b id="pivot-total-amount">0원</b></span>
+                <span class="summary-badge">집계 행수: <b id="pivot-total-rows">0행</b></span>
+            </div>
+        </div>
+        <div class="table-container">
+            <table>
+                <thead id="pivot-thead"><tr><th>선택된 기준이 없습니다.</th></tr></thead>
+                <tbody id="pivot-tbody">
+                    <tr><td style="text-align:center; padding:30px; color:#94a3b8;">상단 [피벗 분석 집계 조회] 버튼을 눌러 데이터를 불러오세요.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co"; 
+        const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN";
+
+        let rawOrders = [];
+        let currentPivotList = [];
+
+        function cleanNumber(v) { return parseFloat(String(v).replace(/[^0-9.-]/g, '')) || 0; }
+        function formatDisplayDate(d) { return !d || d === '-' ? '-' : String(d).split('T')[0].replace(/-/g, '/'); }
+
+        async function fetchPivotRawData(params) {
+            const { startDate, endDate, brandName, itemName } = params;
+            if (!startDate || !endDate) return;
+
+            rawOrders = [];
+            document.getElementById('pivot-tbody').innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:#2563eb;">⚡ 피벗 원천 데이터를 로딩 중입니다...</td></tr>`;
+
+            let baseSelect = `select=store_code,store_name,distribution_center,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name`;
+            let url = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&${baseSelect}`;
+
+            if (brandName) {
+                const bList = brandName.split(',').map(b => b.trim()).filter(Boolean);
+                if (bList.length === 1) url += `&brand_name=ilike.*${encodeURIComponent(bList[0])}*`;
+                else if (bList.length > 1) url += `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`;
+            }
+            if (itemName) {
+                const iList = itemName.split(',').map(i => i.trim()).filter(Boolean);
+                if (iList.length === 1) url += `&or=(item_code.ilike.*${encodeURIComponent(iList[0])}*,item_name.ilike.*${encodeURIComponent(iList[0])}*)`;
+                else if (iList.length > 1) url += `&or=(${iList.map(i => `item_code.ilike.*${encodeURIComponent(i)}*,item_name.ilike.*${encodeURIComponent(i)}*`).join(',')})`;
+            }
+
+            let offset = 0, limit = 1000, hasMore = true;
+            while (hasMore) {
+                try {
+                    const res = await fetch(`${url}&limit=${limit}&offset=${offset}`, {
+                        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                    });
+                    if (res.ok) {
+                        const chunk = await res.json();
+                        if (!chunk || chunk.length === 0) break;
+                        chunk.forEach(r => { r.center_name = r.distribution_center || '-'; });
+                        rawOrders = rawOrders.concat(chunk);
+                        if (chunk.length < limit) hasMore = false; else offset += limit;
+                    } else hasMore = false;
+                } catch(e) { hasMore = false; }
+            }
+            runPivot();
+        }
+
+        /* 💡 동적 Group By 피벗 엔진 */
+        function runPivot() {
+            if (!rawOrders || rawOrders.length === 0) {
+                document.getElementById('pivot-tbody').innerHTML = `<tr><td style="text-align:center; padding:30px; color:#94a3b8;">데이터가 없습니다.</td></tr>`;
+                return;
+            }
+
+            const dims = [];
+            if (document.getElementById('col-date').checked) dims.push({ key: 'delivery_date', label: '배송일자', isDate: true });
+            if (document.getElementById('col-brand').checked) dims.push({ key: 'brand_name', label: '브랜드' });
+            if (document.getElementById('col-center').checked) dims.push({ key: 'center_name', label: '센터명' });
+            if (document.getElementById('col-store').checked) dims.push({ key: 'store_name', label: '점포명' });
+            if (document.getElementById('col-item').checked) dims.push({ key: 'item_name', label: '품목명' });
+            if (document.getElementById('col-itemcode').checked) dims.push({ key: 'item_code', label: '품목코드' });
+
+            // 헤더 생성
+            const thead = document.getElementById('pivot-thead');
+            if (dims.length === 0) thead.innerHTML = `<tr><th>전체 합산</th><th class="text-right">수량 합계</th><th class="text-right">금액 합계</th><th class="text-right">주문 건수</th></tr>`;
+            else thead.innerHTML = `<tr>${dims.map(d => `<th>${d.label}</th>`).join('')}<th class="text-right">수량 합계</th><th class="text-right">금액 합계</th><th class="text-right">주문 건수</th></tr>`;
+
+            // Group By 맵
+            const map = new Map();
+            let grandQty = 0, grandAmt = 0;
+
+            rawOrders.forEach(r => {
+                const q = cleanNumber(r.qty), amt = cleanNumber(r.total_amount) || (q * cleanNumber(r.price));
+                grandQty += q; grandAmt += amt;
+
+                let keys = dims.length === 0 ? ['전체'] : dims.map(d => d.isDate ? formatDisplayDate(r[d.key]) : (r[d.key] || '-'));
+                const hash = keys.join('__||__');
+                let target = map.get(hash);
+                if (!target) {
+                    target = { keys, qty: 0, amount: 0, count: 0 };
+                    map.set(hash, target);
+                }
+                target.qty += q; target.amount += amt; target.count++;
+            });
+
+            currentPivotList = Array.from(map.values()).sort((a,b) => b.qty - a.qty);
+
+            document.getElementById('pivot-total-qty').innerText = `${grandQty.toLocaleString()}개`;
+            document.getElementById('pivot-total-amount').innerText = `${grandAmt.toLocaleString()}원`;
+            document.getElementById('pivot-total-rows').innerText = `${currentPivotList.length.toLocaleString()}행`;
+
+            const tbody = document.getElementById('pivot-tbody');
+            tbody.innerHTML = currentPivotList.map(item => `
+                <tr>
+                    ${item.keys.map(k => `<td><b>${k}</b></td>`).join('')}
+                    <td class="text-right" style="color:#2563eb; font-weight:bold;">${item.qty.toLocaleString()}</td>
+                    <td class="text-right" style="font-weight:bold;">${item.amount > 0 ? item.amount.toLocaleString() + '원' : '-'}</td>
+                    <td class="text-right" style="color:#64748b;">${item.count.toLocaleString()}건</td>
+                </tr>
+            `).join('');
+        }
+
+        function exportPivotToExcel() {
+            if (!currentPivotList || currentPivotList.length === 0) return alert("저장할 피벗 데이터가 없습니다.");
+            const dims = [];
+            if (document.getElementById('col-date').checked) dims.push('배송일자');
+            if (document.getElementById('col-brand').checked) dims.push('브랜드');
+            if (document.getElementById('col-center').checked) dims.push('센터명');
+            if (document.getElementById('col-store').checked) dims.push('점포명');
+            if (document.getElementById('col-item').checked) dims.push('품목명');
+            if (document.getElementById('col-itemcode').checked) dims.push('품목코드');
+            if (dims.length === 0) dims.push('구분');
+
+            const exportData = currentPivotList.map(item => {
+                const obj = {};
+                dims.forEach((d, idx) => { obj[d] = item.keys[idx]; });
+                obj['수량 합계'] = item.qty;
+                obj['금액 합계'] = item.amount;
+                obj['주문 건수'] = item.count;
+                return obj;
+            });
+
+            const ws = XLSX.utils.json_to_sheet(exportData), wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "피벗집계");
+            XLSX.writeFile(wb, `OMS_피벗집계_${Date.now()}.xlsx`);
+        }
+
+        // 💡 부모창 통신 수신
+        window.addEventListener('message', (e) => {
+            if (e.data && e.data.action === 'SEARCH') {
+                fetchPivotRawData(e.data.params);
+            }
+        });
+        window.addEventListener('DOMContentLoaded', () => {
+            window.parent.postMessage({ action: 'FRAME_READY', tab: 'pivot' }, '*');
+        });
+    </script>
+</body>
+</html>
