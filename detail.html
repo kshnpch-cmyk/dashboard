@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>점포별 상세 내역 프레임</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Pretendard', 'Malgun Gothic', sans-serif; background: transparent; color: #1e293b; padding: 5px 0; }
+        .dashboard-layout { display: grid; grid-template-columns: 290px 1fr; gap: 20px; align-items: start; }
+        .panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+        .panel-title { font-size: 17px; font-weight: 700; margin-bottom: 15px; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .summary-badge-group { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+        .summary-badge { background-color: #f1f5f9; padding: 4px 10px; border-radius: 6px; border: 1px solid #cbd5e1; color: #475569; }
+        .summary-badge b { color: #2563eb; }
+        .search-input { width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; margin-bottom: 10px; outline: none; }
+        .store-list { list-style: none; padding: 0; margin: 0; max-height: 520px; overflow-y: auto; }
+        .store-item { padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 5px; cursor: pointer; display: flex; justify-content: space-between; font-size: 13px; }
+        .store-item:hover, .store-item.active { background-color: #eff6ff; border-color: #2563eb; font-weight: bold; }
+        .table-container { width: 100%; overflow-x: auto; max-height: 520px; }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #e2e8f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+        th { background-color: #f8fafc; color: #475569; position: sticky; top: 0; z-index: 2; }
+        .table-filter-input { width: 100%; padding: 4px 6px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 4px; }
+        .text-right { text-align: right; }
+        .code-tag { font-size: 11px; color: #64748b; font-family: monospace; }
+        .btn-excel { background-color: #16a34a; color: white; border: none; padding: 5px 10px; font-size: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; }
+        .pagination-container { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding-top: 10px; border-top: 1px solid #e2e8f0; }
+        .page-btn { background-color: #f8fafc; border: 1px solid #cbd5e1; padding: 4px 8px; font-size: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; }
+        .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard-layout">
+        <!-- 좌측 점포 목록 -->
+        <div class="panel">
+            <div class="panel-title"><span>🏢 주문 점포 필터</span></div>
+            <input type="text" id="store-search-input" class="search-input" placeholder="🔍 점포명 검색" oninput="filterStoreList()">
+            <div id="brand-summary" style="margin-bottom: 8px; font-size: 12px; color: #64748b;">
+                점포수: <b id="brand-store-count">0개</b>
+            </div>
+            <ul class="store-list" id="store-list">
+                <li style="padding:15px; text-align:center; color:#94a3b8; font-size:13px;">상단 [조회]를 누르면 로드됩니다.</li>
+            </ul>
+        </div>
+
+        <!-- 우측 주문 상세 내역 -->
+        <div class="panel">
+            <div class="panel-title">
+                <span id="selected-store-title">🛒 기간 내 전체 점포 합산 상세</span>
+                <div class="summary-badge-group">
+                    <button class="btn-excel" onclick="exportToExcel()">📥 엑셀 저장</button>
+                    <span class="summary-badge">수량합계: <b id="list-total-qty">0개</b></span>
+                    <span class="summary-badge">금액합계: <b id="list-total-amount">0원</b></span>
+                </div>
+            </div>
+            
+            <div class="table-container">
+                <table id="detail-table">
+                    <colgroup>
+                        <col style="width: 80px;"><col style="width: 140px;"><col style="width: 110px;">
+                        <col style="width: 90px;"><col style="width: 90px;"><col style="width: 90px;">
+                        <col style="width: 180px;"><col style="width: 65px;"><col style="width: 85px;"><col style="width: 105px;">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>점포코드</th><th>점포명</th><th>센터명</th><th>주문일자</th><th>배송일자</th>
+                            <th>품목코드</th><th>품목명</th><th class="text-right">수량</th>
+                            <th class="text-right">단가</th><th class="text-right">금액</th>
+                        </tr>
+                        <tr>
+                            <th><input type="text" id="filter-storeCode" class="table-filter-input" oninput="applyColumnFilters()"></th>
+                            <th><input type="text" id="filter-storeName" class="table-filter-input" oninput="applyColumnFilters()"></th>
+                            <th><input type="text" id="filter-centerName" class="table-filter-input" oninput="applyColumnFilters()"></th>
+                            <th><input type="text" id="filter-orderDate" class="table-filter-input" oninput="applyColumnFilters()"></th>
+                            <th><input type="text" id="filter-deliveryDate" class="table-filter-input" oninput="applyColumnFilters()"></th>
+                            <th><input type="text" id="filter-itemCode" class="table-filter-input" oninput="applyColumnFilters()"></th>
+                            <th><input type="text" id="filter-itemName" class="table-filter-input" oninput="applyColumnFilters()"></th>
+                            <th></th><th></th><th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="order-detail-table">
+                        <tr><td colspan="10" style="text-align:center; padding:30px; color:#94a3b8;">상단 [점포별 상세 조회] 버튼을 누르면 데이터를 불러옵니다.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination-container">
+                <div style="font-size: 13px; color: #64748b; font-weight: 600;">
+                    페이지당: 
+                    <select id="rows-per-page" style="padding: 2px 4px; border: 1px solid #cbd5e1; border-radius: 4px;" onchange="changeRowsPerPage()">
+                        <option value="10">10개씩</option><option value="50">50개씩</option><option value="100">100개씩</option><option value="1000">1000개씩</option>
+                    </select>
+                </div>
+                <div>
+                    <button class="page-btn" id="btn-prev" onclick="goToPage(currentPage - 1)">‹ 이전</button>
+                    <span style="font-size: 12.5px; font-weight: bold; margin: 0 8px;" id="page-info">1 / 1</span>
+                    <button class="page-btn" id="btn-next" onclick="goToPage(currentPage + 1)">다음 ›</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co"; 
+        const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN";
+
+        let rawDetailOrders = [], baseDetailOrders = [], currentDetailOrders = [];
+        let storeSummaryList = [];
+        let currentSelectedStore = 'ALL';
+        let currentPage = 1, rowsPerPage = 10, totalPages = 1;
+
+        function cleanNumber(val) { return parseFloat(String(val).replace(/[^0-9.-]/g, '')) || 0; }
+        function cleanCode(val) { return (!val && val !== 0) ? '-' : String(val).replace(/\.0$/, '').trim(); }
+        function formatDisplayDate(d) { return !d || d === '-' ? '-' : String(d).split('T')[0].replace(/-/g, '/'); }
+
+        async function fetchDetailData(params) {
+            const { startDate, endDate, brandName, itemName } = params;
+            if (!startDate || !endDate) return;
+
+            rawDetailOrders = [];
+            document.getElementById('order-detail-table').innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:#2563eb;">⚡ 상세 데이터를 로딩 중입니다...</td></tr>`;
+
+            let baseSelect = `select=store_code,store_name,distribution_center,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name`;
+            let url = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&${baseSelect}`;
+
+            if (brandName) {
+                const bList = brandName.split(',').map(b => b.trim()).filter(Boolean);
+                if (bList.length === 1) url += `&brand_name=ilike.*${encodeURIComponent(bList[0])}*`;
+                else if (bList.length > 1) url += `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`;
+            }
+            if (itemName) {
+                const iList = itemName.split(',').map(i => i.trim()).filter(Boolean);
+                if (iList.length === 1) url += `&or=(item_code.ilike.*${encodeURIComponent(iList[0])}*,item_name.ilike.*${encodeURIComponent(iList[0])}*)`;
+                else if (iList.length > 1) url += `&or=(${iList.map(i => `item_code.ilike.*${encodeURIComponent(i)}*,item_name.ilike.*${encodeURIComponent(i)}*`).join(',')})`;
+            }
+
+            let offset = 0, limit = 1000, hasMore = true;
+            while (hasMore) {
+                try {
+                    const res = await fetch(`${url}&order=delivery_date.asc,store_code.asc&limit=${limit}&offset=${offset}`, {
+                        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                    });
+                    if (res.ok) {
+                        const chunk = await res.json();
+                        if (!chunk || chunk.length === 0) break;
+                        chunk.forEach(r => { r.center_name = r.distribution_center || '-'; });
+                        rawDetailOrders = rawDetailOrders.concat(chunk);
+                        if (chunk.length < limit) hasMore = false; else offset += limit;
+                    } else hasMore = false;
+                } catch(e) { hasMore = false; }
+            }
+
+            // 사이드바 점포 리스트 집계
+            const storeMap = {};
+            rawDetailOrders.forEach(r => {
+                if (r.store_name) {
+                    if (!storeMap[r.store_name]) storeMap[r.store_name] = 0;
+                    storeMap[r.store_name]++;
+                }
+            });
+            storeSummaryList = Object.keys(storeMap).sort().map(s => ({ store_name: s, count: storeMap[s] }));
+            renderStoreList();
+
+            // 전체 점포 표시
+            onStoreSelect(currentSelectedStore);
+        }
+
+        function renderStoreList() {
+            const listEl = document.getElementById('store-list');
+            document.getElementById('brand-store-count').innerText = `${storeSummaryList.length}개`;
+            const totalCount = rawDetailOrders.length;
+
+            let html = [`<li class="store-item total-item ${currentSelectedStore==='ALL'?'active':''}" onclick="onStoreSelect('ALL', this)"><span>🏢 전체 점포 합산</span><span style="color:#2563eb;">${totalCount.toLocaleString()}건</span></li>`];
+            storeSummaryList.forEach(s => {
+                html.push(`<li class="store-item ${currentSelectedStore===s.store_name?'active':''}" onclick="onStoreSelect('${s.store_name}', this)"><span>${s.store_name}</span><span style="color:#64748b;">${s.count.toLocaleString()}건</span></li>`);
+            });
+            listEl.innerHTML = html.join('');
+        }
+
+        function filterStoreList() {
+            const q = document.getElementById('store-search-input').value.toLowerCase().trim();
+            document.querySelectorAll('#store-list .store-item').forEach(item => {
+                item.style.display = item.innerText.toLowerCase().includes(q) ? 'flex' : 'none';
+            });
+        }
+
+        function onStoreSelect(sName, el) {
+            currentSelectedStore = sName;
+            document.querySelectorAll('.store-item').forEach(i => i.classList.remove('active'));
+            if (el) el.classList.add('active');
+
+            if (sName === 'ALL') {
+                document.getElementById('selected-store-title').innerText = `🛒 기간 내 전체 점포 합산 상세`;
+                baseDetailOrders = rawDetailOrders;
+            } else {
+                document.getElementById('selected-store-title').innerText = `🛒 [${sName}] 주문 상세`;
+                baseDetailOrders = rawDetailOrders.filter(r => r.store_name === sName);
+            }
+            applyColumnFilters();
+        }
+
+        function applyColumnFilters() {
+            const qSC = document.getElementById('filter-storeCode').value.toLowerCase().trim();
+            const qSN = document.getElementById('filter-storeName').value.toLowerCase().trim();
+            const qCN = document.getElementById('filter-centerName').value.toLowerCase().trim();
+            const qOD = document.getElementById('filter-orderDate').value.toLowerCase().trim();
+            const qDD = document.getElementById('filter-deliveryDate').value.toLowerCase().trim();
+            const qIC = document.getElementById('filter-itemCode').value.toLowerCase().trim();
+            const qIN = document.getElementById('filter-itemName').value.toLowerCase().trim();
+
+            currentDetailOrders = baseDetailOrders.filter(r => {
+                if (qSC && !cleanCode(r.store_code).toLowerCase().includes(qSC)) return false;
+                if (qSN && !String(r.store_name||'').toLowerCase().includes(qSN)) return false;
+                if (qCN && !String(r.center_name||'').toLowerCase().includes(qCN)) return false;
+                if (qOD && !formatDisplayDate(r.order_date).toLowerCase().includes(qOD)) return false;
+                if (qDD && !formatDisplayDate(r.delivery_date).toLowerCase().includes(qDD)) return false;
+                if (qIC && !cleanCode(r.item_code).toLowerCase().includes(qIC)) return false;
+                if (qIN && !String(r.item_name||'').toLowerCase().includes(qIN)) return false;
+                return true;
+            });
+            currentPage = 1;
+            renderTable();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('order-detail-table');
+            if (!currentDetailOrders || currentDetailOrders.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:#94a3b8;">데이터가 없습니다.</td></tr>`;
+                document.getElementById('list-total-qty').innerText = "0개";
+                document.getElementById('list-total-amount').innerText = "0원";
+                document.getElementById('page-info').innerText = "0 / 0";
+                return;
+            }
+
+            let sumQty = 0, sumAmt = 0;
+            currentDetailOrders.forEach(r => {
+                const q = cleanNumber(r.qty), p = cleanNumber(r.price);
+                sumQty += q; sumAmt += (cleanNumber(r.total_amount) || (q * p));
+            });
+            document.getElementById('list-total-qty').innerText = `${sumQty.toLocaleString()}개`;
+            document.getElementById('list-total-amount').innerText = `${sumAmt.toLocaleString()}원`;
+
+            totalPages = Math.ceil(currentDetailOrders.length / rowsPerPage) || 1;
+            const start = (currentPage - 1) * rowsPerPage;
+            const pageData = currentDetailOrders.slice(start, start + rowsPerPage);
+
+            tbody.innerHTML = pageData.map(r => {
+                const q = cleanNumber(r.qty), p = cleanNumber(r.price), t = cleanNumber(r.total_amount) || (q * p);
+                return `<tr>
+                    <td><span class="code-tag">${cleanCode(r.store_code)}</span></td>
+                    <td><b>${r.store_name||'-'}</b></td>
+                    <td><span style="color:#2563eb; font-weight:600;">${r.center_name||'-'}</span></td>
+                    <td>${formatDisplayDate(r.order_date)}</td>
+                    <td><span style="color:#2563eb; font-weight:bold;">${formatDisplayDate(r.delivery_date)}</span></td>
+                    <td><span class="code-tag">${cleanCode(r.item_code)}</span></td>
+                    <td>${r.item_name||'-'}</td>
+                    <td class="text-right">${q.toLocaleString()}</td>
+                    <td class="text-right">${p>0?p.toLocaleString()+'원':'-'}</td>
+                    <td class="text-right"><b>${t>0?t.toLocaleString()+'원':'-'}</b></td>
+                </tr>`;
+            }).join('');
+
+            document.getElementById('page-info').innerText = `${currentPage} / ${totalPages}`;
+            document.getElementById('btn-prev').disabled = (currentPage === 1);
+            document.getElementById('btn-next').disabled = (currentPage === totalPages);
+        }
+
+        function goToPage(p) {
+            if (p < 1 || p > totalPages) return;
+            currentPage = p; renderTable();
+        }
+        function changeRowsPerPage() {
+            rowsPerPage = parseInt(document.getElementById('rows-per-page').value, 10);
+            currentPage = 1; renderTable();
+        }
+
+        function exportToExcel() {
+            if (!currentDetailOrders || currentDetailOrders.length === 0) return alert("저장할 데이터가 없습니다.");
+            const exportData = currentDetailOrders.map(r => ({
+                '점포코드': cleanCode(r.store_code), '점포명': r.store_name || '-', '센터명': r.center_name || '-',
+                '주문일자': formatDisplayDate(r.order_date), '배송일자': formatDisplayDate(r.delivery_date),
+                '품목코드': cleanCode(r.item_code), '품목명': r.item_name || '-',
+                '수량': cleanNumber(r.qty), '단가': cleanNumber(r.price),
+                '금액': cleanNumber(r.total_amount) || (cleanNumber(r.qty) * cleanNumber(r.price))
+            }));
+            const ws = XLSX.utils.json_to_sheet(exportData), wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "주문상세");
+            XLSX.writeFile(wb, `OMS_주문상세_${Date.now()}.xlsx`);
+        }
+
+        // 💡 부모창 통신 수신
+        window.addEventListener('message', (e) => {
+            if (e.data && e.data.action === 'SEARCH') {
+                fetchDetailData(e.data.params);
+            }
+        });
+        window.addEventListener('DOMContentLoaded', () => {
+            window.parent.postMessage({ action: 'FRAME_READY', tab: 'detail' }, '*');
+        });
+    </script>
+</body>
+</html>
