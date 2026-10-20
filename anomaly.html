@@ -1,1 +1,428 @@
 
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>이상 감지 프레임</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Pretendard', 'Malgun Gothic', sans-serif; background: transparent; color: #1e293b; padding: 5px 0; }
+        
+        .dashboard-layout { display: grid; grid-template-columns: 1fr 360px; gap: 20px; align-items: start; }
+        .panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+        .panel-title { font-size: 17px; font-weight: 800; margin-bottom: 15px; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; color: #0f172a; }
+        
+        /* 커스텀 필터 바 */
+        .filter-bar { display: flex; flex-wrap: wrap; gap: 15px; align-items: center; background: #f8fafc; padding: 12px 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 15px; }
+        .filter-item { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 700; color: #475569; }
+        .input-box, .select-box { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; font-weight: 700; outline: none; }
+        .highlight-input { width: 70px; text-align: center; color: #e11d48; border-color: #fda4af; background: #fff1f2; }
+        
+        /* 요약 KPI 카드 */
+        .kpi-row { display: flex; gap: 15px; margin-bottom: 15px; }
+        .kpi-box { flex: 1; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #e2e8f0; background: white; }
+        .kpi-box.danger { border-color: #fda4af; background: #fff1f2; }
+        .kpi-box.warning { border-color: #fcd34d; background: #fffbeb; }
+        .kpi-title { font-size: 12px; font-weight: 800; color: #64748b; margin-bottom: 5px; }
+        .kpi-value { font-size: 24px; font-weight: 900; }
+        .kpi-box.danger .kpi-value { color: #e11d48; }
+        .kpi-box.warning .kpi-value { color: #d97706; }
+
+        /* 메인 리스트 테이블 */
+        .table-container { width: 100%; overflow-x: auto; max-height: 480px; border: 1px solid #e2e8f0; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+        th { background-color: #f8fafc; color: #475569; position: sticky; top: 0; z-index: 2; border-bottom: 2px solid #cbd5e1; }
+        tr:hover { background-color: #eff6ff; }
+        tr.active-row { background-color: #e0f2fe; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        
+        /* 태그 */
+        .tag { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 800; }
+        .tag-up { background: #fee2e2; color: #b91c1c; }
+        .tag-down { background: #e0f2fe; color: #0369a1; }
+        
+        /* 우측 상세 패널 */
+        .detail-item-title { font-size: 16px; font-weight: 900; color: #1e293b; margin-bottom: 5px; white-space: normal; }
+        .detail-item-code { font-size: 12px; color: #64748b; font-family: monospace; margin-bottom: 15px; display: block; }
+        .chart-container { height: 180px; width: 100%; margin-bottom: 20px; }
+        
+        .store-ranking-title { font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
+        .store-list { list-style: none; }
+        .store-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #e2e8f0; font-size: 13px; }
+        .store-item b { color: #0f172a; }
+        .store-item span { font-weight: 800; color: #2563eb; }
+        .cause-badge { display: inline-block; margin-top: 15px; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 800; width: 100%; text-align: center; }
+        .cause-store { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+        .cause-all { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+        
+        .empty-state { text-align: center; padding: 60px 20px; color: #94a3b8; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+    <div class="filter-bar">
+        <div class="filter-item">
+            <span style="color:#64748b;">기준일 (대시보드 종료일):</span>
+            <span id="display-target-date" style="color:#0f172a;">-</span>
+        </div>
+        <div class="filter-item">
+            <label>비교 대상군:</label>
+            <select id="compare-mode" class="select-box" onchange="runAnomalyDetection()">
+                <option value="4w">직전 4주 동요일 평균 (권장)</option>
+                <option value="1w">직전 주 동일 요일</option>
+                <option value="1d">직전 일 (어제)</option>
+            </select>
+        </div>
+        <div class="filter-item" style="margin-left: auto;">
+            <label>알림 민감도:</label>
+            <span>증감률</span>
+            <input type="number" id="sensitivity-input" class="input-box highlight-input" value="200" min="50" step="50" onchange="runAnomalyDetection()">
+            <span>% 이상</span>
+        </div>
+    </div>
+
+    <div class="kpi-row">
+        <div class="kpi-box danger">
+            <div class="kpi-title">🚨 급증 (품절/오발주 위험) 품목</div>
+            <div class="kpi-value" id="kpi-up-count">0</div>
+        </div>
+        <div class="kpi-box warning">
+            <div class="kpi-title">⚠️ 단일점포 오입력 강력 의심</div>
+            <div class="kpi-value" id="kpi-store-issue">0</div>
+        </div>
+        <div class="kpi-box">
+            <div class="kpi-title">📉 급감 (-50% 이하) 품목</div>
+            <div class="kpi-value" id="kpi-down-count">0</div>
+        </div>
+    </div>
+
+    <div class="dashboard-layout">
+        <!-- 좌측 이상 품목 리스트 -->
+        <div class="panel" style="padding: 15px;">
+            <div class="panel-title">📋 튀는 품목 (Anomaly List)</div>
+            <div class="table-container">
+                <table>
+                    <colgroup>
+                        <col style="width: 70px;">
+                        <col style="width: 100px;">
+                        <col style="width: auto;">
+                        <col style="width: 90px;">
+                        <col style="width: 90px;">
+                        <col style="width: 90px;">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th class="text-center">상태</th>
+                            <th>브랜드</th>
+                            <th>품목명</th>
+                            <th class="text-right">비교군 평균</th>
+                            <th class="text-right">기준일 수량</th>
+                            <th class="text-right">증감률</th>
+                        </tr>
+                    </thead>
+                    <tbody id="anomaly-tbody">
+                        <tr class="empty-state"><td colspan="6">조회 버튼을 눌러주세요.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 우측 원인 분석 패널 -->
+        <div class="panel">
+            <div class="panel-title">🔍 상세 원인 분석</div>
+            <div id="detail-panel">
+                <div class="empty-state">좌측 리스트에서 품목을 클릭하면<br>원인 분석이 표시됩니다.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co"; 
+        const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN";
+        
+        let targetDate = '';
+        let globalBrandFilter = '';
+        let globalItemFilter = '';
+        
+        let anomalyDataList = [];
+        let miniChart = null;
+
+        function cleanNumber(v) { return parseFloat(String(v).replace(/[^0-9.-]/g, '')) || 0; }
+        function safeSearchKeyword(term) { return term ? term.replace(/"/g, '').replace(/[()]/g, '*').trim() : ''; }
+
+        // YYYY-MM-DD 날짜 연산 보조 함수
+        function addDays(dateStr, days) {
+            const d = new Date(dateStr);
+            d.setDate(d.getDate() + days);
+            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        }
+
+        // DB Fetch 유틸리티
+        async function fetchDailySummary(datesArr) {
+            let allRows = [];
+            for (const d of datesArr) {
+                let url = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=eq.${d}&select=item_code,item_name,brand_name,total_qty`;
+                if (globalBrandFilter) {
+                    const bList = globalBrandFilter.split(',').map(b=>b.trim()).filter(Boolean);
+                    if(bList.length===1) url += `&brand_name=ilike.*${encodeURIComponent(safeSearchKeyword(bList[0]))}*`;
+                    else if(bList.length>1) url += `&or=(${bList.map(b=>`brand_name.ilike.*${encodeURIComponent(safeSearchKeyword(b))}*`).join(',')})`;
+                }
+                try {
+                    const res = await fetch(`${url}&limit=10000`, { headers: { 'apikey': SUPABASE_ANON_KEY }});
+                    if (res.ok) {
+                        const chunk = await res.json();
+                        chunk.forEach(r => r.fetched_date = d); // 날짜 태깅
+                        allRows = allRows.concat(chunk);
+                    }
+                } catch(e) {}
+            }
+            return allRows;
+        }
+
+        /* 💡 메인 감지 로직 */
+        async function runAnomalyDetection() {
+            if (!targetDate) return;
+            const mode = document.getElementById('compare-mode').value;
+            const threshold = parseInt(document.getElementById('sensitivity-input').value, 10) || 200;
+            
+            document.getElementById('anomaly-tbody').innerHTML = `<tr><td colspan="6" class="empty-state">⚡ 과거 데이터를 대조하여 튀는 품목을 찾고 있습니다...</td></tr>`;
+            document.getElementById('detail-panel').innerHTML = `<div class="empty-state">대기 중...</div>`;
+
+            // 1. 타겟일자(오늘) 세팅
+            const targetDates = [targetDate];
+            
+            // 2. 비교일자 세팅
+            let compareDates = [];
+            if (mode === '1d') compareDates = [addDays(targetDate, -1)];
+            else if (mode === '1w') compareDates = [addDays(targetDate, -7)];
+            else if (mode === '4w') compareDates = [addDays(targetDate, -7), addDays(targetDate, -14), addDays(targetDate, -21), addDays(targetDate, -28)];
+
+            // 3. DB 병렬 로드
+            const [targetRaw, compareRaw] = await Promise.all([
+                fetchDailySummary(targetDates),
+                fetchDailySummary(compareDates)
+            ]);
+
+            // 4. 품목별 병합 맵 생성
+            const itemMap = {};
+            
+            // 타겟일 수량 누적
+            targetRaw.forEach(r => {
+                const code = r.item_code || '-';
+                if (!itemMap[code]) itemMap[code] = { code, name: r.item_name, brand: r.brand_name, targetQty: 0, compareQtySum: 0, compareCount: 0, history: {} };
+                itemMap[code].targetQty += cleanNumber(r.total_qty);
+            });
+
+            // 비교일 수량 누적 (과거 히스토리 저장 포함)
+            compareRaw.forEach(r => {
+                const code = r.item_code || '-';
+                if (!itemMap[code]) itemMap[code] = { code, name: r.item_name, brand: r.brand_name, targetQty: 0, compareQtySum: 0, compareCount: 0, history: {} };
+                itemMap[code].compareQtySum += cleanNumber(r.total_qty);
+                itemMap[code].history[r.fetched_date] = (itemMap[code].history[r.fetched_date] || 0) + cleanNumber(r.total_qty);
+            });
+
+            // 평균 계산용 분모 설정 (4주의 경우 데이터가 있는 날짜 수 기준)
+            const expectedCompareDays = compareDates.length;
+            
+            // 5. 이상치 판별 (증감률 계산)
+            anomalyDataList = [];
+            Object.values(itemMap).forEach(item => {
+                // 비교 기간의 일평균
+                const avgCompareQty = item.compareQtySum > 0 ? (item.compareQtySum / expectedCompareDays) : 0;
+                
+                // 증감률 (%)
+                let diffPct = 0;
+                if (avgCompareQty === 0 && item.targetQty > 0) diffPct = 999; // 신규 발주나 부활 발주
+                else if (avgCompareQty > 0) diffPct = ((item.targetQty - avgCompareQty) / avgCompareQty) * 100;
+                
+                item.avgCompareQty = avgCompareQty;
+                item.diffPct = diffPct;
+                item.compareDates = compareDates; // 히스토리 차트용
+
+                // 민감도 필터링: 급증(설정값 이상) 또는 급감(-50% 이하)
+                if (diffPct >= threshold || diffPct <= -50) {
+                    // 수량이 너무 미미한 노이즈(1개->3개)는 제외 (비교+타겟 합이 10개 이상인 건만)
+                    if (item.targetQty + avgCompareQty >= 10) {
+                        item.type = diffPct > 0 ? 'UP' : 'DOWN';
+                        anomalyDataList.push(item);
+                    }
+                }
+            });
+
+            // 정렬 (급증률 높은 순 -> 급감률 낮은 순)
+            anomalyDataList.sort((a, b) => b.diffPct - a.diffPct);
+            renderAnomalyList();
+        }
+
+        function renderAnomalyList() {
+            const tbody = document.getElementById('anomaly-tbody');
+            let upCount = 0, downCount = 0;
+
+            if (anomalyDataList.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">설정한 기준에 튀는 이상 품목이 없습니다.</td></tr>`;
+                document.getElementById('kpi-up-count').innerText = "0";
+                document.getElementById('kpi-down-count').innerText = "0";
+                document.getElementById('kpi-store-issue').innerText = "0"; // 초기화
+                return;
+            }
+
+            let html = '';
+            anomalyDataList.forEach((item, idx) => {
+                if (item.type === 'UP') upCount++; else downCount++;
+                
+                const pctStr = item.diffPct === 999 ? '신규/폭증' : (item.diffPct > 0 ? '+' : '') + Math.round(item.diffPct) + '%';
+                const tagHtml = item.type === 'UP' ? `<span class="tag tag-up">🚨 급증</span>` : `<span class="tag tag-down">📉 급감</span>`;
+                
+                html += `
+                    <tr onclick="loadItemDetail('${item.code}', this)" id="row-${idx}">
+                        <td class="text-center">${tagHtml}</td>
+                        <td>${item.brand || '-'}</td>
+                        <td><b>${item.name || '-'}</b></td>
+                        <td class="text-right" style="color:#64748b;">${Math.round(item.avgCompareQty).toLocaleString()}</td>
+                        <td class="text-right"><b>${item.targetQty.toLocaleString()}</b></td>
+                        <td class="text-right" style="font-weight:900; color:${item.type==='UP'?'#e11d48':'#0284c7'}">${pctStr}</td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+            document.getElementById('kpi-up-count').innerText = upCount;
+            document.getElementById('kpi-down-count').innerText = downCount;
+            document.getElementById('kpi-store-issue').innerText = "0"; // 상세 클릭 전이므로 0
+
+            // 첫 번째 항목 자동 클릭
+            if (anomalyDataList.length > 0) {
+                loadItemDetail(anomalyDataList[0].code, document.getElementById('row-0'));
+            }
+        }
+
+        /* 💡 특정 품목 점포 쏠림 원인 드릴다운 */
+        async function loadItemDetail(itemCode, rowElement) {
+            // 하이라이트 처리
+            document.querySelectorAll('#anomaly-tbody tr').forEach(tr => tr.classList.remove('active-row'));
+            if(rowElement) rowElement.classList.add('active-row');
+
+            const item = anomalyDataList.find(i => i.code === itemCode);
+            if (!item) return;
+
+            const panel = document.getElementById('detail-panel');
+            panel.innerHTML = `<div class="empty-state">해당 품목의 점포별 발주 비중을 조회하고 있습니다...</div>`;
+
+            // 해당 품목의 '타겟일자' 점포별 원천 데이터 고속 스캔
+            let url = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=eq.${targetDate}&item_code=eq.${encodeURIComponent(itemCode)}&select=store_name,qty`;
+            let storeRaw = [];
+            try {
+                let offset = 0, limit = 1000, hasMore = true;
+                while (hasMore) {
+                    const res = await fetch(`${url}&limit=${limit}&offset=${offset}`, { headers: { 'apikey': SUPABASE_ANON_KEY }});
+                    if (res.ok) {
+                        const chunk = await res.json();
+                        if(chunk.length===0) break;
+                        storeRaw = storeRaw.concat(chunk);
+                        if(chunk.length < limit) hasMore = false; else offset += limit;
+                    } else hasMore = false;
+                }
+            } catch(e) {}
+
+            // 점포별 랭킹 집계
+            const storeMap = {};
+            storeRaw.forEach(r => {
+                const s = r.store_name || '알수없는점포';
+                storeMap[s] = (storeMap[s] || 0) + cleanNumber(r.qty);
+            });
+            const sortedStores = Object.keys(storeMap).map(k => ({ name: k, qty: storeMap[k] })).sort((a,b) => b.qty - a.qty);
+
+            // 오입력 의심 판별 (1위 점포가 당일 총 발주량의 50% 이상을 혼자 발주했는가?)
+            let causeHtml = '';
+            let isStoreIssue = false;
+            if (item.type === 'UP' && sortedStores.length > 0) {
+                const top1Share = (sortedStores[0].qty / item.targetQty) * 100;
+                if (top1Share >= 50 && item.targetQty >= 10) {
+                    isStoreIssue = true;
+                    causeHtml = `<div class="cause-badge cause-store">⚠️ 특정 매장(${sortedStores[0].name}) 오입력 의심 (${Math.round(top1Share)}% 독식)</div>`;
+                    
+                    // 상단 KPI 강제 업데이트 (의심 건수 1 올림 - 단순 UI 표출용)
+                    const curIssue = parseInt(document.getElementById('kpi-store-issue').innerText, 10);
+                    document.getElementById('kpi-store-issue').innerText = curIssue + 1;
+
+                } else {
+                    causeHtml = `<div class="cause-badge cause-all">👥 전 매장 동반 상승 (프로모션 또는 계절성 의심)</div>`;
+                }
+            } else if (item.type === 'DOWN') {
+                causeHtml = `<div class="cause-badge" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;">📉 전 매장 발주 감소 (단종 또는 계절성 아웃)</div>`;
+            }
+
+            // 상세 패널 렌더링
+            const chartId = 'mini-history-chart';
+            let storeHtml = sortedStores.slice(0, 5).map((s, idx) => `
+                <li class="store-item">
+                    <span>${idx+1}. <b>${s.name}</b></span>
+                    <span>${s.qty.toLocaleString()}개</span>
+                </li>
+            `).join('');
+            if(sortedStores.length === 0) storeHtml = `<li class="store-item" style="justify-content:center; color:#94a3b8;">당일 점포 발주 내역이 없습니다.</li>`;
+
+            panel.innerHTML = `
+                <div class="detail-item-title">${item.name}</div>
+                <span class="detail-item-code">[${item.code}] | ${item.brand}</span>
+                
+                <div class="chart-container"><canvas id="${chartId}"></canvas></div>
+                
+                <div class="store-ranking-title">🏪 당일 주문 점포 TOP 5</div>
+                <ul class="store-list">${storeHtml}</ul>
+                
+                ${causeHtml}
+            `;
+
+            // 미니 차트 그리기 (과거 히스토리 + 당일)
+            const labels = [];
+            const dataPts = [];
+            const bgColors = [];
+
+            // 과거 4주/1주/1일치 데이터 배열에 넣기
+            item.compareDates.sort().forEach(dStr => {
+                labels.push(dStr.slice(5)); // MM-DD
+                dataPts.push(item.history[dStr] || 0);
+                bgColors.push('#cbd5e1'); // 회색
+            });
+            // 당일 데이터 넣기
+            labels.push('기준일\n(오늘)');
+            dataPts.push(item.targetQty);
+            bgColors.push(item.type === 'UP' ? '#ef4444' : '#3b82f6'); // 빨강 or 파랑
+
+            const ctx = document.getElementById(chartId).getContext('2d');
+            if (miniChart) miniChart.destroy();
+            miniChart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels, datasets: [{ data: dataPts, backgroundColor: bgColors, borderRadius: 4 }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { enabled: true } },
+                    scales: { x: { ticks: { font: { size: 10 } }, grid: { display: false } }, y: { beginAtZero: true, ticks: { font: { size: 10 } } } }
+                }
+            });
+        }
+
+        // 부모창 검색 수신
+        window.addEventListener('message', (e) => {
+            if (e.data && (e.data.action === 'SEARCH' || e.data.action === 'INIT_SEARCH')) {
+                targetDate = e.data.params.endDate; // 종료일을 기준일로 사용
+                globalBrandFilter = e.data.params.brandName;
+                globalItemFilter = e.data.params.itemName;
+                
+                const dayStr = ['일','월','화','수','목','금','토'][new Date(targetDate).getDay()];
+                document.getElementById('display-target-date').innerText = `${targetDate} (${dayStr})`;
+
+                runAnomalyDetection();
+            }
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            window.parent.postMessage({ action: 'FRAME_READY', tab: 'anomaly' }, '*');
+        });
+    </script>
+</body>
+</html>
