@@ -49,7 +49,6 @@
         </div>
     </div>
 
-    <!-- 🏢 브랜드별 점포수 상세 모달 -->
     <div class="modal-overlay" id="brand-store-modal">
         <div class="modal-content">
             <div class="modal-header"><span class="modal-title">🏢 브랜드별 주문 점포수 상세</span><span class="close-btn" onclick="closeBrandStoreModal()">✕</span></div>
@@ -66,7 +65,6 @@
         let fetchToken = 0;
 
         function cleanNumber(val) { return parseFloat(String(val).replace(/[^0-9.-]/g, '')) || 0; }
-        function cleanCode(val) { return (!val && val !== 0) ? '-' : String(val).replace(/\.0$/, '').trim(); }
         function formatDisplayDate(dateStr) { return !dateStr || dateStr === '-' ? '-' : String(dateStr).split('T')[0].replace(/-/g, '/'); }
         function safeSearchKeyword(term) { return term ? term.replace(/"/g, '').replace(/[()]/g, '*').trim() : ''; }
 
@@ -106,18 +104,30 @@
                 currentBrandStoreMap = {};
                 renderDashboard(dailyData);
 
-                // 2단계: 점포수 산출 로직 (숫자코드 검색 에러 회피 적용)
+                // 2단계: 점포수 산출 로직 (정확한 품목코드 기준)
                 if (itemName) {
-                    // dailyData에서 이미 매칭에 성공한 '정확한 품목코드'만 배열로 추출
-                    const matchedCodes = [...new Set(dailyData.map(r => cleanCode(r.item_code)).filter(c => c && c !== '-'))];
-                    const matchedNames = [...new Set(dailyData.map(r => r.item_name).filter(Boolean))];
+                    // 💡 [핵심 보완] 이름이 아닌 "정확한 고유 품목코드" 자체로만 매칭합니다.
+                    // 단, DB에 '1014410194', '1014410194.0' 등 포맷이 미세하게 다르게 저장되어 있을 수 있으므로
+                    // 두 가지 포맷을 모두 생성하여 in.() 조건으로 안전하게 던집니다.
+                    const codeSet = new Set();
+                    dailyData.forEach(r => {
+                        if (r.item_code && r.item_code !== '-') {
+                            const raw = String(r.item_code).trim();
+                            const clean = raw.replace(/\.0$/, '');
+                            const dotZero = clean + '.0';
+                            
+                            codeSet.add(raw);
+                            codeSet.add(clean);
+                            codeSet.add(dotZero);
+                        }
+                    });
+                    const matchedCodes = [...codeSet];
 
-                    if (matchedCodes.length === 0 && matchedNames.length === 0) {
+                    if (matchedCodes.length === 0) {
                         recalculateStores([], true);
                         return;
                     }
 
-                    // 원천 테이블(oms_orders) URL 구성
                     let storeUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_name,brand_name`;
 
                     if (brandName) {
@@ -126,13 +136,8 @@
                         else if (bList.length > 1) storeUrl += `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(safeSearchKeyword(b))}*`).join(',')})`;
                     }
 
-                    // 💡 [핵심 해결] 'ilike' 대신 'in' 연산자를 사용하여 숫자로 된 품목코드라도 완벽하게 매칭하여 검색
-                    if (matchedCodes.length > 0) {
-                        storeUrl += `&item_code=in.(${matchedCodes.map(encodeURIComponent).join(',')})`;
-                    } else if (matchedNames.length > 0) {
-                        const nameStr = matchedNames.map(n => `"${n.replace(/"/g, '""')}"`).map(encodeURIComponent).join(',');
-                        storeUrl += `&item_name=in.(${nameStr})`;
-                    }
+                    // 💡 준비된 코드 포맷(.0 유무 포함)들을 쉼표로 연결하여 in 조건으로 정확하게 타격
+                    storeUrl += `&item_code=in.(${matchedCodes.map(encodeURIComponent).join(',')})`;
 
                     let offset = 0, limit = 1000, hasMore = true;
                     let storeDataAccumulated = [];
@@ -149,7 +154,7 @@
                             hasMore = false; 
                         }
                     }
-                    recalculateStores(storeDataAccumulated, true); // 렌더링 완료
+                    recalculateStores(storeDataAccumulated, true); // 최종 렌더링
 
                 } else {
                     // 품목 미지정 시 가벼운 요약 뷰 사용
