@@ -178,7 +178,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 대시보드</h1>
-            <span class="version-tag">v35.1 Modular Iframe Shell</span>
+            <span class="version-tag">v35.2 Strict ItemCode Filter</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -391,6 +391,8 @@
             toggleClearBtn('chart-brand-input');
             document.getElementById('brand-autocomplete-list').style.display = 'none';
         }
+
+        /* 💡 검색어 입력 시 드롭다운 (클릭 시 코드가 들어가도록 변경) */
         function handleItemInput(val) {
             safeSetStorage('cached_item_input', val); toggleClearBtn('chart-item-input');
             const dropEl = document.getElementById('item-autocomplete-list');
@@ -398,12 +400,14 @@
             if (!keyword || allItemList.length === 0) return dropEl.style.display = 'none';
             const matched = allItemList.filter(i => i.code.toLowerCase().includes(keyword) || i.name.toLowerCase().includes(keyword)).slice(0, 8);
             if (matched.length === 0) return dropEl.style.display = 'none';
-            dropEl.innerHTML = matched.map(i => `<div class="autocomplete-item" onclick="selectAutocompleteItem('${i.name}')"><span><b>${i.name}</b></span><span class="code-tag">[${i.code}]</span></div>`).join('');
+            // 클릭 시 selectAutocompleteItem 에 item.code 전달
+            dropEl.innerHTML = matched.map(i => `<div class="autocomplete-item" onclick="selectAutocompleteItem('${i.code}')"><span><b>${i.name}</b></span><span class="code-tag">[${i.code}]</span></div>`).join('');
             dropEl.style.display = 'block';
         }
-        function selectAutocompleteItem(itemName) {
-            document.getElementById('chart-item-input').value = itemName;
-            safeSetStorage('cached_item_input', itemName);
+        // 자동완성 클릭 시 품목코드를 화면에 입력
+        function selectAutocompleteItem(itemCode) {
+            document.getElementById('chart-item-input').value = itemCode;
+            safeSetStorage('cached_item_input', itemCode);
             toggleClearBtn('chart-item-input');
             document.getElementById('item-autocomplete-list').style.display = 'none';
         }
@@ -417,7 +421,7 @@
             }
         });
 
-        /* 🤖 부모창 상주 AI 챗봇 로직 (이천센터 등 원천 DB 조회 지원) */
+        /* 🤖 부모창 상주 AI 챗봇 로직 */
         function toggleAiChatWidget() {
             const widget = document.getElementById('ai-chat-modal');
             if (widget.style.display === 'flex') { widget.style.display = 'none'; } 
@@ -594,20 +598,40 @@
             document.getElementById('chart-brand-input').value = vals; toggleClearBtn('chart-brand-input'); closeBrandModal();
         }
 
+        /* 💡 품목 모달 (품목코드 기준 체크 유지 및 검색창 적용) */
         function openItemModal() { document.getElementById('item-modal').style.display = 'flex'; renderItemModalList(); }
         function closeItemModal() { document.getElementById('item-modal').style.display = 'none'; }
         function renderItemModalList() {
-            const cur = document.getElementById('chart-item-input').value.split(',').map(s => s.trim());
+            // 현재 검색창에 있는 '품목코드'들을 기준으로 체크 상태 유지
+            const currentSelected = document.getElementById('chart-item-input').value.split(',').map(s => s.trim());
             const kw = document.getElementById('modal-item-search').value.toLowerCase().trim();
             const listEl = document.getElementById('item-modal-list');
             const filtered = allItemList.filter(i => i.code.toLowerCase().includes(kw) || i.name.toLowerCase().includes(kw));
-            listEl.innerHTML = filtered.map(i => `<div class="search-list-item"><label><input type="checkbox" class="item-modal-chk" value="${i.name}" ${cur.includes(i.name)?'checked':''}><span><span style="font-family:monospace; color:#64748b;">[${i.code}]</span> <b>${i.name}</b></span></label></div>`).join('');
+            
+            if (filtered.length === 0) {
+                listEl.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:15px;">검색 결과가 없습니다.</div>';
+                return;
+            }
+            
+            // 체크박스 value를 i.code로 세팅
+            listEl.innerHTML = filtered.map(i => `
+                <div class="search-list-item">
+                    <label>
+                        <input type="checkbox" class="item-modal-chk" value="${i.code}" ${currentSelected.includes(i.code) ? 'checked' : ''}>
+                        <span><span style="font-family:monospace; color:#64748b;">[${i.code}]</span> <b>${i.name}</b></span>
+                    </label>
+                </div>
+            `).join('');
         }
         function filterItemModalList() { renderItemModalList(); }
         function toggleAllItemCheck(status) { document.querySelectorAll('.item-modal-chk').forEach(c => c.checked = status); }
         function applyItemSelection() {
+            // 체크된 항목들의 품목코드를 가져와서 쉼표로 연결
             const vals = Array.from(document.querySelectorAll('.item-modal-chk:checked')).map(c => c.value).join(', ');
-            document.getElementById('chart-item-input').value = vals; toggleClearBtn('chart-item-input'); closeItemModal();
+            document.getElementById('chart-item-input').value = vals; 
+            safeSetStorage('cached_item_input', vals);
+            toggleClearBtn('chart-item-input'); 
+            closeItemModal();
         }
 
         /* ⚡ 페이지 로드 시 초기화 */
