@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <title>피벗 분석 프레임</title>
+    <!-- 엑셀 저장 및 마우스 드래그(SortableJS) 라이브러리 추가 -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Pretendard', 'Malgun Gothic', sans-serif; background: transparent; color: #1e293b; padding: 5px 0; }
@@ -14,29 +16,41 @@
         .btn-excel { background-color: #16a34a; color: white; border: none; padding: 5px 12px; font-size: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
         .btn-excel:hover { background-color: #15803d; }
 
-        /* ✨ 피벗 컨트롤 UI 스타일 */
-        .pivot-controls { display: flex; flex-direction: column; gap: 10px; }
+        /* ✨ 드래그 앤 드롭 피벗 컨트롤 UI 스타일 */
+        .pivot-controls { display: flex; flex-direction: column; gap: 12px; }
         .pivot-box { 
-            border: 1px dashed #cbd5e1; border-radius: 8px; padding: 12px 15px; 
-            background: #f8fafc; min-height: 60px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; 
+            border: 2px dashed #cbd5e1; border-radius: 8px; padding: 12px 15px; 
+            background: #f8fafc; min-height: 65px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; 
+            transition: all 0.2s;
         }
-        .pivot-box.active-box { border-color: #3b82f6; background: #eff6ff; }
-        .pivot-box-title { font-size: 13px; font-weight: 800; color: #475569; width: 105px; flex-shrink: 0; line-height: 1.3; }
+        .pivot-box.active-box { border-color: #93c5fd; background: #eff6ff; border-style: solid; }
+        .pivot-box-title { font-size: 13px; font-weight: 800; color: #475569; width: 110px; flex-shrink: 0; line-height: 1.4; }
         .pivot-box.active-box .pivot-box-title { color: #1d4ed8; }
         
-        .chip-container { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; flex: 1; }
-        .pivot-arrow { color: #94a3b8; font-size: 12px; font-weight: bold; margin: 0 2px; }
+        .chip-container { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; flex: 1; min-height: 35px; }
 
+        /* 칩(Chip) 기본 스타일 */
         .pivot-chip {
-            padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; cursor: pointer;
-            display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s; user-select: none;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            padding: 7px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; cursor: grab;
+            display: inline-flex; align-items: center; gap: 6px; user-select: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: transform 0.1s;
         }
-        .pivot-chip.active { background: #2563eb; color: white; border: 1px solid #1d4ed8; }
-        .pivot-chip.active:hover { background: #1e40af; transform: translateY(-1px); box-shadow: 0 3px 6px rgba(37,99,235,0.2); }
-        .pivot-chip.available { background: white; color: #475569; border: 1px solid #cbd5e1; }
-        .pivot-chip.available:hover { background: #f1f5f9; border-color: #94a3b8; transform: translateY(-1px); box-shadow: 0 3px 6px rgba(0,0,0,0.05); }
-        .chip-icon { font-size: 11px; opacity: 0.9; margin-left: 2px; font-weight: 900; }
+        .pivot-chip:active { cursor: grabbing; transform: scale(0.95); }
+
+        /* 상태별 칩 색상 변환 (CSS 자동 적용) */
+        #active-pivot-fields .pivot-chip { background: #2563eb; color: white; border: 1px solid #1d4ed8; }
+        #active-pivot-fields .pivot-chip:hover { background: #1e40af; box-shadow: 0 4px 8px rgba(37,99,235,0.2); }
+        
+        #available-pivot-fields .pivot-chip { background: white; color: #475569; border: 1px solid #cbd5e1; }
+        #available-pivot-fields .pivot-chip:hover { background: #f1f5f9; border-color: #94a3b8; box-shadow: 0 4px 8px rgba(0,0,0,0.08); }
+
+        /* 드래그 중인 칩 스타일 */
+        .sortable-ghost { opacity: 0.4; background-color: #e2e8f0 !important; border: 2px dashed #94a3b8 !important; color: transparent !important; }
+
+        /* CSS로 화살표(▶) 자동 생성 (활성화된 칩 사이에만 적용) */
+        #active-pivot-fields .pivot-chip:not(:last-child)::after {
+            content: "▶"; color: #94a3b8; font-size: 11px; margin-left: 10px; margin-right: -5px; font-weight: 900;
+        }
 
         .summary-badge-group { display: flex; align-items: center; gap: 10px; font-size: 13px; }
         .summary-badge { background-color: #f1f5f9; padding: 4px 10px; border-radius: 6px; border: 1px solid #cbd5e1; color: #475569; }
@@ -52,27 +66,33 @@
 </head>
 <body>
 
-    <!-- 1. 새로운 칩(Chip) 기반 그룹 기준 선택 패널 -->
+    <!-- 1. 드래그 앤 드롭 그룹 기준 선택 패널 -->
     <div class="section-panel">
         <div class="panel-header" style="margin-bottom: 15px;">
-            <span class="panel-title-text">🧩 피벗 그룹핑 기준 <span style="font-size: 12px; font-weight: normal; color: #64748b; margin-left: 8px;">원하는 항목을 클릭하여 집계 순서를 자유롭게 조합하세요.</span></span>
+            <span class="panel-title-text">🧩 피벗 그룹핑 기준 <span style="font-size: 12px; font-weight: normal; color: #64748b; margin-left: 8px;">마우스로 드래그(끌어다 놓기)하여 계층 순서를 자유롭게 조합하세요.</span></span>
             <button class="btn-excel" onclick="exportPivotToExcel()">📥 피벗 엑셀 저장</button>
         </div>
         
         <div class="pivot-controls">
-            <!-- 적용된 기준 (Active) -->
+            <!-- 적용된 기준 (상단 박스) -->
             <div class="pivot-box active-box">
-                <div class="pivot-box-title">🎯 적용된 기준<br><span style="font-size:10.5px; font-weight:normal; opacity:0.8;">(클릭 시 해제)</span></div>
+                <div class="pivot-box-title">🎯 적용된 기준<br><span style="font-size:10.5px; font-weight:normal; opacity:0.8;">(드래그하여 순서 변경)</span></div>
                 <div class="chip-container" id="active-pivot-fields">
-                    <!-- JS에서 동적 렌더링 됨 -->
+                    <!-- 기본 세팅: 브랜드 -> 품목명 -->
+                    <div class="pivot-chip" data-key="brand_name">🏢 브랜드</div>
+                    <div class="pivot-chip" data-key="item_name">📦 품목명</div>
                 </div>
             </div>
 
-            <!-- 추가 가능한 기준 (Available) -->
+            <!-- 추가 가능한 기준 (하단 박스) -->
             <div class="pivot-box">
-                <div class="pivot-box-title">➕ 추가 가능<br><span style="font-size:10.5px; font-weight:normal; opacity:0.8;">(클릭 시 추가)</span></div>
+                <div class="pivot-box-title">➕ 대기 항목<br><span style="font-size:10.5px; font-weight:normal; opacity:0.8;">(위로 끌어다 놓으세요)</span></div>
                 <div class="chip-container" id="available-pivot-fields">
-                    <!-- JS에서 동적 렌더링 됨 -->
+                    <!-- 대기 중인 항목들 -->
+                    <div class="pivot-chip" data-key="delivery_date">📅 배송일자</div>
+                    <div class="pivot-chip" data-key="center_name">🏬 센터명</div>
+                    <div class="pivot-chip" data-key="store_name">🏪 점포명</div>
+                    <div class="pivot-chip" data-key="item_code">🏷️ 품목코드</div>
                 </div>
             </div>
         </div>
@@ -92,7 +112,7 @@
             <table>
                 <thead id="pivot-thead"></thead>
                 <tbody id="pivot-tbody">
-                    <tr class="no-data-row"><td colspan="10">상단 [피벗 분석 집계 조회] 버튼을 눌러 데이터를 불러오세요.</td></tr>
+                    <tr class="no-data-row"><td colspan="10">상단 [대시보드 종합 조회] 버튼을 눌러 데이터를 불러오세요.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -107,88 +127,69 @@
         let currentSearchParams = null;
         let currentPivotList = [];
 
-        // 💡 피벗 가능 컬럼 정의
+        // 💡 피벗 컬럼 메타데이터 정의
         const PIVOT_COLS = {
-            'delivery_date': { label: '배송일자', icon: '📅', isDate: true },
-            'brand_name': { label: '브랜드', icon: '🏢' },
-            'center_name': { label: '센터명', icon: '🏬' },
-            'store_name': { label: '점포명', icon: '🏪' },
-            'item_name': { label: '품목명', icon: '📦' },
-            'item_code': { label: '품목코드', icon: '🏷️' }
+            'delivery_date': { label: '배송일자', isDate: true },
+            'brand_name': { label: '브랜드' },
+            'center_name': { label: '센터명' },
+            'store_name': { label: '점포명' },
+            'item_name': { label: '품목명' },
+            'item_code': { label: '품목코드' }
         };
-
-        // 기본 활성화된 컬럼 (초기값: 브랜드 -> 품목명)
-        let activePivotFields = ['brand_name', 'item_name'];
 
         function cleanNumber(v) { return parseFloat(String(v).replace(/[^0-9.-]/g, '')) || 0; }
         function formatDisplayDate(d) { return !d || d === '-' ? '-' : String(d).split('T')[0].replace(/-/g, '/'); }
         function safeSearchKeyword(term) { return term ? term.replace(/"/g, '').replace(/[()]/g, '*').trim() : ''; }
 
-        /* 💡 칩(Chip) UI 렌더링 함수 */
-        function renderPivotControls() {
-            const activeEl = document.getElementById('active-pivot-fields');
-            const availableEl = document.getElementById('available-pivot-fields');
+        /* ✨ 마우스 드래그 앤 드롭 설정 (SortableJS 연동) */
+        document.addEventListener('DOMContentLoaded', () => {
+            const activeContainer = document.getElementById('active-pivot-fields');
+            const availableContainer = document.getElementById('available-pivot-fields');
 
-            // 1. 활성화된 칩 렌더링 (순서대로)
-            if (activePivotFields.length === 0) {
-                activeEl.innerHTML = `<span style="font-size:13px; color:#94a3b8; padding-left:5px;">선택된 기준이 없습니다. (전체 합산)</span>`;
-            } else {
-                activeEl.innerHTML = activePivotFields.map((key, index) => {
-                    const field = PIVOT_COLS[key];
-                    const chipHtml = `
-                        <div class="pivot-chip active" onclick="removePivotField('${key}')">
-                            ${field.icon} ${field.label} <span class="chip-icon">✕</span>
-                        </div>
-                    `;
-                    // 마지막 칩이 아니면 계층 화살표(▶) 추가
-                    return index < activePivotFields.length - 1 ? chipHtml + `<span class="pivot-arrow">▶</span>` : chipHtml;
-                }).join('');
-            }
+            // 두 컨테이너 간의 드래그 이동을 허용하도록 group을 'shared'로 묶음
+            const sortableOptions = {
+                group: 'shared', 
+                animation: 150, // 부드러운 이동 애니메이션 (ms)
+                ghostClass: 'sortable-ghost', // 드래그 중인 잔상 클래스
+                onEnd: function (evt) {
+                    // 드래그가 끝난 직후 0.01초 내로 피벗 재집계 실행
+                    onCriteriaChange();
+                }
+            };
 
-            // 2. 추가 가능한 칩 렌더링 (나머지)
-            const availableFields = Object.keys(PIVOT_COLS).filter(k => !activePivotFields.includes(k));
-            availableEl.innerHTML = availableFields.map(key => {
-                const field = PIVOT_COLS[key];
-                return `
-                    <div class="pivot-chip available" onclick="addPivotField('${key}')">
-                        ${field.icon} ${field.label} <span class="chip-icon">+</span>
-                    </div>
-                `;
-            }).join('');
-        }
+            new Sortable(activeContainer, sortableOptions);
+            new Sortable(availableContainer, sortableOptions);
+            
+            // 초기 헤더 렌더링
+            renderPivotHeader(getSelectedDimensions());
+            // 부모 프레임에 로드 완료 신호 발송
+            window.parent.postMessage({ action: 'FRAME_READY', tab: 'pivot' }, '*');
+        });
 
-        // 칩 클릭 동작 (추가/제거)
-        function addPivotField(key) {
-            activePivotFields.push(key);
-            renderPivotControls();
-            onCriteriaChange();
-        }
-        function removePivotField(key) {
-            activePivotFields = activePivotFields.filter(k => k !== key);
-            renderPivotControls();
-            onCriteriaChange();
-        }
-
-        // 현재 순서대로 차원(Dimensions) 배열 반환
+        // 현재 '적용된 기준(active-pivot-fields)' 컨테이너 안에 놓여있는 칩들의 순서를 배열로 추출
         function getSelectedDimensions() {
-            return activePivotFields.map(key => ({
-                key: key,
-                label: PIVOT_COLS[key].label,
-                isDate: PIVOT_COLS[key].isDate || false
-            }));
+            const activeChips = document.getElementById('active-pivot-fields').querySelectorAll('.pivot-chip');
+            return Array.from(activeChips).map(chip => {
+                const key = chip.getAttribute('data-key');
+                return {
+                    key: key,
+                    label: PIVOT_COLS[key].label,
+                    isDate: PIVOT_COLS[key].isDate || false
+                };
+            });
         }
 
         // 테이블 헤더 즉시 갱신
         function renderPivotHeader(dims) {
             const thead = document.getElementById('pivot-thead');
             if (dims.length === 0) {
-                thead.innerHTML = `<tr><th>전체 합산</th><th class="text-right">수량 합계</th><th class="text-right">금액 합계</th><th class="text-right">주문 건수</th></tr>`;
+                thead.innerHTML = `<tr><th>전체 합산 (선택된 기준 없음)</th><th class="text-right">수량 합계</th><th class="text-right">금액 합계</th><th class="text-right">주문 건수</th></tr>`;
             } else {
                 thead.innerHTML = `<tr>${dims.map(d => `<th>${d.label}</th>`).join('')}<th class="text-right">수량 합계</th><th class="text-right">금액 합계</th><th class="text-right">주문 건수</th></tr>`;
             }
         }
 
-        /* 💡 데이터 원천 조회 로직 (기존 고속 로딩 로직 유지) */
+        /* 💡 데이터 원천 조회 로직 (스마트 쿼리) */
         async function fetchPivotData(params) {
             currentSearchParams = params;
             const { startDate, endDate, brandName, itemName } = params;
@@ -202,6 +203,7 @@
             currentRawData = [];
             document.getElementById('pivot-tbody').innerHTML = `<tr class="no-data-row"><td colspan="10" style="color:#2563eb;">⚡ 조건에 맞는 피벗 데이터를 고속 로딩 중입니다...</td></tr>`;
 
+            // 점포명, 센터명이 없으면 무거운 oms_orders 대신 가벼운 요약 뷰 호출
             if (!needStoreOrCenter) {
                 currentLoadedSource = 'summary';
                 let url = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,brand_name,item_code,item_name,total_qty,total_amount`;
@@ -252,19 +254,21 @@
                 }
             }
 
+            // 조회 완료 시 피벗 집계 즉시 실행
             runPivot();
         }
 
-        // 기준 변경 (필요에 따라 데이터 재조회)
+        // 드래그가 끝났을 때(순서/항목 변경) 호출
         function onCriteriaChange() {
             const dims = getSelectedDimensions();
             renderPivotHeader(dims);
 
             const needStoreOrCenter = dims.some(d => d.key === 'store_name' || d.key === 'center_name');
+            // 만약 새로 끌어다 놓은 칩이 '점포명'인데, 이전에 가벼운 요약 뷰만 조회해 둔 상태라면 재조회 실행
             if (needStoreOrCenter && currentLoadedSource === 'summary' && currentSearchParams) {
                 fetchPivotData(currentSearchParams);
             } else {
-                runPivot();
+                runPivot(); // 그 외에는 이미 받아놓은 데이터로 0.01초 내에 인메모리 정렬
             }
         }
 
@@ -302,7 +306,7 @@
                 target.count += cleanNumber(r.order_count || 1);
             });
 
-            // 수량 기준 내림차순 정렬
+            // 수량 기준 내림차순 자동 정렬
             currentPivotList = Array.from(map.values()).sort((a, b) => b.qty - a.qty);
 
             document.getElementById('pivot-total-qty').innerText = `${grandQty.toLocaleString()}개`;
@@ -342,17 +346,11 @@
             XLSX.writeFile(wb, `OMS_피벗집계_${Date.now()}.xlsx`);
         }
 
-        // 부모창 명령 수신
+        // 부모창 검색 명령 수신
         window.addEventListener('message', (e) => {
             if (e.data && e.data.action === 'SEARCH') {
                 fetchPivotData(e.data.params);
             }
-        });
-
-        // 로드 완료 시 초기 렌더링 및 부모에 Ready 신호 전송
-        window.addEventListener('DOMContentLoaded', () => {
-            renderPivotControls();
-            window.parent.postMessage({ action: 'FRAME_READY', tab: 'pivot' }, '*');
         });
     </script>
 </body>
