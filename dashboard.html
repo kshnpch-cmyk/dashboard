@@ -67,26 +67,32 @@
 
         function cleanNumber(val) { return parseFloat(String(val).replace(/[^0-9.-]/g, '')) || 0; }
         function formatDisplayDate(dateStr) { return !dateStr || dateStr === '-' ? '-' : String(dateStr).split('T')[0].replace(/-/g, '/'); }
-        
-        // 💡 괄호 ( ) 특수문자를 와일드카드(*)로 안전하게 변환하여 PostgREST 400 에러를 원천 차단하는 함수
-        function safeSearchKeyword(term) {
-            if (!term) return '';
-            return term.replace(/"/g, '').replace(/[()]/g, '*').trim();
-        }
+        function safeSearchKeyword(term) { return term ? term.replace(/"/g, '').replace(/[()]/g, '*').trim() : ''; }
 
         async function fetchChartData(params) {
             const currentToken = ++fetchToken;
             const { startDate, endDate, brandName, itemName } = params;
             if (!startDate || !endDate) return;
 
+            // 1. 요약 뷰 URL 세팅
             let dailyUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
+            
+            // 2. 점포 원천 테이블 URL 세팅 (품목이 없으면 가벼운 요약 테이블로 대체)
+            let storeUrl = itemName
+                ? `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_name,brand_name`
+                : `${SUPABASE_URL}/rest/v1/store_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_name,brand_name`;
 
+            // 💡 양쪽 테이블에 동일한 검색 조건(ilike) 직접 주입
             if (brandName) {
                 const bList = brandName.split(',').map(b => b.trim()).filter(Boolean);
                 if (bList.length === 1) { 
-                    dailyUrl += `&brand_name=ilike.*${encodeURIComponent(safeSearchKeyword(bList[0]))}*`; 
+                    const safeKw = encodeURIComponent(safeSearchKeyword(bList[0]));
+                    dailyUrl += `&brand_name=ilike.*${safeKw}*`; 
+                    storeUrl += `&brand_name=ilike.*${safeKw}*`; 
                 } else if (bList.length > 1) { 
-                    dailyUrl += `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(safeSearchKeyword(b))}*`).join(',')})`; 
+                    const orConds = bList.map(b => `brand_name.ilike.*${encodeURIComponent(safeSearchKeyword(b))}*`).join(','); 
+                    dailyUrl += `&or=(${orConds})`; 
+                    storeUrl += `&or=(${orConds})`; 
                 }
             }
             if (itemName) {
@@ -94,12 +100,14 @@
                 if (iList.length === 1) { 
                     const safe = encodeURIComponent(safeSearchKeyword(iList[0]));
                     dailyUrl += `&or=(item_code.ilike.*${safe}*,item_name.ilike.*${safe}*)`; 
+                    storeUrl += `&or=(item_code.ilike.*${safe}*,item_name.ilike.*${safe}*)`; 
                 } else if (iList.length > 1) { 
                     const orConds = iList.map(i => {
                         const safe = encodeURIComponent(safeSearchKeyword(i));
                         return `item_code.ilike.*${safe}*,item_name.ilike.*${safe}*`;
                     }).join(','); 
                     dailyUrl += `&or=(${orConds})`; 
+                    storeUrl += `&or=(${orConds})`; 
                 }
             }
 
@@ -112,54 +120,21 @@
                 currentBrandStoreMap = {};
                 renderDashboard(dailyData);
 
-                // 2단계: 집계된 결과에서 정확한 품목코드(item_code)를 추출하여 점포 데이터 0.05초 고속 인덱스 조회
-                if (itemName) {
-                    const matchedCodes = [...new Set(dailyData.map(r => r.item_code).filter(Boolean))];
-                    if (matchedCodes.length === 0) {
-                        document.getElementById('kpi-total-stores').innerText = "0 개점";
-                        return;
-                    }
-
-                    // 품목코드로 점포 원천 테이블을 정확히 타격 (500 타임아웃 절대 없음)
-                    let storeUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_name,brand_name`;
-                    if (brandName) {
-                        const bList = brandName.split(',').map(b => b.trim()).filter(Boolean);
-                        if (bList.length === 1) storeUrl += `&brand_name=ilike.*${encodeURIComponent(safeSearchKeyword(bList[0]))}*`;
-                        else if (bList.length > 1) storeUrl += `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(safeSearchKeyword(b))}*`).join(',')})`;
-                    }
-                    if (matchedCodes.length === 1) {
-                        storeUrl += `&item_code=eq.${encodeURIComponent(matchedCodes[0])}`;
-                    } else {
-                        storeUrl += `&item_code=in.(${matchedCodes.map(c => encodeURIComponent(c)).join(',')})`;
-                    }
-
-                    let offset = 0, limit = 1000, hasMore = true;
-                    let storeDataAccumulated = [];
-                    while (hasMore) {
-                        if (fetchToken !== currentToken) return;
-                        const res = await fetch(`${storeUrl}&limit=${limit}&offset=${offset}`, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
-                        if (res.ok) {
-                            const chunk = await res.json();
-                            if (!chunk || chunk.length === 0) break;
-                            storeDataAccumulated = storeDataAccumulated.concat(chunk);
-                            recalculateStores(storeDataAccumulated, false);
-                            if (chunk.length < limit) hasMore = false; else offset += limit;
-                        } else { hasMore = false; }
-                    }
-                    recalculateStores(storeDataAccumulated, true);
-
-                } else {
-                    // 품목 미지정 시: 가벼운 점포 요약 뷰 사용
-                    let storeSummaryUrl = `${SUPABASE_URL}/rest/v1/store_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_name,brand_name`;
-                    if (brandName) {
-                        const bList = brandName.split(',').map(b => b.trim()).filter(Boolean);
-                        if (bList.length === 1) storeSummaryUrl += `&brand_name=ilike.*${encodeURIComponent(safeSearchKeyword(bList[0]))}*`;
-                        else if (bList.length > 1) storeSummaryUrl += `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(safeSearchKeyword(b))}*`).join(',')})`;
-                    }
-                    const resStore = await fetch(`${storeSummaryUrl}&limit=10000`, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
-                    const storeData = resStore.ok ? await resStore.json() : [];
-                    recalculateStores(storeData, true);
+                // 2단계: 원천 데이터에서 점포수 실시간 스캔 (1000개 단위 Chunk)
+                let offset = 0, limit = 1000, hasMore = true;
+                let storeDataAccumulated = [];
+                while (hasMore) {
+                    if (fetchToken !== currentToken) return;
+                    const res = await fetch(`${storeUrl}&limit=${limit}&offset=${offset}`, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                    if (res.ok) {
+                        const chunk = await res.json();
+                        if (!chunk || chunk.length === 0) break;
+                        storeDataAccumulated = storeDataAccumulated.concat(chunk);
+                        recalculateStores(storeDataAccumulated, false); // 라이브 카운팅
+                        if (chunk.length < limit) hasMore = false; else offset += limit;
+                    } else { hasMore = false; }
                 }
+                recalculateStores(storeDataAccumulated, true); // 최종 렌더링
 
             } catch (e) {
                 console.error("대시보드 조회 실패:", e);
