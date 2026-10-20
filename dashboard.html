@@ -49,6 +49,7 @@
         </div>
     </div>
 
+    <!-- 🏢 브랜드별 점포수 상세 모달 -->
     <div class="modal-overlay" id="brand-store-modal">
         <div class="modal-content">
             <div class="modal-header"><span class="modal-title">🏢 브랜드별 주문 점포수 상세</span><span class="close-btn" onclick="closeBrandStoreModal()">✕</span></div>
@@ -68,12 +69,20 @@
         function formatDisplayDate(dateStr) { return !dateStr || dateStr === '-' ? '-' : String(dateStr).split('T')[0].replace(/-/g, '/'); }
         function safeSearchKeyword(term) { return term ? term.replace(/"/g, '').replace(/[()]/g, '*').trim() : ''; }
 
+        // 코드가 숫자일 때 .0이 붙은 형태와 안 붙은 형태를 모두 생성하는 헬퍼 함수
+        function expandCodeVariants(rawCode) {
+            const trimmed = String(rawCode).trim();
+            const clean = trimmed.replace(/\.0$/, '');
+            const withDotZero = clean + '.0';
+            return [clean, withDotZero];
+        }
+
         async function fetchChartData(params) {
             const currentToken = ++fetchToken;
             const { startDate, endDate, brandName, itemName } = params;
             if (!startDate || !endDate) return;
 
-            // 1. 요약 뷰 검색 URL 구성
+            // 1. 요약 데이터 조회 URL
             let dailyUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
             
             if (brandName) {
@@ -96,7 +105,7 @@
             }
 
             try {
-                // 1단계: 요약 데이터 0.1초 쾌속 호출 및 차트 렌더링
+                // 1단계: 요약 데이터 고속 호출 및 차트 렌더링
                 const resDaily = await fetch(dailyUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                 const dailyData = resDaily.ok ? await resDaily.json() : [];
 
@@ -104,26 +113,26 @@
                 currentBrandStoreMap = {};
                 renderDashboard(dailyData);
 
-                // 2단계: 점포수 산출 로직 (정확한 품목코드 기준)
+                // 2단계: 점포수 산출
                 if (itemName) {
-                    // 💡 [핵심 보완] 이름이 아닌 "정확한 고유 품목코드" 자체로만 매칭합니다.
-                    // 단, DB에 '1014410194', '1014410194.0' 등 포맷이 미세하게 다르게 저장되어 있을 수 있으므로
-                    // 두 가지 포맷을 모두 생성하여 in.() 조건으로 안전하게 던집니다.
-                    const codeSet = new Set();
+                    // 검색된 품목들의 고유 코드 수집 (.0 버전과 정수 버전 모두 준비)
+                    const codeTargets = new Set();
+                    
+                    // 사용자가 직접 입력한 검색어에서 코드 추출
+                    const userInputs = itemName.split(',').map(s => s.trim()).filter(Boolean);
+                    userInputs.forEach(input => {
+                        expandCodeVariants(input).forEach(c => codeTargets.add(c));
+                    });
+
+                    // 요약 뷰 결과에 포함된 실제 item_code도 추가
                     dailyData.forEach(r => {
                         if (r.item_code && r.item_code !== '-') {
-                            const raw = String(r.item_code).trim();
-                            const clean = raw.replace(/\.0$/, '');
-                            const dotZero = clean + '.0';
-                            
-                            codeSet.add(raw);
-                            codeSet.add(clean);
-                            codeSet.add(dotZero);
+                            expandCodeVariants(r.item_code).forEach(c => codeTargets.add(c));
                         }
                     });
-                    const matchedCodes = [...codeSet];
 
-                    if (matchedCodes.length === 0) {
+                    const finalCodes = Array.from(codeTargets);
+                    if (finalCodes.length === 0) {
                         recalculateStores([], true);
                         return;
                     }
@@ -136,8 +145,8 @@
                         else if (bList.length > 1) storeUrl += `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(safeSearchKeyword(b))}*`).join(',')})`;
                     }
 
-                    // 💡 준비된 코드 포맷(.0 유무 포함)들을 쉼표로 연결하여 in 조건으로 정확하게 타격
-                    storeUrl += `&item_code=in.(${matchedCodes.map(encodeURIComponent).join(',')})`;
+                    // 💡 [핵심] .0이 포함된 DB 원천 코드를 정확히 타격
+                    storeUrl += `&item_code=in.(${finalCodes.map(encodeURIComponent).join(',')})`;
 
                     let offset = 0, limit = 1000, hasMore = true;
                     let storeDataAccumulated = [];
@@ -148,16 +157,15 @@
                             const chunk = await res.json();
                             if (!chunk || chunk.length === 0) break;
                             storeDataAccumulated = storeDataAccumulated.concat(chunk);
-                            recalculateStores(storeDataAccumulated, false); // 라이브 카운팅
+                            recalculateStores(storeDataAccumulated, false);
                             if (chunk.length < limit) hasMore = false; else offset += limit;
                         } else { 
                             hasMore = false; 
                         }
                     }
-                    recalculateStores(storeDataAccumulated, true); // 최종 렌더링
+                    recalculateStores(storeDataAccumulated, true);
 
                 } else {
-                    // 품목 미지정 시 가벼운 요약 뷰 사용
                     let storeUrl = `${SUPABASE_URL}/rest/v1/store_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_name,brand_name`;
                     if (brandName) {
                         const bList = brandName.split(',').map(b => b.trim()).filter(Boolean);
