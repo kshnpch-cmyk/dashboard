@@ -33,7 +33,6 @@
 <body>
 
     <div class="dashboard-layout">
-        <!-- 좌측 점포 목록 -->
         <div class="panel">
             <div class="panel-title"><span>🏢 주문 점포 필터</span></div>
             <input type="text" id="store-search-input" class="search-input" placeholder="🔍 점포명 검색" oninput="filterStoreList()">
@@ -45,7 +44,6 @@
             </ul>
         </div>
 
-        <!-- 우측 주문 상세 내역 -->
         <div class="panel">
             <div class="panel-title">
                 <span id="selected-store-title">🛒 기간 내 전체 점포 합산 상세</span>
@@ -114,6 +112,7 @@
         function cleanNumber(val) { return parseFloat(String(val).replace(/[^0-9.-]/g, '')) || 0; }
         function cleanCode(val) { return (!val && val !== 0) ? '-' : String(val).replace(/\.0$/, '').trim(); }
         function formatDisplayDate(d) { return !d || d === '-' ? '-' : String(d).split('T')[0].replace(/-/g, '/'); }
+        function safeSearchKeyword(term) { return term ? term.replace(/"/g, '').replace(/[()]/g, '*').trim() : ''; }
 
         async function fetchDetailData(params) {
             const { startDate, endDate, brandName, itemName } = params;
@@ -127,13 +126,21 @@
 
             if (brandName) {
                 const bList = brandName.split(',').map(b => b.trim()).filter(Boolean);
-                if (bList.length === 1) url += `&brand_name=ilike.*${encodeURIComponent(bList[0])}*`;
-                else if (bList.length > 1) url += `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(b)}*`).join(',')})`;
+                if (bList.length === 1) url += `&brand_name=ilike.*${encodeURIComponent(safeSearchKeyword(bList[0]))}*`;
+                else if (bList.length > 1) url += `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(safeSearchKeyword(b))}*`).join(',')})`;
             }
             if (itemName) {
                 const iList = itemName.split(',').map(i => i.trim()).filter(Boolean);
-                if (iList.length === 1) url += `&or=(item_code.ilike.*${encodeURIComponent(iList[0])}*,item_name.ilike.*${encodeURIComponent(iList[0])}*)`;
-                else if (iList.length > 1) url += `&or=(${iList.map(i => `item_code.ilike.*${encodeURIComponent(i)}*,item_name.ilike.*${encodeURIComponent(i)}*`).join(',')})`;
+                if (iList.length === 1) {
+                    const safe = encodeURIComponent(safeSearchKeyword(iList[0]));
+                    url += `&or=(item_code.ilike.*${safe}*,item_name.ilike.*${safe}*)`;
+                } else if (iList.length > 1) {
+                    const orConds = iList.map(i => {
+                        const safe = encodeURIComponent(safeSearchKeyword(i));
+                        return `item_code.ilike.*${safe}*,item_name.ilike.*${safe}*`;
+                    }).join(',');
+                    url += `&or=(${orConds})`;
+                }
             }
 
             let offset = 0, limit = 1000, hasMore = true;
@@ -152,7 +159,6 @@
                 } catch(e) { hasMore = false; }
             }
 
-            // 사이드바 점포 리스트 집계
             const storeMap = {};
             rawDetailOrders.forEach(r => {
                 if (r.store_name) {
@@ -162,8 +168,6 @@
             });
             storeSummaryList = Object.keys(storeMap).sort().map(s => ({ store_name: s, count: storeMap[s] }));
             renderStoreList();
-
-            // 전체 점포 표시
             onStoreSelect(currentSelectedStore);
         }
 
@@ -267,14 +271,8 @@
             document.getElementById('btn-next').disabled = (currentPage === totalPages);
         }
 
-        function goToPage(p) {
-            if (p < 1 || p > totalPages) return;
-            currentPage = p; renderTable();
-        }
-        function changeRowsPerPage() {
-            rowsPerPage = parseInt(document.getElementById('rows-per-page').value, 10);
-            currentPage = 1; renderTable();
-        }
+        function goToPage(p) { if (p < 1 || p > totalPages) return; currentPage = p; renderTable(); }
+        function changeRowsPerPage() { rowsPerPage = parseInt(document.getElementById('rows-per-page').value, 10); currentPage = 1; renderTable(); }
 
         function exportToExcel() {
             if (!currentDetailOrders || currentDetailOrders.length === 0) return alert("저장할 데이터가 없습니다.");
@@ -290,11 +288,8 @@
             XLSX.writeFile(wb, `OMS_주문상세_${Date.now()}.xlsx`);
         }
 
-        // 💡 부모창 통신 수신
         window.addEventListener('message', (e) => {
-            if (e.data && e.data.action === 'SEARCH') {
-                fetchDetailData(e.data.params);
-            }
+            if (e.data && e.data.action === 'SEARCH') fetchDetailData(e.data.params);
         });
         window.addEventListener('DOMContentLoaded', () => {
             window.parent.postMessage({ action: 'FRAME_READY', tab: 'detail' }, '*');
