@@ -7,43 +7,81 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Pretendard', 'Malgun Gothic', sans-serif; background: transparent; color: #1e293b; padding: 5px 0; }
+        
         .section-panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-bottom: 15px; }
-        .panel-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 12px; }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 15px; }
         .panel-title-text { font-size: 16px; font-weight: 700; color: #0f172a; }
-        .btn-excel { background-color: #16a34a; color: white; border: none; padding: 5px 12px; font-size: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; }
-        .checkbox-row { display: flex; gap: 20px; flex-wrap: wrap; align-items: center; padding: 4px 0; }
-        .checkbox-label { display: flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; cursor: pointer; color: #1e293b; }
+        .btn-excel { background-color: #16a34a; color: white; border: none; padding: 5px 12px; font-size: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
+        .btn-excel:hover { background-color: #15803d; }
+
+        /* ✨ 피벗 컨트롤 UI 스타일 */
+        .pivot-controls { display: flex; flex-direction: column; gap: 10px; }
+        .pivot-box { 
+            border: 1px dashed #cbd5e1; border-radius: 8px; padding: 12px 15px; 
+            background: #f8fafc; min-height: 60px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; 
+        }
+        .pivot-box.active-box { border-color: #3b82f6; background: #eff6ff; }
+        .pivot-box-title { font-size: 13px; font-weight: 800; color: #475569; width: 105px; flex-shrink: 0; line-height: 1.3; }
+        .pivot-box.active-box .pivot-box-title { color: #1d4ed8; }
+        
+        .chip-container { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; flex: 1; }
+        .pivot-arrow { color: #94a3b8; font-size: 12px; font-weight: bold; margin: 0 2px; }
+
+        .pivot-chip {
+            padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; cursor: pointer;
+            display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s; user-select: none;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .pivot-chip.active { background: #2563eb; color: white; border: 1px solid #1d4ed8; }
+        .pivot-chip.active:hover { background: #1e40af; transform: translateY(-1px); box-shadow: 0 3px 6px rgba(37,99,235,0.2); }
+        .pivot-chip.available { background: white; color: #475569; border: 1px solid #cbd5e1; }
+        .pivot-chip.available:hover { background: #f1f5f9; border-color: #94a3b8; transform: translateY(-1px); box-shadow: 0 3px 6px rgba(0,0,0,0.05); }
+        .chip-icon { font-size: 11px; opacity: 0.9; margin-left: 2px; font-weight: 900; }
+
         .summary-badge-group { display: flex; align-items: center; gap: 10px; font-size: 13px; }
         .summary-badge { background-color: #f1f5f9; padding: 4px 10px; border-radius: 6px; border: 1px solid #cbd5e1; color: #475569; }
         .summary-badge b { color: #2563eb; }
-        .table-container { width: 100%; overflow-x: auto; max-height: 550px; }
+
+        .table-container { width: 100%; overflow-x: auto; max-height: 550px; border: 1px solid #e2e8f0; border-radius: 8px; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 13px; white-space: nowrap; }
-        th { background-color: #f8fafc; color: #475569; position: sticky; top: 0; z-index: 2; }
+        th { background-color: #f8fafc; color: #475569; position: sticky; top: 0; z-index: 2; border-bottom: 2px solid #cbd5e1; }
         .text-right { text-align: right; }
+        .no-data-row td { text-align:center; padding:40px; color:#94a3b8; font-size:14px; }
     </style>
 </head>
 <body>
 
+    <!-- 1. 새로운 칩(Chip) 기반 그룹 기준 선택 패널 -->
     <div class="section-panel">
-        <div class="panel-header">
-            <span class="panel-title-text">🧩 피벗 그룹핑 기준 (집계할 컬럼을 자유롭게 선택하세요)</span>
+        <div class="panel-header" style="margin-bottom: 15px;">
+            <span class="panel-title-text">🧩 피벗 그룹핑 기준 <span style="font-size: 12px; font-weight: normal; color: #64748b; margin-left: 8px;">원하는 항목을 클릭하여 집계 순서를 자유롭게 조합하세요.</span></span>
             <button class="btn-excel" onclick="exportPivotToExcel()">📥 피벗 엑셀 저장</button>
         </div>
-        <div class="checkbox-row">
-            <label class="checkbox-label"><input type="checkbox" id="col-date" onchange="onCriteriaChange()"> 📅 배송일자</label>
-            <label class="checkbox-label"><input type="checkbox" id="col-brand" checked onchange="onCriteriaChange()"> 🏢 브랜드</label>
-            <label class="checkbox-label"><input type="checkbox" id="col-center" onchange="onCriteriaChange()"> 🏬 센터명</label>
-            <label class="checkbox-label"><input type="checkbox" id="col-store" onchange="onCriteriaChange()"> 🏪 점포명</label>
-            <label class="checkbox-label"><input type="checkbox" id="col-item" checked onchange="onCriteriaChange()"> 📦 품목명</label>
-            <label class="checkbox-label"><input type="checkbox" id="col-itemcode" onchange="onCriteriaChange()"> 🏷️ 품목코드</label>
-            <span style="font-size: 12px; color: #64748b; margin-left: auto;">💡 조건에 맞추어 수량 기준 내림차순으로 자동 소팅됩니다.</span>
+        
+        <div class="pivot-controls">
+            <!-- 적용된 기준 (Active) -->
+            <div class="pivot-box active-box">
+                <div class="pivot-box-title">🎯 적용된 기준<br><span style="font-size:10.5px; font-weight:normal; opacity:0.8;">(클릭 시 해제)</span></div>
+                <div class="chip-container" id="active-pivot-fields">
+                    <!-- JS에서 동적 렌더링 됨 -->
+                </div>
+            </div>
+
+            <!-- 추가 가능한 기준 (Available) -->
+            <div class="pivot-box">
+                <div class="pivot-box-title">➕ 추가 가능<br><span style="font-size:10.5px; font-weight:normal; opacity:0.8;">(클릭 시 추가)</span></div>
+                <div class="chip-container" id="available-pivot-fields">
+                    <!-- JS에서 동적 렌더링 됨 -->
+                </div>
+            </div>
         </div>
     </div>
 
+    <!-- 2. 피벗 집계 결과 테이블 -->
     <div class="section-panel">
-        <div class="panel-header">
-            <span class="panel-title-text">📊 피벗 집계 결과</span>
+        <div class="panel-header" style="margin-bottom: 12px; border:none; padding-bottom:0;">
+            <span class="panel-title-text">📊 피벗 집계 결과 <span style="font-size: 12px; font-weight: normal; color: #64748b; margin-left: 8px;">수량 합계 기준 내림차순으로 자동 정렬됩니다.</span></span>
             <div class="summary-badge-group">
                 <span class="summary-badge">수량합계: <b id="pivot-total-qty">0개</b></span>
                 <span class="summary-badge">금액합계: <b id="pivot-total-amount">0원</b></span>
@@ -54,7 +92,7 @@
             <table>
                 <thead id="pivot-thead"></thead>
                 <tbody id="pivot-tbody">
-                    <tr><td style="text-align:center; padding:30px; color:#94a3b8;">상단 [피벗 분석 집계 조회] 버튼을 눌러 데이터를 불러오세요.</td></tr>
+                    <tr class="no-data-row"><td colspan="10">상단 [피벗 분석 집계 조회] 버튼을 눌러 데이터를 불러오세요.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -65,25 +103,82 @@
         const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN";
 
         let currentRawData = [];
-        let currentLoadedSource = '';
+        let currentLoadedSource = ''; 
         let currentSearchParams = null;
         let currentPivotList = [];
+
+        // 💡 피벗 가능 컬럼 정의
+        const PIVOT_COLS = {
+            'delivery_date': { label: '배송일자', icon: '📅', isDate: true },
+            'brand_name': { label: '브랜드', icon: '🏢' },
+            'center_name': { label: '센터명', icon: '🏬' },
+            'store_name': { label: '점포명', icon: '🏪' },
+            'item_name': { label: '품목명', icon: '📦' },
+            'item_code': { label: '품목코드', icon: '🏷️' }
+        };
+
+        // 기본 활성화된 컬럼 (초기값: 브랜드 -> 품목명)
+        let activePivotFields = ['brand_name', 'item_name'];
 
         function cleanNumber(v) { return parseFloat(String(v).replace(/[^0-9.-]/g, '')) || 0; }
         function formatDisplayDate(d) { return !d || d === '-' ? '-' : String(d).split('T')[0].replace(/-/g, '/'); }
         function safeSearchKeyword(term) { return term ? term.replace(/"/g, '').replace(/[()]/g, '*').trim() : ''; }
 
-        function getSelectedDimensions() {
-            const dims = [];
-            if (document.getElementById('col-date').checked) dims.push({ key: 'delivery_date', label: '배송일자', isDate: true });
-            if (document.getElementById('col-brand').checked) dims.push({ key: 'brand_name', label: '브랜드' });
-            if (document.getElementById('col-center').checked) dims.push({ key: 'center_name', label: '센터명' });
-            if (document.getElementById('col-store').checked) dims.push({ key: 'store_name', label: '점포명' });
-            if (document.getElementById('col-item').checked) dims.push({ key: 'item_name', label: '품목명' });
-            if (document.getElementById('col-itemcode').checked) dims.push({ key: 'item_code', label: '품목코드' });
-            return dims;
+        /* 💡 칩(Chip) UI 렌더링 함수 */
+        function renderPivotControls() {
+            const activeEl = document.getElementById('active-pivot-fields');
+            const availableEl = document.getElementById('available-pivot-fields');
+
+            // 1. 활성화된 칩 렌더링 (순서대로)
+            if (activePivotFields.length === 0) {
+                activeEl.innerHTML = `<span style="font-size:13px; color:#94a3b8; padding-left:5px;">선택된 기준이 없습니다. (전체 합산)</span>`;
+            } else {
+                activeEl.innerHTML = activePivotFields.map((key, index) => {
+                    const field = PIVOT_COLS[key];
+                    const chipHtml = `
+                        <div class="pivot-chip active" onclick="removePivotField('${key}')">
+                            ${field.icon} ${field.label} <span class="chip-icon">✕</span>
+                        </div>
+                    `;
+                    // 마지막 칩이 아니면 계층 화살표(▶) 추가
+                    return index < activePivotFields.length - 1 ? chipHtml + `<span class="pivot-arrow">▶</span>` : chipHtml;
+                }).join('');
+            }
+
+            // 2. 추가 가능한 칩 렌더링 (나머지)
+            const availableFields = Object.keys(PIVOT_COLS).filter(k => !activePivotFields.includes(k));
+            availableEl.innerHTML = availableFields.map(key => {
+                const field = PIVOT_COLS[key];
+                return `
+                    <div class="pivot-chip available" onclick="addPivotField('${key}')">
+                        ${field.icon} ${field.label} <span class="chip-icon">+</span>
+                    </div>
+                `;
+            }).join('');
         }
 
+        // 칩 클릭 동작 (추가/제거)
+        function addPivotField(key) {
+            activePivotFields.push(key);
+            renderPivotControls();
+            onCriteriaChange();
+        }
+        function removePivotField(key) {
+            activePivotFields = activePivotFields.filter(k => k !== key);
+            renderPivotControls();
+            onCriteriaChange();
+        }
+
+        // 현재 순서대로 차원(Dimensions) 배열 반환
+        function getSelectedDimensions() {
+            return activePivotFields.map(key => ({
+                key: key,
+                label: PIVOT_COLS[key].label,
+                isDate: PIVOT_COLS[key].isDate || false
+            }));
+        }
+
+        // 테이블 헤더 즉시 갱신
         function renderPivotHeader(dims) {
             const thead = document.getElementById('pivot-thead');
             if (dims.length === 0) {
@@ -93,6 +188,7 @@
             }
         }
 
+        /* 💡 데이터 원천 조회 로직 (기존 고속 로딩 로직 유지) */
         async function fetchPivotData(params) {
             currentSearchParams = params;
             const { startDate, endDate, brandName, itemName } = params;
@@ -102,8 +198,9 @@
             renderPivotHeader(dims);
 
             const needStoreOrCenter = dims.some(d => d.key === 'store_name' || d.key === 'center_name');
+
             currentRawData = [];
-            document.getElementById('pivot-tbody').innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:#2563eb;">⚡ 피벗 데이터를 고속 로딩 중입니다...</td></tr>`;
+            document.getElementById('pivot-tbody').innerHTML = `<tr class="no-data-row"><td colspan="10" style="color:#2563eb;">⚡ 조건에 맞는 피벗 데이터를 고속 로딩 중입니다...</td></tr>`;
 
             if (!needStoreOrCenter) {
                 currentLoadedSource = 'summary';
@@ -116,16 +213,8 @@
                 }
                 if (itemName) {
                     const iList = itemName.split(',').map(i => i.trim()).filter(Boolean);
-                    if (iList.length === 1) {
-                        const safe = encodeURIComponent(safeSearchKeyword(iList[0]));
-                        url += `&or=(item_code.ilike.*${safe}*,item_name.ilike.*${safe}*)`;
-                    } else if (iList.length > 1) {
-                        const orConds = iList.map(i => {
-                            const safe = encodeURIComponent(safeSearchKeyword(i));
-                            return `item_code.ilike.*${safe}*,item_name.ilike.*${safe}*`;
-                        }).join(',');
-                        url += `&or=(${orConds})`;
-                    }
+                    if (iList.length === 1) url += `&or=(item_code.ilike.*${encodeURIComponent(safeSearchKeyword(iList[0]))}*,item_name.ilike.*${encodeURIComponent(safeSearchKeyword(iList[0]))}*)`;
+                    else if (iList.length > 1) url += `&or=(${iList.map(i => `item_code.ilike.*${encodeURIComponent(safeSearchKeyword(i))}*,item_name.ilike.*${encodeURIComponent(safeSearchKeyword(i))}*`).join(',')})`;
                 }
 
                 try {
@@ -144,16 +233,8 @@
                 }
                 if (itemName) {
                     const iList = itemName.split(',').map(i => i.trim()).filter(Boolean);
-                    if (iList.length === 1) {
-                        const safe = encodeURIComponent(safeSearchKeyword(iList[0]));
-                        url += `&or=(item_code.ilike.*${safe}*,item_name.ilike.*${safe}*)`;
-                    } else if (iList.length > 1) {
-                        const orConds = iList.map(i => {
-                            const safe = encodeURIComponent(safeSearchKeyword(i));
-                            return `item_code.ilike.*${safe}*,item_name.ilike.*${safe}*`;
-                        }).join(',');
-                        url += `&or=(${orConds})`;
-                    }
+                    if (iList.length === 1) url += `&or=(item_code.ilike.*${encodeURIComponent(safeSearchKeyword(iList[0]))}*,item_name.ilike.*${encodeURIComponent(safeSearchKeyword(iList[0]))}*)`;
+                    else if (iList.length > 1) url += `&or=(${iList.map(i => `item_code.ilike.*${encodeURIComponent(safeSearchKeyword(i))}*,item_name.ilike.*${encodeURIComponent(safeSearchKeyword(i))}*`).join(',')})`;
                 }
 
                 let offset = 0, limit = 1000, hasMore = true;
@@ -174,9 +255,11 @@
             runPivot();
         }
 
+        // 기준 변경 (필요에 따라 데이터 재조회)
         function onCriteriaChange() {
             const dims = getSelectedDimensions();
             renderPivotHeader(dims);
+
             const needStoreOrCenter = dims.some(d => d.key === 'store_name' || d.key === 'center_name');
             if (needStoreOrCenter && currentLoadedSource === 'summary' && currentSearchParams) {
                 fetchPivotData(currentSearchParams);
@@ -185,12 +268,13 @@
             }
         }
 
+        /* 💡 동적 계층형 피벗 그룹핑 및 정렬 */
         function runPivot() {
             const dims = getSelectedDimensions();
             renderPivotHeader(dims);
 
             if (!currentRawData || currentRawData.length === 0) {
-                document.getElementById('pivot-tbody').innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:#94a3b8;">조건에 해당하는 데이터가 없습니다.</td></tr>`;
+                document.getElementById('pivot-tbody').innerHTML = `<tr class="no-data-row"><td colspan="10">조건에 해당하는 데이터가 없습니다.</td></tr>`;
                 document.getElementById('pivot-total-qty').innerText = "0개";
                 document.getElementById('pivot-total-amount').innerText = "0원";
                 document.getElementById('pivot-total-rows').innerText = "0행";
@@ -203,7 +287,8 @@
             currentRawData.forEach(r => {
                 const q = cleanNumber(r.total_qty || r.qty);
                 const amt = cleanNumber(r.total_amount) || (q * cleanNumber(r.price));
-                grandQty += q; grandAmt += amt;
+                grandQty += q; 
+                grandAmt += amt;
 
                 let keys = dims.length === 0 ? ['전체 합산'] : dims.map(d => d.isDate ? formatDisplayDate(r[d.key]) : (r[d.key] || '-'));
                 const hash = keys.join('__||__');
@@ -212,10 +297,12 @@
                     target = { keys, qty: 0, amount: 0, count: 0 };
                     map.set(hash, target);
                 }
-                target.qty += q; target.amount += amt;
+                target.qty += q; 
+                target.amount += amt; 
                 target.count += cleanNumber(r.order_count || 1);
             });
 
+            // 수량 기준 내림차순 정렬
             currentPivotList = Array.from(map.values()).sort((a, b) => b.qty - a.qty);
 
             document.getElementById('pivot-total-qty').innerText = `${grandQty.toLocaleString()}개`;
@@ -226,8 +313,8 @@
             tbody.innerHTML = currentPivotList.map(item => `
                 <tr>
                     ${item.keys.map(k => `<td><b>${k}</b></td>`).join('')}
-                    <td class="text-right" style="color:#2563eb; font-weight:bold;">${item.qty.toLocaleString()}</td>
-                    <td class="text-right" style="font-weight:bold;">${item.amount > 0 ? item.amount.toLocaleString() + '원' : '-'}</td>
+                    <td class="text-right" style="color:#2563eb; font-weight:800;">${item.qty.toLocaleString()}</td>
+                    <td class="text-right" style="font-weight:700;">${item.amount > 0 ? item.amount.toLocaleString() + '원' : '-'}</td>
                     <td class="text-right" style="color:#64748b;">${item.count.toLocaleString()}건</td>
                 </tr>
             `).join('');
@@ -239,8 +326,11 @@
 
             const exportData = currentPivotList.map(item => {
                 const obj = {};
-                if (dims.length === 0) { obj['구분'] = item.keys[0]; } 
-                else { dims.forEach((d, idx) => { obj[d.label] = item.keys[idx]; }); }
+                if (dims.length === 0) {
+                    obj['구분'] = item.keys[0];
+                } else {
+                    dims.forEach((d, idx) => { obj[d.label] = item.keys[idx]; });
+                }
                 obj['수량 합계'] = item.qty;
                 obj['금액 합계'] = item.amount;
                 obj['주문 건수'] = item.count;
@@ -252,11 +342,16 @@
             XLSX.writeFile(wb, `OMS_피벗집계_${Date.now()}.xlsx`);
         }
 
+        // 부모창 명령 수신
         window.addEventListener('message', (e) => {
-            if (e.data && e.data.action === 'SEARCH') fetchPivotData(e.data.params);
+            if (e.data && e.data.action === 'SEARCH') {
+                fetchPivotData(e.data.params);
+            }
         });
+
+        // 로드 완료 시 초기 렌더링 및 부모에 Ready 신호 전송
         window.addEventListener('DOMContentLoaded', () => {
-            renderPivotHeader(getSelectedDimensions());
+            renderPivotControls();
             window.parent.postMessage({ action: 'FRAME_READY', tab: 'pivot' }, '*');
         });
     </script>
