@@ -178,7 +178,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 대시보드</h1>
-            <span class="version-tag">v35.2 Strict ItemCode Filter</span>
+            <span class="version-tag">v36.0 Brand Ranking Suite</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -221,9 +221,10 @@
     <div class="modal-overlay" id="item-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">📦 품목 다중 선택</span><span class="close-btn" onclick="closeItemModal()">✕</span></div><div style="display: flex; gap: 8px; margin-bottom: 8px;"><input type="text" id="modal-item-search" class="input-box" style="flex:1;" placeholder="품목코드 또는 품목명 검색 (Enter)" onkeydown="if(event.key==='Enter') filterItemModalList()"><button class="btn btn-cal" style="background:#2563eb;" onclick="filterItemModalList()">검색</button><button class="btn btn-cal" style="background:#475569;" onclick="toggleAllItemCheck(true)">전체선택</button><button class="btn btn-cal" style="background:#64748b;" onclick="toggleAllItemCheck(false)">해제</button></div><div class="modal-body-scroll" id="item-modal-list"></div><div style="margin-top: 15px; text-align: right;"><button class="btn" onclick="applyItemSelection()">확인 적용</button></div></div></div>
 
     <div class="container">
-        <!-- 📑 3대 탭 메뉴 -->
+        <!-- 📑 4대 탭 메뉴 -->
         <div class="tab-container">
             <button class="tab-btn active" id="tab-btn-dashboard" onclick="switchTab('dashboard')">📈 요약 대시보드</button>
+            <button class="tab-btn" id="tab-btn-brand_detail" onclick="switchTab('brand_detail')">🏆 브랜드별 상세내역 (매출 순위)</button>
             <button class="tab-btn" id="tab-btn-detail" onclick="switchTab('detail')">🛒 점포별 상세 내역</button>
             <button class="tab-btn" id="tab-btn-pivot" onclick="switchTab('pivot')">📊 피벗 분석 (조건별 집계)</button>
         </div>
@@ -261,6 +262,7 @@
 
         <!-- 🚀 Iframe 뷰포트 영역 (독립 로딩) -->
         <iframe id="frame-dashboard" class="iframe-viewport" src="dashboard.html" style="display: block;"></iframe>
+        <iframe id="frame-brand_detail" class="iframe-viewport" src="brand_detail.html" style="display: none;"></iframe>
         <iframe id="frame-detail" class="iframe-viewport" src="detail.html" style="display: none;"></iframe>
         <iframe id="frame-pivot" class="iframe-viewport" src="pivot.html" style="display: none;"></iframe>
     </div>
@@ -289,7 +291,7 @@
             try { localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); } catch (e) {}
         }
 
-        /* 💡 탭 전환: 해당 Iframe만 표시 */
+        /* 💡 4대 탭 전환 제어 */
         function switchTab(tabId) {
             activeTab = tabId;
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -300,11 +302,11 @@
             document.getElementById(`frame-${tabId}`).style.display = 'block';
 
             if (tabId === 'dashboard') btnQuery.innerText = "🔍 대시보드 종합 조회";
+            else if (tabId === 'brand_detail') btnQuery.innerText = "🔍 브랜드별 매출 순위 조회";
             else if (tabId === 'detail') btnQuery.innerText = "🔍 점포별 상세 조회";
             else if (tabId === 'pivot') btnQuery.innerText = "🔍 피벗 분석 집계 조회";
         }
 
-        /* 💡 검색 파라미터 가져오기 */
         function getCurrentSearchParams() {
             return {
                 startDate: document.getElementById('chart-start-date').value,
@@ -314,7 +316,6 @@
             };
         }
 
-        /* 💡 활성화된 탭의 Iframe으로 검색 명령 발송 */
         function executeTabSearch() {
             if (!validateDates('start')) return;
             const params = getCurrentSearchParams();
@@ -329,7 +330,6 @@
             }
         }
 
-        /* 💡 Iframe 자식 창들이 준비되었을 때 검색 파라미터 전달 */
         window.addEventListener('message', (e) => {
             if (e.data && e.data.action === 'FRAME_READY') {
                 const frameEl = document.getElementById(`frame-${e.data.tab}`);
@@ -392,7 +392,6 @@
             document.getElementById('brand-autocomplete-list').style.display = 'none';
         }
 
-        /* 💡 검색어 입력 시 드롭다운 (클릭 시 코드가 들어가도록 변경) */
         function handleItemInput(val) {
             safeSetStorage('cached_item_input', val); toggleClearBtn('chart-item-input');
             const dropEl = document.getElementById('item-autocomplete-list');
@@ -400,11 +399,9 @@
             if (!keyword || allItemList.length === 0) return dropEl.style.display = 'none';
             const matched = allItemList.filter(i => i.code.toLowerCase().includes(keyword) || i.name.toLowerCase().includes(keyword)).slice(0, 8);
             if (matched.length === 0) return dropEl.style.display = 'none';
-            // 클릭 시 selectAutocompleteItem 에 item.code 전달
             dropEl.innerHTML = matched.map(i => `<div class="autocomplete-item" onclick="selectAutocompleteItem('${i.code}')"><span><b>${i.name}</b></span><span class="code-tag">[${i.code}]</span></div>`).join('');
             dropEl.style.display = 'block';
         }
-        // 자동완성 클릭 시 품목코드를 화면에 입력
         function selectAutocompleteItem(itemCode) {
             document.getElementById('chart-item-input').value = itemCode;
             safeSetStorage('cached_item_input', itemCode);
@@ -421,7 +418,7 @@
             }
         });
 
-        /* 🤖 부모창 상주 AI 챗봇 로직 */
+        /* 🤖 부모창 상주 AI 챗봇 */
         function toggleAiChatWidget() {
             const widget = document.getElementById('ai-chat-modal');
             if (widget.style.display === 'flex') { widget.style.display = 'none'; } 
@@ -543,7 +540,7 @@
             } catch (e) { return { status: "error", message: "DB 오류" }; }
         }
 
-        // --- 상단 모달창 함수들 ---
+        // --- 상단 모달 제어 함수들 ---
         function openCalendarModal() { document.getElementById('calendar-modal').style.display = 'flex'; loadCalendarData(); }
         function closeCalendarModal() { document.getElementById('calendar-modal').style.display = 'none'; }
         async function loadCalendarData() {
@@ -598,11 +595,9 @@
             document.getElementById('chart-brand-input').value = vals; toggleClearBtn('chart-brand-input'); closeBrandModal();
         }
 
-        /* 💡 품목 모달 (품목코드 기준 체크 유지 및 검색창 적용) */
         function openItemModal() { document.getElementById('item-modal').style.display = 'flex'; renderItemModalList(); }
         function closeItemModal() { document.getElementById('item-modal').style.display = 'none'; }
         function renderItemModalList() {
-            // 현재 검색창에 있는 '품목코드'들을 기준으로 체크 상태 유지
             const currentSelected = document.getElementById('chart-item-input').value.split(',').map(s => s.trim());
             const kw = document.getElementById('modal-item-search').value.toLowerCase().trim();
             const listEl = document.getElementById('item-modal-list');
@@ -612,8 +607,6 @@
                 listEl.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:15px;">검색 결과가 없습니다.</div>';
                 return;
             }
-            
-            // 체크박스 value를 i.code로 세팅
             listEl.innerHTML = filtered.map(i => `
                 <div class="search-list-item">
                     <label>
@@ -626,7 +619,6 @@
         function filterItemModalList() { renderItemModalList(); }
         function toggleAllItemCheck(status) { document.querySelectorAll('.item-modal-chk').forEach(c => c.checked = status); }
         function applyItemSelection() {
-            // 체크된 항목들의 품목코드를 가져와서 쉼표로 연결
             const vals = Array.from(document.querySelectorAll('.item-modal-chk:checked')).map(c => c.value).join(', ');
             document.getElementById('chart-item-input').value = vals; 
             safeSetStorage('cached_item_input', vals);
