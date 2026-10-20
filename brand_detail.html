@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>브랜드별 상세내역 프레임</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Pretendard', 'Malgun Gothic', sans-serif; background: transparent; color: #1e293b; padding: 5px 0; }
+        
+        .dashboard-layout { display: grid; grid-template-columns: 290px 1fr; gap: 20px; align-items: start; }
+        .panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+        .panel-title { font-size: 17px; font-weight: 700; margin-bottom: 15px; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        
+        .search-input { width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; margin-bottom: 10px; outline: none; }
+        .brand-list { list-style: none; padding: 0; margin: 0; max-height: 570px; overflow-y: auto; }
+        .brand-item { padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 5px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 13px; transition: all 0.15s; }
+        .brand-item:hover, .brand-item.active { background-color: #eff6ff; border-color: #2563eb; font-weight: bold; color: #1d4ed8; }
+        .brand-item.total-item { background: #f8fafc; font-weight: 800; border-color: #cbd5e1; }
+        
+        /* 우측 상단 컨트롤 바 */
+        .control-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; background: #f8fafc; padding: 10px 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
+        .control-group { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #475569; }
+        .top-n-input { width: 65px; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; font-weight: 800; text-align: center; color: #2563eb; }
+        
+        .sort-btn-group { display: flex; border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; background: white; }
+        .sort-btn { border: none; background: white; padding: 6px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; color: #64748b; transition: all 0.15s; }
+        .sort-btn.active { background: #2563eb; color: white; }
+
+        .summary-badge-group { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+        .summary-badge { background-color: #f1f5f9; padding: 4px 10px; border-radius: 6px; border: 1px solid #cbd5e1; color: #475569; }
+        .summary-badge b { color: #2563eb; }
+        
+        .btn-excel { background-color: #16a34a; color: white; border: none; padding: 6px 12px; font-size: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; }
+        .btn-excel:hover { background-color: #15803d; }
+
+        .table-container { width: 100%; overflow-x: auto; max-height: 520px; border: 1px solid #e2e8f0; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        th { background-color: #f8fafc; color: #475569; position: sticky; top: 0; z-index: 2; border-bottom: 2px solid #cbd5e1; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        
+        /* 순위 뱃지 */
+        .rank-badge { display: inline-block; width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 50%; font-size: 11px; font-weight: 800; background: #e2e8f0; color: #475569; }
+        .rank-1 { background: #fef08a; color: #854d0e; }
+        .rank-2 { background: #e2e8f0; color: #334155; }
+        .rank-3 { background: #fed7aa; color: #9a3412; }
+
+        /* 점유율 비중 프로그레스 바 */
+        .share-cell { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+        .share-bar-bg { width: 60px; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
+        .share-bar-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #2563eb); border-radius: 3px; }
+        .share-text { font-weight: 800; color: #0f172a; min-width: 42px; text-align: right; }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard-layout">
+        <!-- 🏢 좌측 브랜드 목록 패널 -->
+        <div class="panel">
+            <div class="panel-title"><span>🏢 브랜드 필터</span></div>
+            <input type="text" id="brand-search-input" class="search-input" placeholder="🔍 브랜드명 검색" oninput="filterBrandList()">
+            <div id="brand-count-summary" style="margin-bottom: 10px; font-size: 12px; color: #64748b;">
+                브랜드: <b id="total-brand-count">0개</b>
+            </div>
+            <ul class="brand-list" id="brand-list">
+                <li style="padding:20px; text-align:center; color:#94a3b8; font-size:13px;">상단 [조회] 버튼을 누르면 로드됩니다.</li>
+            </ul>
+        </div>
+
+        <!-- 🏆 우측 브랜드별 품목 랭킹 및 상세 내역 -->
+        <div class="panel">
+            <div class="panel-title">
+                <span id="selected-brand-title">🏆 전체 브랜드 합산 TOP 100 순위</span>
+                <div class="summary-badge-group">
+                    <button class="btn-excel" onclick="exportToExcel()">📥 엑셀 저장</button>
+                    <span class="summary-badge">총 매출: <b id="brand-total-amount">0원</b></span>
+                    <span class="summary-badge">총 수량: <b id="brand-total-qty">0개</b></span>
+                </div>
+            </div>
+
+            <!-- 컨트롤 바: TOP N & 정렬 토글 -->
+            <div class="control-bar">
+                <div class="control-group">
+                    <label>표시 순위:</label>
+                    <span>TOP</span>
+                    <input type="number" id="top-n-input" class="top-n-input" value="100" min="1" max="1000" oninput="onFilterOptionChange()">
+                    <span>위까지 보기</span>
+                </div>
+
+                <div class="control-group">
+                    <label>정렬 기준:</label>
+                    <div class="sort-btn-group">
+                        <button type="button" class="sort-btn active" id="sort-amount-btn" onclick="setSortMode('amount')">💰 매출금액 높은순</button>
+                        <button type="button" class="sort-btn" id="sort-qty-btn" onclick="setSortMode('qty')">📦 판매수량 많은순</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="table-container">
+                <table>
+                    <colgroup>
+                        <col style="width: 55px;">
+                        <col style="width: 130px;">
+                        <col style="width: 100px;">
+                        <col style="width: 220px;">
+                        <col style="width: 90px;">
+                        <col style="width: 100px;">
+                        <col style="width: 120px;">
+                        <col style="width: 130px;">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th class="text-center">순위</th>
+                            <th>브랜드</th>
+                            <th>품목코드</th>
+                            <th>품목명</th>
+                            <th class="text-right">판매수량</th>
+                            <th class="text-right">평균단가</th>
+                            <th class="text-right">매출금액</th>
+                            <th class="text-right">매출 비중(점유율)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ranking-tbody">
+                        <tr><td colspan="8" style="text-align:center; padding:40px; color:#94a3b8;">상단 [조회] 버튼을 눌러 데이터를 불러오세요.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co"; 
+        const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN";
+
+        let rawSummaryRows = [];
+        let brandSummaryMap = {};
+        let currentSelectedBrand = 'ALL';
+        let currentSortMode = 'amount'; // 'amount' 또는 'qty'
+        let currentRenderedList = [];
+
+        function cleanNumber(val) { return parseFloat(String(val).replace(/[^0-9.-]/g, '')) || 0; }
+        function cleanCode(val) { return (!val && val !== 0) ? '-' : String(val).replace(/\.0$/, '').trim(); }
+        function safeSearchKeyword(term) { return term ? term.replace(/"/g, '').replace(/[()]/g, '*').trim() : ''; }
+
+        /* 💡 데이터 원천 조회 (가벼운 요약 뷰 사용으로 0.5초 고속 완료) */
+        async function fetchBrandRankingData(params) {
+            const { startDate, endDate, brandName, itemName } = params;
+            if (!startDate || !endDate) return;
+
+            document.getElementById('ranking-tbody').innerHTML = `<tr><td colspan="8" style="text-align:center; padding:40px; color:#2563eb;">⚡ 브랜드별 매출 및 수량 데이터를 고속 로딩 중입니다...</td></tr>`;
+
+            let url = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=brand_name,item_code,item_name,total_qty,total_amount`;
+
+            if (brandName) {
+                const bList = brandName.split(',').map(b => b.trim()).filter(Boolean);
+                if (bList.length === 1) url += `&brand_name=ilike.*${encodeURIComponent(safeSearchKeyword(bList[0]))}*`;
+                else if (bList.length > 1) url += `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(safeSearchKeyword(b))}*`).join(',')})`;
+            }
+            if (itemName) {
+                const iList = itemName.split(',').map(i => i.trim()).filter(Boolean);
+                if (iList.length === 1) {
+                    const safe = encodeURIComponent(safeSearchKeyword(iList[0]));
+                    url += `&or=(item_code.ilike.*${safe}*,item_name.ilike.*${safe}*)`;
+                } else if (iList.length > 1) {
+                    const orConds = iList.map(i => {
+                        const safe = encodeURIComponent(safeSearchKeyword(i));
+                        return `item_code.ilike.*${safe}*,item_name.ilike.*${safe}*`;
+                    }).join(',');
+                    url += `&or=(${orConds})`;
+                }
+            }
+
+            rawSummaryRows = [];
+            let offset = 0, limit = 1000, hasMore = true;
+            while (hasMore) {
+                try {
+                    const res = await fetch(`${url}&limit=${limit}&offset=${offset}`, {
+                        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                    });
+                    if (res.ok) {
+                        const chunk = await res.json();
+                        if (!chunk || chunk.length === 0) break;
+                        rawSummaryRows = rawSummaryRows.concat(chunk);
+                        if (chunk.length < limit) hasMore = false; else offset += limit;
+                    } else hasMore = false;
+                } catch (e) { hasMore = false; }
+            }
+
+            // 브랜드별 총 매출 및 수량 맵 빌드
+            buildBrandSummaryMap();
+            renderBrandList();
+
+            // 부모창에서 특정 브랜드를 검색해 들어왔다면 해당 브랜드 자동 선택
+            if (brandName && brandSummaryMap[brandName]) {
+                currentSelectedBrand = brandName;
+            } else {
+                currentSelectedBrand = 'ALL';
+            }
+            onBrandSelect(currentSelectedBrand);
+        }
+
+        function buildBrandSummaryMap() {
+            brandSummaryMap = {};
+            let totalAmt = 0, totalQty = 0;
+
+            rawSummaryRows.forEach(r => {
+                const b = r.brand_name || '기타';
+                const q = cleanNumber(r.total_qty);
+                const a = cleanNumber(r.total_amount);
+                
+                totalAmt += a;
+                totalQty += q;
+
+                if (!brandSummaryMap[b]) {
+                    brandSummaryMap[b] = { totalAmount: 0, totalQty: 0, rows: [] };
+                }
+                brandSummaryMap[b].totalAmount += a;
+                brandSummaryMap[b].totalQty += q;
+                brandSummaryMap[b].rows.push(r);
+            });
+
+            // 전체 합산 데이터 저장
+            brandSummaryMap['ALL'] = {
+                totalAmount: totalAmt,
+                totalQty: totalQty,
+                rows: rawSummaryRows
+            };
+        }
+
+        function renderBrandList() {
+            const listEl = document.getElementById('brand-list');
+            const sortedBrands = Object.keys(brandSummaryMap).filter(b => b !== 'ALL').sort((a,b) => brandSummaryMap[b].totalAmount - brandSummaryMap[a].totalAmount);
+            
+            document.getElementById('total-brand-count').innerText = `${sortedBrands.length}개`;
+            const allSales = brandSummaryMap['ALL'] ? brandSummaryMap['ALL'].totalAmount.toLocaleString() + '원' : '0원';
+
+            let html = [`
+                <li class="brand-item total-item ${currentSelectedBrand === 'ALL' ? 'active' : ''}" onclick="onBrandSelect('ALL', this)">
+                    <span>🏢 전체 브랜드 합산</span>
+                    <span style="color:#2563eb; font-weight:800;">${allSales}</span>
+                </li>
+            `];
+
+            sortedBrands.forEach(b => {
+                const bAmt = brandSummaryMap[b].totalAmount.toLocaleString() + '원';
+                html.push(`
+                    <li class="brand-item ${currentSelectedBrand === b ? 'active' : ''}" onclick="onBrandSelect('${b}', this)">
+                        <span>${b}</span>
+                        <span style="color:#64748b; font-size:12px;">${bAmt}</span>
+                    </li>
+                `);
+            });
+            listEl.innerHTML = html.join('');
+        }
+
+        function filterBrandList() {
+            const q = document.getElementById('brand-search-input').value.toLowerCase().trim();
+            document.querySelectorAll('#brand-list .brand-item').forEach(item => {
+                item.style.display = item.innerText.toLowerCase().includes(q) ? 'flex' : 'none';
+            });
+        }
+
+        function onBrandSelect(bName, element) {
+            currentSelectedBrand = bName;
+            document.querySelectorAll('.brand-item').forEach(el => el.classList.remove('active'));
+            if (element) element.classList.add('active');
+
+            if (bName === 'ALL') {
+                document.getElementById('selected-brand-title').innerText = `🏆 전체 브랜드 합산 순위`;
+            } else {
+                document.getElementById('selected-brand-title').innerText = `🏆 [${bName}] 품목별 매출/수량 순위`;
+            }
+
+            renderRankingTable();
+        }
+
+        function setSortMode(mode) {
+            currentSortMode = mode;
+            document.getElementById('sort-amount-btn').classList.toggle('active', mode === 'amount');
+            document.getElementById('sort-qty-btn').classList.toggle('active', mode === 'qty');
+            renderRankingTable();
+        }
+
+        function onFilterOptionChange() {
+            renderRankingTable();
+        }
+
+        /* 💡 브랜드별 품목 집계, 랭킹 및 점유율 계산 */
+        function renderRankingTable() {
+            const tbody = document.getElementById('ranking-tbody');
+            const targetData = brandSummaryMap[currentSelectedBrand];
+
+            if (!targetData || !targetData.rows || targetData.rows.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:40px; color:#94a3b8;">데이터가 없습니다.</td></tr>`;
+                document.getElementById('brand-total-amount').innerText = "0원";
+                document.getElementById('brand-total-qty').innerText = "0개";
+                return;
+            }
+
+            const brandTotalAmt = targetData.totalAmount;
+            const brandTotalQty = targetData.totalQty;
+            document.getElementById('brand-total-amount').innerText = `${brandTotalAmt.toLocaleString()}원`;
+            document.getElementById('brand-total-qty').innerText = `${brandTotalQty.toLocaleString()}개`;
+
+            // 품목별 그룹핑 (동일 품목코드 합산)
+            const itemMap = {};
+            targetData.rows.forEach(r => {
+                const code = cleanCode(r.item_code);
+                const name = r.item_name || '-';
+                const bName = r.brand_name || '-';
+                const q = cleanNumber(r.total_qty);
+                const a = cleanNumber(r.total_amount);
+
+                const hash = `${code}__${name}__${bName}`;
+                if (!itemMap[hash]) {
+                    itemMap[hash] = { itemCode: code, itemName: name, brandName: bName, qty: 0, amount: 0 };
+                }
+                itemMap[hash].qty += q;
+                itemMap[hash].amount += a;
+            });
+
+            // 정렬 기준에 따른 정렬 (매출순 vs 수량순)
+            let sortedItems = Object.values(itemMap);
+            if (currentSortMode === 'amount') {
+                sortedItems.sort((a, b) => b.amount - a.amount);
+            } else {
+                sortedItems.sort((a, b) => b.qty - a.qty);
+            }
+
+            // TOP N 개수 자르기
+            let topN = parseInt(document.getElementById('top-n-input').value, 10);
+            if (isNaN(topN) || topN < 1) topN = 100;
+            currentRenderedList = sortedItems.slice(0, topN);
+
+            if (currentRenderedList.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:40px; color:#94a3b8;">집계된 품목이 없습니다.</td></tr>`;
+                return;
+            }
+
+            // 테이블 렌더링
+            tbody.innerHTML = currentRenderedList.map((item, idx) => {
+                const rank = idx + 1;
+                const rankClass = rank === 1 ? 'rank-1' : (rank === 2 ? 'rank-2' : (rank === 3 ? 'rank-3' : ''));
+                const avgPrice = item.qty > 0 ? Math.round(item.amount / item.qty) : 0;
+                
+                // 매출 비중 (%) 계산
+                const sharePct = brandTotalAmt > 0 ? ((item.amount / brandTotalAmt) * 100).toFixed(1) : '0.0';
+
+                return `
+                    <tr>
+                        <td class="text-center"><span class="rank-badge ${rankClass}">${rank}</span></td>
+                        <td><b>${item.brandName}</b></td>
+                        <td><span style="font-family:monospace; color:#64748b;">${item.itemCode}</span></td>
+                        <td><b>${item.itemName}</b></td>
+                        <td class="text-right" style="color:#2563eb; font-weight:700;">${item.qty.toLocaleString()}개</td>
+                        <td class="text-right">${avgPrice > 0 ? avgPrice.toLocaleString() + '원' : '-'}</td>
+                        <td class="text-right" style="font-weight:800;">${item.amount.toLocaleString()}원</td>
+                        <td class="text-right">
+                            <div class="share-cell">
+                                <div class="share-bar-bg">
+                                    <div class="share-bar-fill" style="width: ${Math.min(100, Math.max(2, sharePct))}%;"></div>
+                                </div>
+                                <span class="share-text">${sharePct}%</span>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function exportToExcel() {
+            if (!currentRenderedList || currentRenderedList.length === 0) return alert("저장할 데이터가 없습니다.");
+            const targetBrandName = currentSelectedBrand === 'ALL' ? '전체브랜드합산' : currentSelectedBrand;
+            const brandTotalAmt = brandSummaryMap[currentSelectedBrand]?.totalAmount || 0;
+
+            const exportData = currentRenderedList.map((item, idx) => ({
+                '순위': idx + 1,
+                '브랜드': item.brandName,
+                '품목코드': item.itemCode,
+                '품목명': item.itemName,
+                '판매수량': item.qty,
+                '평균단가': item.qty > 0 ? Math.round(item.amount / item.qty) : 0,
+                '매출금액': item.amount,
+                '매출비중(%)': brandTotalAmt > 0 ? Number(((item.amount / brandTotalAmt) * 100).toFixed(2)) : 0
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "브랜드랭킹");
+            XLSX.writeFile(wb, `OMS_${targetBrandName}_매출순위_TOP${currentRenderedList.length}.xlsx`);
+        }
+
+        // 부모창 검색 명령 수신
+        window.addEventListener('message', (e) => {
+            if (e.data && (e.data.action === 'SEARCH' || e.data.action === 'INIT_SEARCH')) {
+                fetchBrandRankingData(e.data.params);
+            }
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            window.parent.postMessage({ action: 'FRAME_READY', tab: 'brand_detail' }, '*');
+        });
+    </script>
+</body>
+</html>
