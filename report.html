@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>종합 분석 레포트 프레임</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Pretendard', 'Malgun Gothic', sans-serif; background: transparent; color: #1e293b; padding: 8px 0 25px; }
+
+        .report-sheet { background: white; padding: 28px 32px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.04); max-width: 1400px; margin: 0 auto; }
+        
+        /* 📑 레포트 상단 헤더 & 액션바 */
+        .report-header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #0f172a; padding-bottom: 14px; margin-bottom: 20px; }
+        .report-title-box h2 { font-size: 22px; font-weight: 900; color: #0f172a; letter-spacing: -0.5px; }
+        .report-meta { font-size: 12.5px; color: #64748b; margin-top: 5px; }
+        .report-actions { display: flex; gap: 8px; }
+        .btn-action { border: none; padding: 7px 14px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; transition: opacity 0.2s; }
+        .btn-action:hover { opacity: 0.85; }
+        .btn-print { background: #0f172a; color: white; }
+        .btn-excel { background: #16a34a; color: white; }
+
+        /* 💡 브리핑 요약 박스 */
+        .executive-summary-card { background: #f0fdf4; border-left: 5px solid #16a34a; padding: 14px 18px; border-radius: 8px; margin-bottom: 22px; font-size: 13.5px; line-height: 1.6; color: #166534; }
+        .executive-summary-card b { color: #0f172a; }
+
+        /* 📊 KPI 4분할 그리드 */
+        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+        .kpi-card { background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; }
+        .kpi-title { font-size: 12.5px; color: #64748b; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+        .kpi-val { font-size: 22px; font-weight: 900; color: #0f172a; margin-top: 6px; }
+        .kpi-sub { font-size: 11.5px; margin-top: 4px; font-weight: 700; }
+        .diff-up { color: #dc2626; }
+        .diff-down { color: #2563eb; }
+
+        /* 2단 분할 레이아웃 */
+        .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+        .section-box { border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; background: white; }
+        .section-box-title { font-size: 15px; font-weight: 800; color: #0f172a; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; }
+
+        /* 테이블 공통 스타일 */
+        table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+        th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #f1f5f9; }
+        th { background: #f8fafc; color: #475569; font-weight: 700; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .code-font { font-family: monospace; font-size: 11px; color: #64748b; }
+        .tag-rank { background: #e2e8f0; color: #334155; font-size: 10.5px; font-weight: 800; padding: 2px 6px; border-radius: 4px; }
+        .tag-rank-1 { background: #fef3c7; color: #b45309; }
+
+        /* 🖨️ A4 인쇄 / PDF 최적화 미디어 쿼리 */
+        @media print {
+            body { background: white; padding: 0; }
+            .report-sheet { box-shadow: none; padding: 0; max-width: 100%; }
+            .no-print { display: none !important; }
+            .section-box { break-inside: avoid; border: 1px solid #cbd5e1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="report-sheet">
+        
+        <!-- 📑 레포트 헤더 -->
+        <div class="report-header">
+            <div class="report-title-box">
+                <h2>📑 더본 OMS 정기 주문 분석 및 공급망 실적 보고서</h2>
+                <div class="report-meta" id="report-meta-text">조회 기간: 로딩 중... | 작성 기준: 본사 구매/물류 SCM</div>
+            </div>
+            <div class="report-actions no-print">
+                <button class="btn-action btn-excel" onclick="exportReportToExcel()">📥 레포트 엑셀 다운로드</button>
+                <button class="btn-action btn-print" onclick="window.print()">🖨️ A4 인쇄 / PDF 저장</button>
+            </div>
+        </div>
+
+        <!-- 💡 자동 브리핑 요약 -->
+        <div class="executive-summary-card" id="briefing-box">
+            ⚡ 조회 조건에 맞는 데이터를 정밀 분석하고 있습니다...
+        </div>
+
+        <!-- 📊 핵심 KPI 4개 -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-title">총 발주 금액</div>
+                <div class="kpi-val" id="kpi-total-amount">0 원</div>
+                <div class="kpi-sub" id="kpi-diff-amount">직전 동기간 대비 -</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">총 발주 수량</div>
+                <div class="kpi-val" id="kpi-total-qty">0 건</div>
+                <div class="kpi-sub" id="kpi-diff-qty">직전 동기간 대비 -</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">활동 주문 점포수</div>
+                <div class="kpi-val" id="kpi-total-stores">0 개점</div>
+                <div class="kpi-sub" id="kpi-diff-stores">직전 동기간 대비 -</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">운영 취급 품목수</div>
+                <div class="kpi-val" id="kpi-total-items">0 종</div>
+                <div class="kpi-sub" id="kpi-sub-items" style="color:#64748b">실제 발주 발생 기준</div>
+            </div>
+        </div>
+
+        <!-- 2열 그리드: 브랜드 점유율 + 요일별 물류 부하율 -->
+        <div class="grid-2col">
+            <!-- 섹션 1: 브랜드 매출 점유율 -->
+            <div class="section-box">
+                <div class="section-box-title">
+                    <span>🏢 브랜드별 매출 점유율 Top 5</span>
+                    <span style="font-size:11px;color:#64748b;font-weight:normal">금액 기준</span>
+                </div>
+                <div style="height: 220px; position: relative;">
+                    <canvas id="brandDonutChart"></canvas>
+                </div>
+            </div>
+
+            <!-- 섹션 2: 요일별 물류센터 입출고 부하율 -->
+            <div class="section-box">
+                <div class="section-box-title">
+                    <span>🚚 요일별 물류 출고 집중도 (부하율)</span>
+                    <span style="font-size:11px;color:#64748b;font-weight:normal">수량 기준 (월~토)</span>
+                </div>
+                <div style="height: 220px; position: relative;">
+                    <canvas id="weekdayBarChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- 섹션 3: 핵심 식자재 ABC 파레토 분석 Top 10 -->
+        <div class="section-box" style="margin-bottom: 24px;">
+            <div class="section-box-title">
+                <span>📦 핵심 식자재 ABC 매출 분석 (Top 10)</span>
+                <span style="font-size:11.5px;color:#2563eb;font-weight:bold" id="pareto-share-label">상위 10개 품목 비중: 0%</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th class="text-center" style="width:50px">순위</th>
+                        <th style="width:120px">품목코드</th>
+                        <th>품목명</th>
+                        <th class="text-right" style="width:110px">주문수량</th>
+                        <th class="text-right" style="width:140px">주문금액</th>
+                        <th class="text-right" style="width:90px">매출 비중</th>
+                    </tr>
+                </thead>
+                <tbody id="top-items-tbody">
+                    <tr><td colspan="6" class="text-center" style="padding:20px;color:#94a3b8">데이터 집계 대기 중...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co"; 
+        const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN";
+
+        let brandDonutChart = null;
+        let weekdayBarChart = null;
+        let currentReportData = { current: [], previous: [], params: {} };
+
+        function cleanNumber(val) { return parseFloat(String(val).replace(/[^0-9.-]/g, '')) || 0; }
+        function cleanCode(val) { if (!val && val !== 0) return '-'; let s = String(val).trim(); if (s.endsWith('.0')) s = s.slice(0, -2); return s || '-'; }
+        function safeSearchKeyword(term) { return term ? term.replace(/"/g, '').replace(/[()]/g, '*').trim() : ''; }
+        function parseDate(s) { return new Date(`${s}T00:00:00`); }
+        function formatDate(d) { const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; }
+        function addDays(d, n) { const res = new Date(d); res.setDate(res.getDate() + n); return res; }
+
+        async function fetchSupabase(url) {
+            const res = await fetch(url, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+            return res.ok ? await res.json() : [];
+        }
+
+        async function generateReport(params) {
+            const { startDate, endDate, brandName, itemName } = params;
+            if (!startDate || !endDate) return;
+
+            // 1. 직전 동기간(Previous Period) 계산 (MoM 비교 분석용)
+            const dStart = parseDate(startDate), dEnd = parseDate(endDate);
+            const durationDays = Math.round((dEnd - dStart) / 86400000) + 1;
+            const prevEnd = formatDate(addDays(dStart, -1));
+            const prevStart = formatDate(addDays(dStart, -durationDays));
+
+            document.getElementById('report-meta-text').innerText = `조회 분석 기간: ${startDate.replace(/-/g,'/')} ~ ${endDate.replace(/-/g,'/')} (${durationDays}일간) | 직전 비교 기간: ${prevStart.replace(/-/g,'/')} ~ ${prevEnd.replace(/-/g,'/')}`;
+
+            // 2. 쿼리 URL 세팅
+            let baseDaily = `${SUPABASE_URL}/rest/v1/daily_order_summary?select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
+            let filterPart = '';
+            if (brandName) {
+                const bList = brandName.split(',').map(b => b.trim()).filter(Boolean);
+                if (bList.length === 1) filterPart += `&brand_name=ilike.*${encodeURIComponent(safeSearchKeyword(bList[0]))}*`;
+                else if (bList.length > 1) filterPart += `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(safeSearchKeyword(b))}*`).join(',')})`;
+            }
+            if (itemName) {
+                const iList = itemName.split(',').map(i => i.trim()).filter(Boolean);
+                if (iList.length === 1) { 
+                    const safe = encodeURIComponent(safeSearchKeyword(iList[0]));
+                    filterPart += `&or=(item_code.ilike.*${safe}*,item_name.ilike.*${safe}*)`; 
+                } else if (iList.length > 1) { 
+                    const orConds = iList.map(i => `item_code.ilike.*${encodeURIComponent(safeSearchKeyword(i))}*,item_name.ilike.*${encodeURIComponent(safeSearchKeyword(i))}*`).join(',');
+                    filterPart += `&or=(${orConds})`; 
+                }
+            }
+
+            const currDailyUrl = `${baseDaily}&delivery_date=gte.${startDate}&delivery_date=lte.${endDate}${filterPart}`;
+            const prevDailyUrl = `${baseDaily}&delivery_date=gte.${prevStart}&delivery_date=lte.${prevEnd}${filterPart}`;
+            
+            // 점포 요약 뷰 쿼리
+            const currStoreUrl = `${SUPABASE_URL}/rest/v1/store_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_name`;
+            const prevStoreUrl = `${SUPABASE_URL}/rest/v1/store_order_summary?delivery_date=gte.${prevStart}&delivery_date=lte.${prevEnd}&select=store_name`;
+
+            try {
+                const [currRows, prevRows, currStores, prevStores] = await Promise.all([
+                    fetchSupabase(currDailyUrl),
+                    fetchSupabase(prevDailyUrl),
+                    fetchSupabase(currStoreUrl),
+                    fetchSupabase(prevStoreUrl)
+                ]);
+
+                currentReportData = { current: currRows, previous: prevRows, params };
+                renderReport(currRows, prevRows, currStores, prevStores, durationDays);
+
+            } catch (err) {
+                console.error("레포트 생성 실패:", err);
+                document.getElementById('briefing-box').innerText = "데이터 집계 중 오류가 발생했습니다.";
+            }
+        }
+
+        function renderReport(curr, prev, currStores, prevStores, durationDays) {
+            // A. 당기 합산
+            let curAmt = 0, curQty = 0;
+            const curItems = new Set();
+            const brandMap = {}, itemMap = {}, weekdayMap = { 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 };
+
+            curr.forEach(r => {
+                const q = cleanNumber(r.total_qty), a = cleanNumber(r.total_amount);
+                curQty += q; curAmt += a;
+                if (r.item_name) curItems.add(r.item_name);
+
+                // 브랜드별 집계
+                const b = r.brand_name || '기타';
+                brandMap[b] = (brandMap[b] || 0) + a;
+
+                // 품목별 집계
+                const code = cleanCode(r.item_code);
+                const name = r.item_name || '미등록품목';
+                const iKey = `${code}__${name}`;
+                if (!itemMap[iKey]) itemMap[iKey] = { code, name, qty: 0, amount: 0 };
+                itemMap[iKey].qty += q; itemMap[iKey].amount += a;
+
+                // 요일별 집계 (월=1 ~ 토=6)
+                if (r.delivery_date) {
+                    const wd = parseDate(r.delivery_date).getDay();
+                    if (wd >= 1 && wd <= 6) weekdayMap[wd] += q;
+                }
+            });
+
+            // B. 전기 합산 (비교 분석)
+            let prevAmt = 0, prevQty = 0;
+            prev.forEach(r => {
+                prevQty += cleanNumber(r.total_qty);
+                prevAmt += cleanNumber(r.total_amount);
+            });
+
+            const curStoreCount = new Set(currStores.map(s => s.store_name).filter(Boolean)).size;
+            const prevStoreCount = new Set(prevStores.map(s => s.store_name).filter(Boolean)).size;
+
+            // 증감률 헬퍼 함수
+            const calcRate = (c, p) => p > 0 ? ((c - p) / p * 100) : 0;
+            const diffAmt = calcRate(curAmt, prevAmt);
+            const diffQty = calcRate(curQty, prevQty);
+            const diffStores = calcRate(curStoreCount, prevStoreCount);
+
+            // C. KPI 렌더링
+            document.getElementById('kpi-total-amount').innerText = `${curAmt.toLocaleString()} 원`;
+            document.getElementById('kpi-diff-amount').innerHTML = formatDiffBadge(diffAmt);
+            
+            document.getElementById('kpi-total-qty').innerText = `${curQty.toLocaleString()} 건`;
+            document.getElementById('kpi-diff-qty').innerHTML = formatDiffBadge(diffQty);
+
+            document.getElementById('kpi-total-stores').innerText = `${curStoreCount.toLocaleString()} 개점`;
+            document.getElementById('kpi-diff-stores').innerHTML = formatDiffBadge(diffStores);
+
+            document.getElementById('kpi-total-items').innerText = `${curItems.size.toLocaleString()} 종`;
+
+            // D. 브리핑 텍스트 자동 생성
+            const dailyAvgAmt = Math.round(curAmt / Math.max(1, durationDays));
+            const topBrand = Object.entries(brandMap).sort((a,b) => b[1] - a[1])[0] || ['전체', 0];
+            const topBrandShare = curAmt > 0 ? ((topBrand[1] / curAmt) * 100).toFixed(1) : 0;
+
+            document.getElementById('briefing-box').innerHTML = `
+                📌 <b>핵심 성과 브리핑:</b> 본 분석 기간 총 발주액은 <b>${curAmt.toLocaleString()}원</b>으로 직전 동기간 대비 <b>${Math.abs(diffAmt).toFixed(1)}% ${diffAmt >= 0 ? '증가 ▲' : '감소 ▼'}</b>했습니다. 
+                기간 내 일평균 <b>${dailyAvgAmt.toLocaleString()}원</b> 규모의 발주가 안정적으로 발생했으며, 
+                전체 브랜드 중 <b>${topBrand[0]}</b>이(가) 총 발주액의 <b>${topBrandShare}%</b>를 견인하며 최대 점유율을 기록했습니다.
+            `;
+
+            // E. 차트 렌더링 (도넛 & 막대)
+            renderBrandChart(brandMap, curAmt);
+            renderWeekdayChart(weekdayMap);
+
+            // F. 파레토 Top 10 테이블 렌더링
+            renderParetoTable(itemMap, curAmt);
+        }
+
+        function formatDiffBadge(val) {
+            if (val > 0) return `<span class="diff-up">직전 동기간 대비 ▲ +${val.toFixed(1)}%</span>`;
+            if (val < 0) return `<span class="diff-down">직전 동기간 대비 ▼ ${val.toFixed(1)}%</span>`;
+            return `<span style="color:#64748b">직전 동기간 대비 0.0% 변동없음</span>`;
+        }
+
+        function renderBrandChart(brandMap, totalAmt) {
+            const sorted = Object.entries(brandMap).sort((a,b) => b[1] - a[1]);
+            const top5 = sorted.slice(0, 5);
+            const othersAmt = sorted.slice(5).reduce((s, x) => s + x[1], 0);
+
+            const labels = top5.map(x => x[0]);
+            const data = top5.map(x => x[1]);
+            if (othersAmt > 0) {
+                labels.push('기타 브랜드');
+                data.push(othersAmt);
+            }
+
+            const ctx = document.getElementById('brandDonutChart').getContext('2d');
+            if (brandDonutChart) brandDonutChart.destroy();
+            brandDonutChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [{
+                        data,
+                        backgroundColor: ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#94a3b8'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11, weight: 'bold' } } },
+                        tooltip: {
+                            callbacks: {
+                                label: (c) => {
+                                    const val = c.parsed || 0;
+                                    const pct = totalAmt > 0 ? ((val / totalAmt) * 100).toFixed(1) : 0;
+                                    return ` ${c.label}: ${val.toLocaleString()}원 (${pct}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderWeekdayChart(weekdayMap) {
+            const labels = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+            const data = [1, 2, 3, 4, 5, 6].map(k => weekdayMap[k]);
+            const sumQty = data.reduce((a, b) => a + b, 0);
+
+            const ctx = document.getElementById('weekdayBarChart').getContext('2d');
+            if (weekdayBarChart) weekdayBarChart.destroy();
+            weekdayBarChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: '출고 수량',
+                        data,
+                        backgroundColor: 'rgba(37, 99, 235, 0.75)',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (c) => {
+                                    const val = c.parsed.y || 0;
+                                    const pct = sumQty > 0 ? ((val / sumQty) * 100).toFixed(1) : 0;
+                                    return ` 출고수량: ${val.toLocaleString()}건 (${pct}%)`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { font: { size: 10 } } },
+                        x: { ticks: { font: { size: 11, weight: 'bold' } } }
+                    }
+                }
+            });
+        }
+
+        function renderParetoTable(itemMap, totalAmt) {
+            const sorted = Object.values(itemMap).sort((a,b) => b.amount - a.amount).slice(0, 10);
+            const top10Sum = sorted.reduce((s, x) => s + x.amount, 0);
+            const top10Share = totalAmt > 0 ? ((top10Sum / totalAmt) * 100).toFixed(1) : 0;
+            document.getElementById('pareto-share-label').innerText = `상위 10개 품목 매출 비중: ${top10Share}%`;
+
+            const tbody = document.getElementById('top-items-tbody');
+            if (sorted.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="padding:20px;color:#94a3b8">발주 내역이 없습니다.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = sorted.map((item, idx) => {
+                const share = totalAmt > 0 ? ((item.amount / totalAmt) * 100).toFixed(1) : 0;
+                const rankClass = idx === 0 ? 'tag-rank tag-rank-1' : 'tag-rank';
+                return `
+                    <tr>
+                        <td class="text-center"><span class="${rankClass}">${idx + 1}</span></td>
+                        <td class="code-font">${item.code}</td>
+                        <td><b>${item.name}</b></td>
+                        <td class="text-right">${item.qty.toLocaleString()} 건</td>
+                        <td class="text-right">${item.amount.toLocaleString()} 원</td>
+                        <td class="text-right" style="color:#2563eb;font-weight:bold">${share}%</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function exportReportToExcel() {
+            if (!currentReportData.current.length) return alert('내보낼 레포트 데이터가 없습니다.');
+            const data = currentReportData.current.map(r => ({
+                '배송일자': r.delivery_date,
+                '브랜드': r.brand_name || '기타',
+                '품목코드': cleanCode(r.item_code),
+                '품목명': r.item_name,
+                '발주수량': cleanNumber(r.total_qty),
+                '발주금액': cleanNumber(r.total_amount)
+            }));
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '종합실적데이터');
+            XLSX.writeFile(wb, `더본OMS_종합실적레포트_${currentReportData.params.startDate}_${currentReportData.params.endDate}.xlsx`);
+        }
+
+        window.addEventListener('message', (e) => {
+            if (e.data && e.data.action === 'SEARCH') {
+                generateReport(e.data.params);
+            }
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            window.parent.postMessage({ action: 'FRAME_READY', tab: 'report' }, '*');
+        });
+    </script>
+</body>
+</html>
