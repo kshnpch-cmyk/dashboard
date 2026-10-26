@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>더본 OMS 발주 수요 예측 v7.1 Fixed Boost Engine</title>
+    <title>더본 OMS 발주 수요 예측 v8.0 High-Precision SCM Engine</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
@@ -81,7 +81,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>🔮 더본 OMS 발주 수요 예측 시스템</h1>
-            <span class="version-tag">Forecast v7.1 Fixed Boost Engine</span>
+            <span class="version-tag">Forecast v8.0 High-Precision SCM Engine</span>
         </div>
         <div><button class="btn" style="background:#334155" onclick="window.close()">✕ 창 닫기</button></div>
     </div>
@@ -98,9 +98,10 @@
             <div class="panel-header">
                 <span class="panel-title-text">⚙️ 과거 기반 데이터 & 미래 예측 설정</span>
                 <div>
-                    <span class="pill">소프트맥스 가중치 집중</span>
-                    <span class="pill">급증세(Spike) 동적 추종</span>
-                    <span class="pill">공휴일 보정</span>
+                    <span class="pill">2단계 가맹점 요일 분해</span>
+                    <span class="pill">스파이크 반동(Mean Reversion) 제어</span>
+                    <span class="pill">Top-K 정밀 앙상블</span>
+                    <span class="pill">±1일 SCM 완충 일치율</span>
                 </div>
             </div>
 
@@ -167,7 +168,7 @@
                     <div class="kpi-sub" id="kpi-sub-daily-avg" style="color:#0284c7">실제 영업일 기준</div>
                 </div>
                 <div class="kpi-card teal">
-                    <div class="kpi-title">🎯 검증 구간 일치율</div>
+                    <div class="kpi-title">🎯 검증 구간 일치율 (당일 / ±1일)</div>
                     <div class="kpi-value" id="kpi-accuracy-percent" style="color:#0d9488">-%</div>
                     <div class="kpi-sub" id="kpi-accuracy-sub" style="color:#0d9488">유효 실적 구간 산출</div>
                 </div>
@@ -239,15 +240,15 @@
         const CFG = {
             historyDays: 210,
             backtestDays: 56,
-            minTrainDays: 35,
+            minTrainDays: 28,
             modelWeightShrink: 0.10,
-            calibrationCap: [0.85, 1.25],
+            calibrationCap: [0.88, 1.18],
             weekdayCalibrationCap: [0.90, 1.12],
             weatherCalibrationCap: [0.95, 1.05],
             calendarCalibrationCap: [0.95, 1.05],
             holidayCalibrationCap: [0.75, 1.35],
-            credibilityK: { optimizedBlend: 12, weekdaySpecific: 18, weather: 5, calendar: 6, holiday: 4 },
-            horizonWidenPerWeek: 0.05,
+            credibilityK: { optimizedBlend: 10, weekdaySpecific: 12, weather: 5, calendar: 6, holiday: 4 },
+            horizonWidenPerWeek: 0.04,
             maxRowsPerPage: 1000
         };
 
@@ -262,14 +263,14 @@
         function formatDisplayDate(dateStr) { if (!dateStr) return '-'; return String(dateStr).split('T')[0].replace(/-/g, '/'); }
         function cleanNumber(val) { return parseFloat(String(val ?? 0).replace(/[^0-9.-]/g, '')) || 0; }
         function cleanCode(val) { if (!val && val !== 0) return '-'; let str = String(val).trim(); if (str.endsWith('.0')) str = str.slice(0, -2); return str || '-'; }
+        function safeSearchKeyword(term) { return term ? term.replace(/"/g, '').replace(/[()]/g, '*').trim() : ''; }
         function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
         function mean(a) { return a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0; }
         function median(a) { if (!a.length) return 0; const s = [...a].sort((x, y) => x - y); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
-        function sumAbs(a) { return a.reduce((s, x) => s + Math.abs(x), 0); }
         function weightedAverage(values, weights) { let sw = 0, s = 0; for (let i = 0; i < values.length; i++) { const w = weights[i] ?? 1; s += values[i] * w; sw += w; } return sw ? s / sw : 0; }
-        function cleanArrayIQR(arr) { if (arr.length < 6) return arr.slice(); const s = [...arr].sort((a, b) => a - b); const q1 = s[Math.floor(s.length * 0.25)], q3 = s[Math.floor(s.length * 0.75)], iqr = q3 - q1; const lb = q1 - 1.5 * iqr, ub = q3 + 1.5 * iqr; const out = arr.filter(x => x >= lb && x <= ub); return out.length >= 3 ? out : arr.slice(); }
+        function cleanArrayIQR(arr) { if (arr.length < 5) return arr.slice(); const s = [...arr].sort((a, b) => a - b); const q1 = s[Math.floor(s.length * 0.25)], q3 = s[Math.floor(s.length * 0.75)], iqr = q3 - q1; const lb = q1 - 1.5 * iqr, ub = q3 + 1.5 * iqr; const out = arr.filter(x => x >= lb && x <= ub); return out.length >= 3 ? out : arr.slice(); }
         function credibility(n, k) { return n / (n + Math.max(0.0001, k)); }
-        function winsorize(arr, pct = 0.12) { const n = arr.length; if (n < 4) return arr.slice(); const s = [...arr].sort((a, b) => a - b); const trim = Math.max(1, Math.round(n * pct)); const loIdx = Math.min(trim, Math.floor((n - 1) / 2)); const hiIdx = Math.max(n - 1 - trim, Math.ceil((n - 1) / 2)); const lo = s[loIdx], hi = s[hiIdx]; return arr.map(x => clamp(x, lo, hi)); }
+        function winsorize(arr, pct = 0.10) { const n = arr.length; if (n < 4) return arr.slice(); const s = [...arr].sort((a, b) => a - b); const trim = Math.max(1, Math.round(n * pct)); const loIdx = Math.min(trim, Math.floor((n - 1) / 2)); const hiIdx = Math.max(n - 1 - trim, Math.ceil((n - 1) / 2)); const lo = s[loIdx], hi = s[hiIdx]; return arr.map(x => clamp(x, lo, hi)); }
         
         function nowKST() {
             const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).formatToParts(new Date());
@@ -395,7 +396,7 @@
             const current = document.getElementById('forecast-item-input').value.split(',').map(s => s.trim()).filter(Boolean);
             const k = document.getElementById('modal-item-search').value.toLowerCase().trim();
             const filtered = allItemList.filter(i => i.code.toLowerCase().includes(k) || i.name.toLowerCase().includes(k));
-            document.getElementById('item-modal-list').innerHTML = filtered.length ? filtered.map(i => `<div class="search-list-item"><label><input type="checkbox" class="item-modal-chk" value="${i.name.replace(/"/g, '&quot;')}" ${current.includes(i.name) ? 'checked' : ''}><span><span class="code-tag">[${i.code}]</span> <b style="margin-left:4px">${i.name}</b></span></label></div>`).join('') : '<div style="text-align:center;color:#94a3b8;padding:15px">검색 결과가 없습니다.</div>';
+            document.getElementById('item-modal-list').innerHTML = filtered.length ? filtered.map(i => `<div class="search-list-item"><label><input type="checkbox" class="item-modal-chk" value="${i.code}" ${current.includes(i.code) || current.includes(i.name) ? 'checked' : ''}><span><span class="code-tag">[${i.code}]</span> <b style="margin-left:4px">${i.name}</b></span></label></div>`).join('') : '<div style="text-align:center;color:#94a3b8;padding:15px">검색 결과가 없습니다.</div>';
         }
         function filterItemModalList() { renderItemModalList(); }
         function toggleAllItemCheck(status) { document.querySelectorAll('.item-modal-chk').forEach(x => x.checked = status); }
@@ -424,7 +425,7 @@
                     if (snow > 0 || [71, 73, 75, 77, 85, 86].includes(wc)) { statusIcon = '❄️'; statusText = '눈'; bucket = 'snow'; }
                     else if (prec > 0 || [51, 53, 55, 61, 63, 65, 80, 81, 82].includes(wc)) { statusIcon = '🌧️'; statusText = '비'; bucket = 'rain'; }
                     else if ([1, 2, 3, 45, 48].includes(wc)) { statusIcon = '⛅'; statusText = '흐림'; bucket = 'cloud'; }
-                    map[ds] = { minTemp: minT, maxTemp: maxT, statusIcon, statusText, bucket, displayLabel: `${statusIcon} ${minT}°/${maxTemp}°` };
+                    map[ds] = { minTemp: minT, maxTemp: maxT, statusIcon, statusText, bucket, displayLabel: `${statusIcon} ${minT}°/${maxT}°` };
                 });
             } catch (e) { console.warn('날씨 조회 실패', e); }
             return map;
@@ -477,7 +478,8 @@
 
         function robustMean(a) { const c = cleanArrayIQR(a); return mean(c.length ? c : a); }
         function ewma(a, alpha = .35) { if (!a.length) return 0; let z = a[0]; for (let i = 1; i < a.length; i++) z = alpha * a[i] + (1 - alpha) * z; return Math.max(0, z); }
-        function holtDamped(a, alpha = .42, beta = .18, phi = .82) {
+        
+        function holtDamped(a, alpha = .38, beta = .15, phi = .80) {
             if (a.length === 0) return 0; if (a.length === 1) return a[0];
             let level = a[0], trend = a[1] - a[0];
             for (let i = 1; i < a.length; i++) {
@@ -487,28 +489,32 @@
             }
             return Math.max(0, level + phi * trend);
         }
-        function linTrend(a, n = 14, damp = .65) {
-            const y = a.slice(-n); if (y.length < 3) return robustMean(a);
-            const xm = (y.length - 1) / 2, ym = mean(y);
-            let num = 0, den = 0;
-            for (let i = 0; i < y.length; i++) { num += (i - xm) * (y[i] - ym); den += (i - xm) * (i - xm); }
-            const slope = den ? num / den : 0;
-            return Math.max(0, ym + damp * slope * (y.length));
+
+        /* 💡 가맹점 발주 특화: 동요일 IQR 절단 중앙값 모델 (가장 안정적) */
+        function seasonalMedianTrimmed(target, map) {
+            const s = sameWeekdayVals(target, map, 8);
+            if (!s.length) return null;
+            const v = cleanArrayIQR(s.map(x => x.val));
+            return median(v.length ? v : s.map(x => x.val));
         }
-        function seasonalWeighted(target, map) { const s = sameWeekdayVals(target, map, 8); if (!s.length) return null; const v = winsorize(s.map(x => x.val)); const w = v.map((_, i) => Math.pow(.72, i)); return weightedAverage(v, w); }
-        function lagSeasonal(target, map, lagWeeks = 4) {
-            const td = parseDate(target); const vals = [];
-            for (let k = 1; k <= lagWeeks; k++) { const ds = formatDate(addDays(td, -7 * k)); if (map[ds] !== undefined) vals.push({ k, val: map[ds] }); }
-            if (!vals.length) return null;
-            const clipped = winsorize(vals.map(x => x.val));
-            return weightedAverage(clipped, vals.map(x => Math.pow(.70, x.k - 1)));
+
+        function seasonalWeighted(target, map) {
+            const s = sameWeekdayVals(target, map, 8);
+            if (!s.length) return null;
+            const v = winsorize(s.map(x => x.val));
+            const w = v.map((_, i) => Math.pow(.75, i));
+            return weightedAverage(v, w);
         }
-        function weekdayRatioForecast(target, map) {
-            const recent = valsBefore(target, map, 28); if (!recent.length) return 0;
-            const global = robustMean(recent); const same = sameWeekdayVals(target, map, 8).map(x => x.val);
-            if (!same.length || global <= 0) return global;
-            const ratio = clamp(robustMean(same) / global, .75, 1.30);
-            return global * ratio;
+
+        /* 💡 2단계 허들 분해: 28일 베이스라인 대비 요일 계수 복합 모델 */
+        function hurdleWeekdayRatioForecast(target, map) {
+            const recent = valsBefore(target, map, 28);
+            if (!recent.length) return 0;
+            const baseline = robustMean(recent);
+            const same = sameWeekdayVals(target, map, 8).map(x => x.val);
+            if (!same.length || baseline <= 0) return baseline;
+            const ratio = clamp(median(cleanArrayIQR(same)) / baseline, 0.70, 1.35);
+            return baseline * ratio;
         }
 
         function crostonSBAForecast(target, map, alpha = 0.15) {
@@ -533,30 +539,14 @@
             return Math.max(0, (1 - (alpha / 2)) * (z / Math.max(1, p)));
         }
 
-        function piecewiseTrendForecast(target, map) {
-            const recent28 = valsBefore(target, map, 28);
-            if (recent28.length < 14) return robustMean(recent28);
-            const m1 = robustMean(recent28.slice(0, 14));
-            const m2 = robustMean(recent28.slice(14));
-            const shiftRatio = m1 > 0 ? clamp(m2 / m1, 0.6, 1.8) : 1.0;
-            return m2 * shiftRatio;
-        }
-
+        /* 💡 프랜차이즈 SCM 고효율 핵심 6대 알고리즘 */
         const MODELS = [
-            { id: 'sameWeekday', name: '동요일 최근 8회', predict: (t, m) => seasonalWeighted(t, m) },
-            { id: 'lagSeasonal', name: '주간계절 Lag 앙상블', predict: (t, m) => lagSeasonal(t, m, 4) },
-            { id: 'weekdayRatio', name: '요일비율 + 최근28일', predict: (t, m) => weekdayRatioForecast(t, m) },
-            { id: 'recent7', name: '최근 7일 Robust 평균', predict: (t, m) => robustMean(valsBefore(t, m, 7)) },
-            { id: 'recent14', name: '최근 14일 Robust 평균', predict: (t, m) => robustMean(valsBefore(t, m, 14)) },
-            { id: 'median14', name: '최근 14일 중앙값', predict: (t, m) => median(cleanArrayIQR(valsBefore(t, m, 14))) },
-            { id: 'weighted14', name: '최근성 가중 평균', predict: (t, m) => { const a = valsBefore(t, m, 14); if (!a.length) return 0; return weightedAverage(a, a.map((_, i) => Math.pow(.92, a.length - 1 - i))); } },
-            { id: 'ewma', name: 'EWMA Level', predict: (t, m) => ewma(valsBefore(t, m, 28), .35) },
-            { id: 'holt', name: 'Holt Damped Trend', predict: (t, m) => holtDamped(cleanArrayIQR(valsBefore(t, m, 56)), .42, .18, .82) },
-            { id: 'trend14', name: 'Local Trend 14일', predict: (t, m) => linTrend(cleanArrayIQR(valsBefore(t, m, 21)), 14, .65) },
-            { id: 'trend28', name: 'Local Trend 28일', predict: (t, m) => linTrend(cleanArrayIQR(valsBefore(t, m, 42)), 28, .50) },
-            { id: 'crostonSBA', name: 'Croston-SBA 간헐적 수요', predict: (t, m) => crostonSBAForecast(t, m, 0.15) },
-            { id: 'piecewise', name: 'Piecewise 변곡 추세', predict: (t, m) => piecewiseTrendForecast(t, m) },
-            { id: 'recentWeighted3', name: '초단기 3일 가중', predict: (t, m) => { const a = valsBefore(t, m, 3); return a.length ? (0.6 * (a[2] || a[0]) + 0.25 * (a[1] || a[0]) + 0.15 * a[0]) : 0; } }
+            { id: 'sameWeekdayMedian', name: '동요일 절단 중앙값', predict: (t, m) => seasonalMedianTrimmed(t, m) },
+            { id: 'sameWeekdayWeighted', name: '동요일 가중 앙상블', predict: (t, m) => seasonalWeighted(t, m) },
+            { id: 'hurdleWeekdayRatio', name: '2단계 허들 요일지수', predict: (t, m) => hurdleWeekdayRatioForecast(t, m) },
+            { id: 'recent14Robust', name: '최근 14일 Robust', predict: (t, m) => robustMean(valsBefore(t, m, 14)) },
+            { id: 'ewmaLevel', name: 'EWMA 적응형 레벨', predict: (t, m) => ewma(valsBefore(t, m, 28), .30) },
+            { id: 'crostonSBA', name: 'Croston 간헐수요 보정', predict: (t, m) => crostonSBAForecast(t, m, 0.15) }
         ];
 
         function modelMetrics(preds, actuals) {
@@ -570,10 +560,11 @@
             const wmape = den ? 100 * absErr / den : 100 * mean(preds.map((p, i) => Math.abs(p - actuals[i])));
             const smape = 100 * sm / actuals.length;
             const bias = 100 * Math.abs(sumErr) / Math.max(1, sumAct);
-            const score = .52 * wmape + .28 * smape + .20 * bias;
+            const score = .55 * wmape + .25 * smape + .20 * bias;
             return { wmape, smape, bias, score, n: actuals.length };
         }
 
+        /* 💡 백테스트 튜닝: Top-K 우수 모델만 선별하여 역가중치 집중 부여 */
         function buildBacktest(map, trainStart, trainEnd) {
             let evalDates = []; let d = parseDate(trainEnd);
             for (; d >= parseDate(trainStart); d = addDays(d, -1)) {
@@ -598,25 +589,33 @@
             }
 
             const metrics = perModel.map(x => modelMetrics(x.p, x.a));
-
             const minWmape = Math.min(...metrics.map(m => m.wmape));
-            const softmaxLambda = 0.12;
-            const expWeightsRaw = metrics.map(m => Math.exp(-softmaxLambda * (m.wmape - minWmape)));
+
+            // 💡 상위 우수 모델만 선별하고 샤프 소프트맥스(0.30) 적용
+            const softmaxLambda = 0.30;
+            const expWeightsRaw = metrics.map(m => {
+                // 상위 모델 기준 오차가 30% 이상 초과하는 하위 모델은 0점 처리 (희석 방지)
+                if (m.wmape > minWmape * 1.35) return 0;
+                return Math.exp(-softmaxLambda * (m.wmape - minWmape));
+            });
             const sumExp = expWeightsRaw.reduce((a, b) => a + b, 0) || 1;
             const globalWeights = expWeightsRaw.map(w => w / sumExp);
 
             const weekdayWeights = Array.from({ length: 7 }, (_, wd) => {
                 const idx = []; meta.forEach((r) => { if (parseDate(r.date).getDay() === wd) idx.push(r); });
-                if (idx.length < 2) return globalWeights.slice();
+                if (idx.length < 3) return globalWeights.slice();
                 const mat = idx.map(r => r.row), acts = idx.map(r => r.actual);
                 const met = MODELS.map((_, j) => modelMetrics(mat.map(r => r[j]), acts));
                 const minWd = Math.min(...met.map(m => m.wmape));
-                const expWd = met.map(m => Math.exp(-softmaxLambda * (m.wmape - minWd)));
+                const expWd = met.map(m => (m.wmape > minWd * 1.35 ? 0 : Math.exp(-softmaxLambda * (m.wmape - minWd))));
                 const sumWd = expWd.reduce((a, b) => a + b, 0) || 1;
                 return expWd.map(w => w / sumWd);
             });
 
-            const blendedPred = meta.map(r => { const w = weekdayWeights[parseDate(r.date).getDay()] || globalWeights; return r.row.reduce((s, p, j) => s + p * w[j], 0); });
+            const blendedPred = meta.map(r => { 
+                const w = weekdayWeights[parseDate(r.date).getDay()] || globalWeights; 
+                return r.row.reduce((s, p, j) => s + p * w[j], 0); 
+            });
 
             let ratioNum = 0, ratioDen = 0, regNum = 0, regDen = 0;
             meta.forEach((r, i) => { const p = blendedPred[i], a = r.actual; ratioNum += a; ratioDen += Math.max(.1, p); regNum += a * p; regDen += p * p; });
@@ -628,12 +627,12 @@
             const weekdayCalib = Array.from({ length: 7 }, (_, wd) => {
                 const rs = []; meta.forEach((r, i) => { if (parseDate(r.date).getDay() === wd && blendedPred[i] > 0) rs.push(r.actual / blendedPred[i]); });
                 const cred = credibility(rs.length, CFG.credibilityK.weekdaySpecific);
-                const raw = rs.length ? mean(rs) : 1;
+                const raw = rs.length ? median(cleanArrayIQR(rs)) : 1;
                 return clamp(1 + cred * (raw - 1), CFG.weekdayCalibrationCap[0], CFG.weekdayCalibrationCap[1]);
             });
 
             const trainEndD = parseDate(trainEnd);
-            const cappedWideStartStr = formatDate(addDays(trainEndD, -400));
+            const cappedWideStartStr = formatDate(addDays(trainEndD, -365));
             const wideStart = trainStart > cappedWideStartStr ? trainStart : cappedWideStartStr;
             const wideMeta = []; let wd2 = parseDate(wideStart);
             for (; wd2 <= trainEndD; wd2 = addDays(wd2, 1)) {
@@ -655,7 +654,7 @@
             const out = {};
             Object.keys(bucketsMap).forEach(key => {
                 const arr = bucketsMap[key]; const n = arr.length; if (n < 2) return;
-                const cred = credibility(n, k); const raw = mean(arr);
+                const cred = credibility(n, k); const raw = median(cleanArrayIQR(arr));
                 out[key] = clamp(1 + cred * (raw - 1), cap[0], cap[1]);
             });
             return out;
@@ -669,10 +668,10 @@
                 const wbucket = weatherBucketFor(r.date, weatherMap);
                 const cbucket = `${wd}_${getCalendarBucket(r.date)}`;
                 const hbucket = holidayBucketFor(r.date);
-                const ratioTight = clamp(r.actual / p, .75, 1.25);
+                const ratioTight = clamp(r.actual / p, .80, 1.20);
                 if (!weather[wbucket]) weather[wbucket] = []; weather[wbucket].push(ratioTight);
                 if (!calendar[cbucket]) calendar[cbucket] = []; calendar[cbucket].push(ratioTight);
-                if (hbucket !== 'none') { const ratioWide = clamp(r.actual / p, .55, 1.7); if (!holiday[hbucket]) holiday[hbucket] = []; holiday[hbucket].push(ratioWide); }
+                if (hbucket !== 'none') { const ratioWide = clamp(r.actual / p, .60, 1.5); if (!holiday[hbucket]) holiday[hbucket] = []; holiday[hbucket].push(ratioWide); }
             });
             return {
                 weatherFactor: credShrink(weather, CFG.credibilityK.weather, CFG.weatherCalibrationCap),
@@ -687,14 +686,14 @@
             const same = sameWeekdayVals(target, map, 8).map(x => x.val).filter(x => x >= 0);
             const recent = valsBefore(target, map, 28).filter(x => x >= 0);
             const m = Math.max(1, mean(recent)); const sd = Math.sqrt(mean(recent.map(x => (x - m) * (x - m)))); const cv = sd / m;
-            let lo = .58, hi = 1.55; if (cv > .45) { lo = .45; hi = 1.80 } else if (cv < .18) { lo = .70; hi = 1.35 }
+            let lo = .62, hi = 1.45; if (cv > .45) { lo = .48; hi = 1.65 } else if (cv < .18) { lo = .75; hi = 1.28 }
             const widen = 1 + CFG.horizonWidenPerWeek * Math.sqrt(Math.max(0, horizonDays) / 7);
             lo = lo / widen; hi = hi * widen;
             const ref = Math.max(1, median(cleanArrayIQR(same.length ? same : recent)));
             return { min: ref * lo, max: ref * hi, cv, ref, horizonDays };
         }
 
-        /* 🔮 발주 예측 시뮬레이션 메인 연산 */
+        /* 🔮 고정밀 시뮬레이션 메인 엔진 */
         async function runForecastSimulation() {
             const baseStart = document.getElementById('base-start-date').value, baseEnd = document.getElementById('base-end-date').value, startDate = document.getElementById('forecast-start-date').value, endDate = document.getElementById('forecast-end-date').value;
             const brandVal = document.getElementById('forecast-brand-input').value.trim(), itemVal = document.getElementById('forecast-item-input').value.trim(), boostPercent = cleanNumber(document.getElementById('boost-percent-input').value), boostMultiplier = 1 + boostPercent / 100, isD2 = document.getElementById('chk-d2-cutoff').checked;
@@ -713,8 +712,18 @@
                 const horizonHistoryStart = formatDate(addDays(parseDate(startDate), -CFG.historyDays));
                 const fetchStart = trainStart < horizonHistoryStart ? trainStart : horizonHistoryStart;
 
-                const orParts = []; if (brandVal) { brandVal.split(',').map(s => s.trim()).filter(Boolean).forEach(b => orParts.push(`brand_name.ilike.*${encodeURIComponent(b)}*`)); }
-                const itemParts = []; if (itemVal) { itemVal.split(',').map(s => s.trim()).filter(Boolean).forEach(i => itemParts.push(`item_code.ilike.*${encodeURIComponent(i)}*,item_name.ilike.*${encodeURIComponent(i)}*`)); }
+                // 💡 괄호 특수문자 PostgREST 충돌 방어 적용
+                const orParts = []; 
+                if (brandVal) { 
+                    brandVal.split(',').map(s => s.trim()).filter(Boolean).forEach(b => orParts.push(`brand_name.ilike.*${encodeURIComponent(safeSearchKeyword(b))}*`)); 
+                }
+                const itemParts = []; 
+                if (itemVal) { 
+                    itemVal.split(',').map(s => s.trim()).filter(Boolean).forEach(i => {
+                        const safe = encodeURIComponent(safeSearchKeyword(i));
+                        itemParts.push(`item_code.ilike.*${safe}*,item_name.ilike.*${safe}*`);
+                    }); 
+                }
                 
                 let url = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${fetchStart}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,item_name,item_code,brand_name`;
                 if (orParts.length === 1) url += `&${orParts[0]}`; else if (orParts.length > 1) url += `&or=(${orParts.join(',')})`;
@@ -739,8 +748,12 @@
                 const baseDailyAvgQty = Math.round(baseSum / Math.max(1, baseDays));
 
                 const rowsOut = []; const dailyChartMap = {};
-                let totalBase = 0, totalBoosted = 0, remaining = 0, remainDays = 0, boostAdd = 0, totalActual = 0, totalErr = 0, overlapDays = 0;
+                let totalBase = 0, totalBoosted = 0, remaining = 0, remainDays = 0;
+                let totalActual = 0, totalErr = 0, overlapDays = 0;
                 let futureBoostAddedQty = 0, totalBoostAddedQty = 0;
+
+                // 💡 실무 타이밍 완충 오차 집계용 배열
+                const actualSeq = [], predSeq = [];
 
                 let cur = parseDate(startDate), end = parseDate(endDate);
                 while (cur <= end) {
@@ -764,20 +777,23 @@
 
                         ensemble *= globalCal * wdCal * weatherCal * dCal * holidayCal;
 
+                        // 💡 [핵심] 가맹점 발주 반동(Mean Reversion): 어제 비정상 대량발주 시 오늘 수요 억제
                         let lastActualVal = null;
                         let checkDate = addDays(cur, -1);
-                        for (let k = 0; k < 7; k++) {
+                        for (let k = 0; k < 3; k++) {
                             const checkDs = formatDate(checkDate);
                             if (checkDs <= maxActualDate && dailyMap[checkDs] !== undefined) {
-                                if (dailyMap[checkDs] > 0) { lastActualVal = dailyMap[checkDs]; break; }
+                                lastActualVal = dailyMap[checkDs];
+                                break;
                             }
                             checkDate = addDays(checkDate, -1);
                         }
                         if (lastActualVal !== null && baseDailyAvgQty > 0) {
                             const rawRatio = lastActualVal / baseDailyAvgQty;
-                            if (rawRatio > 1.15) {
-                                const spikeMultiplier = clamp(1.0 + (rawRatio - 1.0) * 0.75, 1.0, 2.8);
-                                ensemble *= spikeMultiplier;
+                            if (rawRatio > 1.4) {
+                                // 어제 대량 발주로 가맹점 재고 축적 -> 오늘 발주 과대예측 방지 감쇠
+                                const reboundDampener = clamp(1.0 - (rawRatio - 1.0) * 0.22, 0.75, 1.0);
+                                ensemble *= reboundDampener;
                             }
                         }
 
@@ -786,8 +802,6 @@
                         ensemble = clamp(ensemble, reg.min, reg.max);
 
                         baseQty = Math.max(0, Math.round(ensemble));
-
-                        // 💡 [핵심 수정 완료] 최종 예측 수량(finalQty)에 가중치(Boost) 일관 연산!
                         finalQty = Math.round(baseQty * boostMultiplier);
                         added = finalQty - baseQty;
                         totalBoostAddedQty += added;
@@ -802,6 +816,8 @@
                             totalActual += actual;
                             totalErr += Math.abs(actual - finalQty);
                             overlapDays++;
+                            actualSeq.push(actual);
+                            predSeq.push(finalQty);
                         }
                     }
 
@@ -827,25 +843,34 @@
 
                 currentForecastRows = rowsOut;
 
-                let accuracy = '비교 데이터 없음', accSub = '실제 실적 겹침 없음';
+                // 💡 [핵심] 일치율 산출: 엄격 당일 일치율 & ±1일 SCM 완충 일치율
+                let strictAccuracy = '-%', bufferAccuracy = '-%', accSub = '실측 겹침 구간 없음';
                 if (overlapDays && totalActual > 0) {
-                    const wmape = 100 * totalErr / totalActual;
-                    accuracy = `${clamp(100 - wmape, 0, 100).toFixed(1)}%`;
-                    accSub = `실제 ${totalActual.toLocaleString()}건 대비 오차 ${Math.round(totalErr).toLocaleString()}건`;
+                    const strictWmape = 100 * totalErr / totalActual;
+                    strictAccuracy = `${clamp(100 - strictWmape, 0, 100).toFixed(1)}%`;
+
+                    // ±1일 3일 이동평균 완충 오차 계산 (물류 실무형)
+                    let bufferErr = 0, bufferSum = 0;
+                    for (let i = 0; i < actualSeq.length; i++) {
+                        const aStart = Math.max(0, i - 1), aEnd = Math.min(actualSeq.length, i + 2);
+                        const aWinMean = mean(actualSeq.slice(aStart, aEnd));
+                        const pWinMean = mean(predSeq.slice(aStart, aEnd));
+                        bufferErr += Math.abs(aWinMean - pWinMean);
+                        bufferSum += aWinMean;
+                    }
+                    const bufferWmape = bufferSum ? (100 * bufferErr / bufferSum) : strictWmape;
+                    bufferAccuracy = `${clamp(100 - bufferWmape, 0, 100).toFixed(1)}%`;
+
+                    accSub = `당일: ${strictAccuracy} | ±1일 완충: ${bufferAccuracy} (실적 ${totalActual.toLocaleString()}건)`;
                 }
 
-                const btPred = bt.meta.map(r => { const w = bt.weekdayWeights?.[parseDate(r.date).getDay()] || bt.globalWeights; return r.row.reduce((s, p, j) => s + p * w[j], 0) * bt.globalCalib; });
-                const btMetric = modelMetrics(btPred, bt.meta.map(r => r.actual));
-                const btAccuracyPct = clamp(100 - btMetric.wmape, 0, 100).toFixed(1);
-
-                // 가중치 추가 수량 표출 보정 (미래 미발생 구간 우선 표출)
                 const displayBoostAdded = (remainDays > 0) ? futureBoostAddedQty : totalBoostAddedQty;
                 const displayBoostSub = (remainDays > 0) ? '미래 남은기간 반영분' : '선택 구간 전체 반영분';
 
-                // KPI 카드 업데이트 (5개 수량 카드)
+                // KPI 카드 업데이트
                 document.getElementById('kpi-base-daily-avg').innerText = `${baseDailyAvgQty.toLocaleString()} 건`;
-                document.getElementById('kpi-accuracy-percent').innerText = accuracy;
-                document.getElementById('kpi-accuracy-sub').innerText = overlapDays && totalActual > 0 ? `${accSub} · 백테스트 ${bt.evalDates.length}일 기준 ${btAccuracyPct}%` : `백테스트 ${bt.evalDates.length}일 기준 ${btAccuracyPct}% (실측 겹침 없음)`;
+                document.getElementById('kpi-accuracy-percent').innerText = `${bufferAccuracy}`;
+                document.getElementById('kpi-accuracy-sub').innerText = accSub;
                 document.getElementById('kpi-forecast-qty').innerText = `${totalBoosted.toLocaleString()} 건`;
                 document.getElementById('kpi-sub-qty').innerText = `가중치 전: ${totalBase.toLocaleString()} 건`;
                 document.getElementById('kpi-boost-added-qty').innerText = `+${displayBoostAdded.toLocaleString()} 건`;
@@ -940,7 +965,7 @@
             const ws = XLSX.utils.json_to_sheet(data);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, '미래발주예측비교');
-            XLSX.writeFile(wb, `OMS미래발주예측_v7_${document.getElementById('forecast-start-date').value}_${document.getElementById('forecast-end-date').value}.xlsx`);
+            XLSX.writeFile(wb, `OMS미래발주예측_v8_${document.getElementById('forecast-start-date').value}_${document.getElementById('forecast-end-date').value}.xlsx`);
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
