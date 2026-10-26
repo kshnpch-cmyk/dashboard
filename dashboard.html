@@ -16,7 +16,7 @@
         .kpi-title { font-size: 13px; color: #64748b; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
         .kpi-value { font-size: 22px; font-weight: 800; margin-top: 4px; color: #0f172a; }
         .btn-view-stores { background-color: #f59e0b; color: white; border: none; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; cursor: pointer; }
-        .chart-container { position: relative; height: 350px; width: 100%; margin-top: 15px; }
+        .chart-container { position: relative; height: 370px; width: 100%; margin-top: 15px; }
         
         /* 점포 모달 */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); z-index: 1000; justify-content: center; align-items: center; }
@@ -76,13 +76,26 @@
             return [clean, withDotZero];
         }
 
-        // 🌤️ 날씨 API 연동 함수 (서울 기준 최고기온 및 강수량 로드)
+        // 🌤️ 기상 코드 기반 날씨 이모지 변환 함수
+        function getWeatherEmoji(code, rain) {
+            if (rain && rain >= 3) return '🌧️';
+            if (code === 0) return '☀️';
+            if ([1, 2].includes(code)) return '🌤️';
+            if (code === 3) return '☁️';
+            if ([45, 48].includes(code)) return '🌫️';
+            if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) return '🌧️';
+            if ([71, 73, 75, 77, 85, 86].includes(code)) return '❄️';
+            if ([95, 96, 99].includes(code)) return '⛈️';
+            return '☀️';
+        }
+
+        // 🌤️ 날씨 API 연동 (서울 기준: 최저/최고기온, 강수량, 날씨코드)
         async function fetchWeatherData(startDate, endDate) {
             try {
-                let url = `https://archive-api.open-meteo.com/v1/archive?latitude=37.5665&longitude=126.9780&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_max,precipitation_sum&timezone=Asia%2FSeoul`;
+                let url = `https://archive-api.open-meteo.com/v1/archive?latitude=37.5665&longitude=126.9780&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode&timezone=Asia%2FSeoul`;
                 let res = await fetch(url);
                 if (!res.ok) {
-                    url = `https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_max,precipitation_sum&timezone=Asia%2FSeoul`;
+                    url = `https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode&timezone=Asia%2FSeoul`;
                     res = await fetch(url);
                 }
                 if (res.ok) {
@@ -92,15 +105,17 @@
                         json.daily.time.forEach((dStr, idx) => {
                             const dKey = formatDisplayDate(dStr);
                             wMap[dKey] = {
-                                temp: json.daily.temperature_2m_max ? json.daily.temperature_2m_max[idx] : null,
-                                rain: json.daily.precipitation_sum ? json.daily.precipitation_sum[idx] : null
+                                tMin: json.daily.temperature_2m_min ? json.daily.temperature_2m_min[idx] : null,
+                                tMax: json.daily.temperature_2m_max ? json.daily.temperature_2m_max[idx] : null,
+                                rain: json.daily.precipitation_sum ? json.daily.precipitation_sum[idx] : 0,
+                                code: json.daily.weathercode ? json.daily.weathercode[idx] : 0
                             };
                         });
                     }
                     return wMap;
                 }
             } catch (err) {
-                console.warn("날씨 데이터 로드 실패 (차트 정상 유지):", err);
+                console.warn("날씨 데이터 로드 실패 (차트는 정상 유지):", err);
             }
             return {};
         }
@@ -110,7 +125,6 @@
             const { startDate, endDate, brandName, itemName } = params;
             if (!startDate || !endDate) return;
 
-            // 1. 요약 데이터 쿼리 URL 세팅
             let dailyUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
             
             if (brandName) {
@@ -133,7 +147,7 @@
             }
 
             try {
-                // 1단계: 주문 요약 데이터와 날씨 데이터를 병렬로 동시 호출
+                // 1단계: 주문 요약 데이터 + 날씨 데이터 병렬 호출
                 const [resDaily, weatherMap] = await Promise.all([
                     fetch(dailyUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } }),
                     fetchWeatherData(startDate, endDate)
@@ -144,10 +158,9 @@
                 currentBrandStoreMap = {};
                 renderDashboard(dailyData, weatherMap);
 
-                // 2단계: 점포수 산출 (.0 코드 포맷 완벽 매칭 유지)
+                // 2단계: 점포수 산출 (.0 코드 포맷 완벽 매칭)
                 if (itemName) {
                     const codeTargets = new Set();
-                    
                     const userInputs = itemName.split(',').map(s => s.trim()).filter(Boolean);
                     userInputs.forEach(input => {
                         expandCodeVariants(input).forEach(c => codeTargets.add(c));
@@ -226,86 +239,54 @@
             document.getElementById('kpi-total-items').innerText = `${items.size.toLocaleString()} 종`;
             document.getElementById('kpi-total-amount').innerText = `${totalAmount.toLocaleString()} 원`;
 
-            const labels = Object.keys(dailyMap).sort();
-            const qtyData = labels.map(k => dailyMap[k].qty);
-            const amtData = labels.map(k => dailyMap[k].amount);
-            
-            // 날씨 데이터 매핑 (기온 및 강수량)
-            const tempData = labels.map(k => (weatherMap[k] && weatherMap[k].temp !== null) ? weatherMap[k].temp : null);
-            const hasWeatherData = tempData.some(v => v !== null);
+            const rawDates = Object.keys(dailyMap).sort();
+            const qtyData = rawDates.map(k => dailyMap[k].qty);
+            const amtData = rawDates.map(k => dailyMap[k].amount);
 
-            // 차트 데이터셋 구성
-            const datasets = [
-                {
-                    label: '주문수량 (건)',
-                    data: qtyData,
-                    backgroundColor: 'rgba(37, 99, 235, 0.6)',
-                    yAxisID: 'y1',
-                    order: 3
-                },
-                {
-                    label: '주문금액 (원)',
-                    data: amtData,
-                    type: 'line',
-                    borderColor: '#8b5cf6',
-                    backgroundColor: '#8b5cf6',
-                    borderWidth: 2,
-                    pointRadius: 2,
-                    yAxisID: 'y2',
-                    order: 2
+            // 💡 [핵심] X축 라벨을 2줄 다중 라벨 배열로 생성:
+            // 1번째 줄: 날짜 (예: 2026/09/01)
+            // 2번째 줄: 날씨 이모지 + 최저/최고기온 (예: ☀️ 18°/28° 또는 🌧️ 19°/23° (4mm))
+            const chartLabels = rawDates.map(dKey => {
+                const labelLines = [dKey];
+                const w = weatherMap[dKey];
+                if (w && w.tMin !== null && w.tMax !== null) {
+                    const emoji = getWeatherEmoji(w.code, w.rain);
+                    let weatherText = `${emoji} ${Math.round(w.tMin)}°/${Math.round(w.tMax)}°`;
+                    if (w.rain && w.rain >= 1) {
+                        weatherText += ` (${Math.round(w.rain)}mm)`;
+                    }
+                    labelLines.push(weatherText);
                 }
-            ];
-
-            // 날씨 데이터가 존재하면 최고기온 라인 추가
-            if (hasWeatherData) {
-                datasets.push({
-                    label: '최고기온 (℃)',
-                    data: tempData,
-                    type: 'line',
-                    borderColor: '#f97316',
-                    backgroundColor: '#f97316',
-                    borderWidth: 2,
-                    borderDash: [3, 3],
-                    pointRadius: 3,
-                    yAxisID: 'y3',
-                    order: 1
-                });
-            }
-
-            const scales = {
-                x: { ticks: { font: { size: 11, weight: 'bold' } } },
-                y1: {
-                    type: 'linear',
-                    position: 'left',
-                    beginAtZero: true,
-                    grace: '20%',
-                    title: { display: true, text: '주문수량 (건)', font: { size: 10, weight: 'bold' } }
-                },
-                y2: {
-                    type: 'linear',
-                    position: 'right',
-                    beginAtZero: true,
-                    grid: { drawOnChartArea: false },
-                    grace: '20%',
-                    title: { display: true, text: '주문금액 (원)', font: { size: 10, weight: 'bold' } }
-                }
-            };
-
-            if (hasWeatherData) {
-                scales.y3 = {
-                    type: 'linear',
-                    position: 'right',
-                    grid: { drawOnChartArea: false },
-                    title: { display: true, text: '기온 (℃)', font: { size: 10, weight: 'bold' } },
-                    ticks: { callback: v => `${v}℃` }
-                };
-            }
+                return labelLines;
+            });
 
             const ctx = document.getElementById('dailyTrendChart').getContext('2d');
             if (trendChart) trendChart.destroy();
             trendChart = new Chart(ctx, {
                 type: 'bar',
-                data: { labels, datasets },
+                data: {
+                    labels: chartLabels,
+                    datasets: [
+                        {
+                            label: '주문수량 (건)',
+                            data: qtyData,
+                            backgroundColor: 'rgba(37, 99, 235, 0.6)',
+                            yAxisID: 'y1',
+                            order: 2
+                        },
+                        {
+                            label: '주문금액 (원)',
+                            data: amtData,
+                            type: 'line',
+                            borderColor: '#8b5cf6',
+                            backgroundColor: '#8b5cf6',
+                            borderWidth: 2,
+                            pointRadius: 2,
+                            yAxisID: 'y2',
+                            order: 1
+                        }
+                    ]
+                },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
@@ -313,17 +294,50 @@
                     plugins: {
                         tooltip: {
                             callbacks: {
+                                title: (tooltipItems) => {
+                                    // 툴팁 상단에는 날짜만 표기
+                                    const raw = tooltipItems[0].label;
+                                    return Array.isArray(raw) ? raw[0] : raw;
+                                },
                                 afterBody: (tooltipItems) => {
-                                    const dKey = tooltipItems[0].label;
-                                    if (weatherMap[dKey] && weatherMap[dKey].rain !== null && weatherMap[dKey].rain > 0) {
-                                        return `🌧️ 강수량: ${weatherMap[dKey].rain}mm`;
+                                    const raw = tooltipItems[0].label;
+                                    const dKey = Array.isArray(raw) ? raw[0] : raw;
+                                    const w = weatherMap[dKey];
+                                    if (w && w.tMin !== null && w.tMax !== null) {
+                                        const emoji = getWeatherEmoji(w.code, w.rain);
+                                        let text = `🌤️ 날씨: ${emoji} 최저 ${Math.round(w.tMin)}℃ / 최고 ${Math.round(w.tMax)}℃`;
+                                        if (w.rain && w.rain > 0) text += ` (강수량: ${w.rain}mm)`;
+                                        return text;
                                     }
                                     return '';
                                 }
                             }
                         }
                     },
-                    scales
+                    scales: {
+                        x: {
+                            ticks: {
+                                font: { size: 10, weight: 'bold' },
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'left',
+                            beginAtZero: true,
+                            grace: '20%',
+                            title: { display: true, text: '주문수량 (건)', font: { size: 10, weight: 'bold' } }
+                        },
+                        y2: {
+                            type: 'linear',
+                            position: 'right',
+                            beginAtZero: true,
+                            grid: { drawOnChartArea: false },
+                            grace: '20%',
+                            title: { display: true, text: '주문금액 (원)', font: { size: 10, weight: 'bold' } }
+                        }
+                    }
                 }
             });
         }
