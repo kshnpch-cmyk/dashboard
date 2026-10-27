@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>더본 OMS 발주 수요 예측 v9.0 Ultra-Precision SCM Engine</title>
+    <title>더본 OMS 발주 수요 예측 v9.1 Dynamic Trim SCM Engine</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
@@ -81,7 +81,7 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>🔮 더본 OMS 발주 수요 예측 시스템</h1>
-            <span class="version-tag">Forecast v9.0 Ultra-Precision SCM Engine</span>
+            <span class="version-tag">Forecast v9.1 Dynamic Trim Engine</span>
         </div>
         <div><button class="btn" style="background:#334155" onclick="window.close()">✕ 창 닫기</button></div>
     </div>
@@ -98,9 +98,9 @@
             <div class="panel-header">
                 <span class="panel-title-text">⚙️ 과거 기반 데이터 & 미래 예측 설정</span>
                 <div>
-                    <span class="pill">월→화 재고 포화 감쇠기 (Saturation Dampener)</span>
-                    <span class="pill">동요일 3주 초적응형 가중 (60:30:10)</span>
-                    <span class="pill">단일 캘리브레이션 튜닝</span>
+                    <span class="pill">동적 극단값(Trim) 조정</span>
+                    <span class="pill">월→화 재고 포화 감쇠기</span>
+                    <span class="pill">동요일 3주 초적응형 가중</span>
                     <span class="pill">±1일 SCM 완충 일치율</span>
                 </div>
             </div>
@@ -151,13 +151,21 @@
                     <div id="item-autocomplete-list" class="autocomplete-dropdown"></div>
                 </div>
 
+                <!-- 💡 [신규 추가] 극단값 절단(트림) 비율 동적 조정 입력창 -->
+                <div class="filter-group" style="background:#e0f2fe;padding:6px 12px;border-radius:6px;border:1px solid #bae6fd">
+                    <label style="color:#0369a1">✂️ 극단값 절단 비율:</label>
+                    <input type="number" id="trim-percent-input" class="input-box" value="25" min="0" max="45" step="5" style="width:60px;text-align:center;font-weight:800;color:#0369a1;padding-right:8px" onkeydown="if(event.key==='Enter')runForecastSimulation()" onchange="runForecastSimulation()" title="상/하위 극단값을 버리는 비율 (기본 25%, 스파이크 수용 시 5%)">
+                    <span style="color:#0369a1;font-weight:800">%</span>
+                </div>
+
                 <div class="filter-group" style="background:#d1fae5;padding:6px 12px;border-radius:6px;border:1px solid #a7f3d0">
                     <label style="color:#065f46">🚀 신메뉴/행사 가중치:</label>
                     <input type="number" id="boost-percent-input" class="input-box" value="0" min="0" max="500" step="5" style="width:65px;text-align:center;font-weight:800;color:#065f46;padding-right:8px">
                     <span style="color:#065f46">%</span>
                 </div>
 
-                <button class="btn btn-forecast" onclick="runForecastSimulation()">🔮 시뮬레이션 실행</button>
+                <!-- 💡 [버튼] 시뮬레이션 실행 및 재계산 버튼 -->
+                <button class="btn btn-forecast" onclick="runForecastSimulation()">🔮 시뮬레이션 실행 / 재계산</button>
             </div>
 
             <!-- KPI 카드 5개 -->
@@ -241,18 +249,17 @@
             historyDays: 210,
             backtestDays: 56,
             minTrainDays: 28,
-            calibrationCap: [0.94, 1.06],
-            weekdayCalibrationCap: [0.95, 1.05],
             weatherCalibrationCap: [0.97, 1.03],
             calendarCalibrationCap: [0.97, 1.03],
             holidayCalibrationCap: [0.85, 1.20],
-            credibilityK: { optimizedBlend: 6, weekdaySpecific: 8, weather: 4, calendar: 4, holiday: 3 },
+            credibilityK: { weather: 4, calendar: 4, holiday: 3 },
             maxRowsPerPage: 1000
         };
 
         let forecastChart = null;
         let currentForecastRows = [];
         let allBrandList = [], allItemList = [];
+        let currentTrimPercent = 25; // 💡 기본 절단율 25%
 
         function formatDate(d) { const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); return `${y}-${m}-${day}`; }
         function parseDate(s) { return new Date(`${s}T00:00:00`); }
@@ -265,8 +272,23 @@
         function mean(a) { return a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0; }
         function median(a) { if (!a.length) return 0; const s = [...a].sort((x, y) => x - y); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
         function weightedAverage(values, weights) { let sw = 0, s = 0; for (let i = 0; i < values.length; i++) { const w = weights[i] ?? 1; s += values[i] * w; sw += w; } return sw ? s / sw : 0; }
-        function cleanArrayIQR(arr) { if (arr.length < 5) return arr.slice(); const s = [...arr].sort((a, b) => a - b); const q1 = s[Math.floor(s.length * 0.25)], q3 = s[Math.floor(s.length * 0.75)], iqr = q3 - q1; const lb = q1 - 1.5 * iqr, ub = q3 + 1.5 * iqr; const out = arr.filter(x => x >= lb && x <= ub); return out.length >= 3 ? out : arr.slice(); }
         function credibility(n, k) { return n / (n + Math.max(0.0001, k)); }
+
+        // 💡 동적 절단율(Trim %)이 반영된 IQR 필터
+        function cleanArrayIQR(arr, pct = currentTrimPercent) {
+            if (!arr || arr.length < 4) return arr ? arr.slice() : [];
+            const s = [...arr].sort((a, b) => a - b);
+            const ratio = clamp(pct / 100, 0.01, 0.45);
+            const q1Idx = Math.floor(s.length * ratio);
+            const q3Idx = Math.floor(s.length * (1 - ratio));
+            const q1 = s[q1Idx];
+            const q3 = s[q3Idx];
+            const iqr = q3 - q1;
+            const lb = q1 - 1.5 * iqr;
+            const ub = q3 + 1.5 * iqr;
+            const out = arr.filter(x => x >= lb && x <= ub);
+            return out.length >= 2 ? out : arr.slice();
+        }
 
         function nowKST() {
             const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).formatToParts(new Date());
@@ -464,12 +486,20 @@
             return weightedAverage(vals, weights);
         }
 
-        /* 💡 모델 2: 동요일 4회 IQR 절단 중앙값 모델 (이상치 저항) */
-        function modelTrimmedMedianWeekday(target, map) {
+        /* 💡 모델 2: [핵심 연동] 사용자가 설정한 비율(기본 25%, 변경 시 5% 등)로 상하위 극단값을 직접 절단하는 모델 */
+        function modelTrimmedMedianWeekday(target, map, pct = currentTrimPercent) {
             const s = sameWeekdayVals(target, map, 5);
             if (!s.length) return null;
-            const vals = cleanArrayIQR(s.map(x => x.val));
-            return median(vals.length ? vals : s.map(x => x.val));
+            const rawVals = s.map(x => x.val);
+            if (rawVals.length < 3 || pct <= 0) return median(rawVals);
+            
+            const sorted = [...rawVals].sort((a, b) => a - b);
+            const trimCount = Math.round(sorted.length * (pct / 100));
+            let trimmed = sorted;
+            if (trimCount > 0 && sorted.length - (trimCount * 2) >= 1) {
+                trimmed = sorted.slice(trimCount, sorted.length - trimCount);
+            }
+            return median(trimmed.length ? trimmed : sorted);
         }
 
         /* 💡 모델 3: 최근 2주 동요일 모멘텀 가속 모델 */
@@ -477,14 +507,13 @@
             const s = sameWeekdayVals(target, map, 2);
             if (!s.length) return null;
             if (s.length === 1) return s[0].val;
-            // 2주 연속 증가/감소 추세를 40%만 완만하게 반영
             const diff = s[0].val - s[1].val;
             return Math.max(0, s[0].val + 0.40 * diff);
         }
 
         const MODELS = [
             { id: 'ultraAdaptive', name: '동요일 3주 초적응형 (60:30:10)', predict: (t, m) => modelUltraAdaptiveWeekday(t, m) },
-            { id: 'trimmedMedian', name: '동요일 4주 절단 중앙값', predict: (t, m) => modelTrimmedMedianWeekday(t, m) },
+            { id: 'trimmedMedian', name: '동요일 IQR 절단 중앙값', predict: (t, m) => modelTrimmedMedianWeekday(t, m, currentTrimPercent) },
             { id: 'twoWeekMomentum', name: '최근 2주 동요일 모멘텀', predict: (t, m) => modelTwoWeekMomentum(t, m) }
         ];
 
@@ -539,7 +568,7 @@
             const out = {};
             Object.keys(bucketsMap).forEach(key => {
                 const arr = bucketsMap[key]; const n = arr.length; if (n < 2) return;
-                const cred = credibility(n, k); const raw = median(cleanArrayIQR(arr));
+                const cred = credibility(n, k); const raw = median(cleanArrayIQR(arr, currentTrimPercent));
                 out[key] = clamp(1 + cred * (raw - 1), cap[0], cap[1]);
             });
             return out;
@@ -567,11 +596,17 @@
             };
         }
 
-        /* 🔮 95%+ 목표 시뮬레이션 메인 엔진 */
+        /* 🔮 시뮬레이션 메인 엔진 */
         async function runForecastSimulation() {
             const baseStart = document.getElementById('base-start-date').value, baseEnd = document.getElementById('base-end-date').value, startDate = document.getElementById('forecast-start-date').value, endDate = document.getElementById('forecast-end-date').value;
             const brandVal = document.getElementById('forecast-brand-input').value.trim(), itemVal = document.getElementById('forecast-item-input').value.trim(), boostPercent = cleanNumber(document.getElementById('boost-percent-input').value), boostMultiplier = 1 + boostPercent / 100, isD2 = document.getElementById('chk-d2-cutoff').checked;
             
+            // 💡 [절단율 입력값 동적 취득]
+            currentTrimPercent = cleanNumber(document.getElementById('trim-percent-input').value);
+            if (isNaN(currentTrimPercent) || currentTrimPercent < 0) currentTrimPercent = 25;
+            currentTrimPercent = clamp(currentTrimPercent, 0, 45);
+            document.getElementById('trim-percent-input').value = currentTrimPercent;
+
             if (!baseStart || !baseEnd || !startDate || !endDate) return alert('기간을 모두 선택하세요.');
             if (baseStart > baseEnd) return alert('분석 기반 시작일은 종료일보다 이전이어야 합니다.');
             if (startDate > endDate) return alert('예측 시작일은 종료일보다 이전이어야 합니다.');
@@ -640,27 +675,23 @@
                         const candidates = MODELS.map(mo => Math.max(0, Number(mo.predict(ds, dailyMap)) || 0));
                         let ensemble = candidates.reduce((s, p, j) => s + p * weights[j], 0);
 
-                        // 💡 기상/공휴일 잔차 미세 보정 (이중 증폭 방지)
                         const weatherCal = residual.weatherFactor?.[weather.bucket] || 1;
                         const dCal = residual.calendarFactor?.[`${wd}_${getCalendarBucket(ds)}`] || 1;
                         const holidayCal = residual.holidayFactor?.[hBucket] || 1;
                         ensemble *= weatherCal * dCal * holidayCal;
 
-                        // 💡 [핵심 해결] 월→화 재고 포화 감쇠기 (Post-Monday Saturation Dampener)
-                        // 화요일(wd === 2)에 전일(월요일) 발주량이 평일 평균치 이상으로 컸다면,
-                        // 가맹점 창고가 꽉 차서 화요일 발주가 20~28% 급감하는 고유 현상을 정밀 반영합니다.
+                        // 월→화 재고 포화 감쇠
                         if (wd === 2) {
                             const mondayDate = formatDate(addDays(cur, -1));
                             const mondayVal = dailyMap[mondayDate];
                             if (mondayVal !== undefined && baseDailyAvgQty > 0) {
                                 if (mondayVal >= baseDailyAvgQty * 0.85) {
-                                    // 화요일 과대예측을 1,700~1,850건대로 정확히 락온
                                     ensemble *= 0.74; 
                                 }
                             }
                         }
 
-                        // 수요일(wd === 3) 추가 미세 안정화 (10/28 수요일 과대예측 제어)
+                        // 수요일 안정화 감쇠
                         if (wd === 3) {
                             const tuesdayDate = formatDate(addDays(cur, -1));
                             const tuesdayVal = dailyMap[tuesdayDate];
@@ -711,7 +742,7 @@
 
                 currentForecastRows = rowsOut;
 
-                // 💡 [핵심] 95%+ SCM 완충 일치율 산출 (가맹점 1일 조기/지연 발주 타이밍 오차 흡수)
+                // SCM 완충 일치율 산출
                 let strictAccuracy = '-%', bufferAccuracy = '-%', accSub = '실측 겹침 구간 없음';
                 if (overlapDays && totalActual > 0) {
                     const strictWmape = 100 * totalErr / totalActual;
@@ -839,7 +870,7 @@
             const ws = XLSX.utils.json_to_sheet(data);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, '미래발주예측비교');
-            XLSX.writeFile(wb, `OMS미래발주예측_v9_${document.getElementById('forecast-start-date').value}_${document.getElementById('forecast-end-date').value}.xlsx`);
+            XLSX.writeFile(wb, `OMS미래발주예측_v9.1_${document.getElementById('forecast-start-date').value}_${document.getElementById('forecast-end-date').value}.xlsx`);
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
