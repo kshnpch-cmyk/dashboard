@@ -96,7 +96,8 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 대시보드</h1>
-            <span class="version-tag">v37.0 Anomaly Detection</span>
+            <!-- 💡 버전 v39.0 공식 카운트업 -->
+            <span class="version-tag">v39.0 SCM & Reporting</span>
         </div>
         <div class="control-panel">
             <div class="last-updated-tag">
@@ -124,19 +125,20 @@
         <div class="ai-chat-input-area"><input type="text" id="ai-user-input" onkeydown="if(event.key==='Enter') sendAiMessage()"><button class="btn-ai-send" id="ai-send-btn" onclick="sendAiMessage()">전송</button></div>
     </div>
 
-    <!-- 모달 창들 -->
+    <!-- 🗓️ 오리지널 캘린더 모달 (발주량 숫자 배지 유지) -->
     <div class="modal-overlay" id="calendar-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">📅 배송일자 데이터 존재 현황</span><span class="close-btn" onclick="closeCalendarModal()">✕</span></div><div style="display: flex; gap: 8px; margin-bottom: 10px; align-items: center;"><label style="font-size: 12px; font-weight: bold;">월 선택:</label><input type="month" id="calendar-month-picker" class="input-box" onchange="loadCalendarData()"></div><div class="calendar-grid" id="calendar-grid"></div></div></div>
     <div class="modal-overlay" id="brand-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">🏢 브랜드 다중 선택</span><span class="close-btn" onclick="closeBrandModal()">✕</span></div><div style="display: flex; gap: 8px; margin-bottom: 8px;"><input type="text" id="modal-brand-search" class="input-box" style="flex:1;" placeholder="브랜드명 검색 (Enter)" onkeydown="if(event.key==='Enter') filterBrandModalList()"><button class="btn btn-cal" style="background:#2563eb;" onclick="filterBrandModalList()">검색</button><button class="btn btn-cal" style="background:#475569;" onclick="toggleAllBrandCheck(true)">전체선택</button><button class="btn btn-cal" style="background:#64748b;" onclick="toggleAllBrandCheck(false)">해제</button></div><div class="modal-body-scroll" id="brand-modal-list"></div><div style="margin-top: 15px; text-align: right;"><button class="btn" onclick="applyBrandSelection()">확인 적용</button></div></div></div>
-    <div class="modal-overlay" id="item-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">📦 품목 다중 선택</span><span class="close-btn" onclick="closeItemModal()">✕</span></div><div style="display: flex; gap: 8px; margin-bottom: 8px;"><input type="text" id="modal-item-search" class="input-box" style="flex:1;" placeholder="품목코드 또는 품목명 검색 (Enter)" onkeydown="if(event.key==='Enter') filterItemModalList()"><button class="btn btn-cal" style="background:#2563eb;" onclick="filterItemModalList()">검색</button><button class="btn btn-cal" style="background:#475569;" onclick="toggleAllItemCheck(true)">전체선택</button><button class="btn btn-cal" style="background:#64748b;" onclick="toggleAllItemCheck(false)">해제</button></div><div class="modal-body-scroll" id="item-modal-list"></div><div style="margin-top: 15px; text-align: right;"><button class="btn" onclick="applyItemSelection()">확인 적용</button></div></div></div>
+    <div class="modal-overlay" id="item-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">📦 품목 다중 선택 (품목코드 기준)</span><span class="close-btn" onclick="closeItemModal()">✕</span></div><div style="display: flex; gap: 8px; margin-bottom: 8px;"><input type="text" id="modal-item-search" class="input-box" style="flex:1;" placeholder="품목코드 또는 품목명 검색 (Enter)" onkeydown="if(event.key==='Enter') filterItemModalList()"><button class="btn btn-cal" style="background:#2563eb;" onclick="filterItemModalList()">검색</button><button class="btn btn-cal" style="background:#475569;" onclick="toggleAllItemCheck(true)">전체선택</button><button class="btn btn-cal" style="background:#64748b;" onclick="toggleAllItemCheck(false)">해제</button></div><div class="modal-body-scroll" id="item-modal-list"></div><div style="margin-top: 15px; text-align: right;"><button class="btn" onclick="applyItemSelection()">확인 적용</button></div></div></div>
 
     <div class="container">
-        <!-- 📑 5대 탭 메뉴 -->
+        <!-- 📑 6대 탭 메뉴 (종합 분석 레포트 탭 추가) -->
         <div class="tab-container">
             <button class="tab-btn active" id="tab-btn-dashboard" onclick="switchTab('dashboard')">📈 요약 대시보드</button>
             <button class="tab-btn" id="tab-btn-brand_detail" onclick="switchTab('brand_detail')">🏆 브랜드별 상세내역 (매출 순위)</button>
             <button class="tab-btn" id="tab-btn-detail" onclick="switchTab('detail')">🛒 점포별 상세 내역</button>
             <button class="tab-btn" id="tab-btn-pivot" onclick="switchTab('pivot')">📊 피벗 분석 (조건별 집계)</button>
             <button class="tab-btn" id="tab-btn-anomaly" onclick="switchTab('anomaly')">🚨 이상 감지 (구매/운영)</button>
+            <button class="tab-btn" id="tab-btn-report" onclick="switchTab('report')">📑 종합 분석 레포트</button>
         </div>
 
         <!-- 📊 통합 검색 컨트롤 패널 -->
@@ -160,7 +162,7 @@
                 <div class="filter-group">
                     <label>품목코드/명:</label>
                     <div class="input-wrapper">
-                        <input type="text" id="chart-item-input" class="input-box" placeholder="품목 선택/검색" style="width: 150px;" oninput="handleItemInput(this.value)" onfocus="handleItemInput(this.value)">
+                        <input type="text" id="chart-item-input" class="input-box" placeholder="품목명/코드 입력 검색" style="width: 160px;" oninput="handleItemInput(this.value)" onfocus="handleItemInput(this.value)">
                         <span class="clear-btn" id="btn-clear-item" onclick="clearInputField('chart-item-input', 'cached_item_input')">✕</span>
                     </div>
                     <button class="btn-search-icon" onclick="openItemModal()">🔍</button>
@@ -168,18 +170,18 @@
                 </div>
                 <button class="btn btn-query" id="tab-query-btn" onclick="executeTabSearch()">🔍 대시보드 종합 조회</button>
             </div>
-            <!-- 이상 감지 탭 안내 메시지 -->
             <div id="anomaly-notice" style="display: none; margin-top: 10px; font-size: 13px; color: #f43f5e; font-weight: 700;">
                 💡 이상 감지 탭에서는 위 조회 기간 중 [종료일]을 기준일로 삼아 특정 과거 시점과 비교 분석합니다.
             </div>
         </div>
 
-        <!-- 🚀 Iframe 뷰포트 영역 (독립 로딩) -->
+        <!-- 🚀 Iframe 뷰포트 영역 (레포트 iframe 추가) -->
         <iframe id="frame-dashboard" class="iframe-viewport" src="dashboard.html" style="display: block;"></iframe>
         <iframe id="frame-brand_detail" class="iframe-viewport" src="brand_detail.html" style="display: none;"></iframe>
         <iframe id="frame-detail" class="iframe-viewport" src="detail.html" style="display: none;"></iframe>
         <iframe id="frame-pivot" class="iframe-viewport" src="pivot.html" style="display: none;"></iframe>
         <iframe id="frame-anomaly" class="iframe-viewport" src="anomaly.html" style="display: none;"></iframe>
+        <iframe id="frame-report" class="iframe-viewport" src="report.html" style="display: none;"></iframe>
     </div>
 
     <script>
@@ -195,7 +197,7 @@
         function cleanCode(val) { return (!val && val !== 0) ? '-' : String(val).replace(/\.0$/, '').trim(); }
         function safeSetStorage(key, value) { try { localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); } catch (e) {} }
 
-        /* 💡 5대 탭 전환 제어 */
+        /* 💡 6대 탭 전환 제어 */
         function switchTab(tabId) {
             activeTab = tabId;
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -214,14 +216,20 @@
             else if (tabId === 'detail') btnQuery.innerText = "🔍 점포별 상세 조회";
             else if (tabId === 'pivot') btnQuery.innerText = "🔍 피벗 분석 집계 조회";
             else if (tabId === 'anomaly') btnQuery.innerText = "🚨 이상 징후 품목 탐지 시작";
+            else if (tabId === 'report') btnQuery.innerText = "📑 레포트 자동 생성";
+
+            executeTabSearch();
         }
 
+        /* 💡 품목코드(itemCode)와 품목명(itemName)을 모두 정확히 전달 */
         function getCurrentSearchParams() {
+            const itemVal = document.getElementById('chart-item-input').value.trim();
             return {
                 startDate: document.getElementById('chart-start-date').value,
                 endDate: document.getElementById('chart-end-date').value,
                 brandName: document.getElementById('chart-brand-input').value.trim(),
-                itemName: document.getElementById('chart-item-input').value.trim()
+                itemCode: itemVal,
+                itemName: itemVal
             };
         }
 
@@ -231,11 +239,50 @@
             safeSetStorage('cached_chart_start_date', params.startDate);
             safeSetStorage('cached_chart_end_date', params.endDate);
             safeSetStorage('cached_brand_input', params.brandName);
-            safeSetStorage('cached_item_input', params.itemName);
+            safeSetStorage('cached_item_input', params.itemCode);
 
             const activeFrame = document.getElementById(`frame-${activeTab}`);
             if (activeFrame && activeFrame.contentWindow) {
                 activeFrame.contentWindow.postMessage({ action: 'SEARCH', params }, '*');
+            }
+        }
+
+        /* 🚀 [복원 완료] 누락되었던 OMS 수동 동기화 triggerBot() 함수 */
+        async function triggerBot() {
+            const syncDate = document.getElementById('sync-target-date').value;
+            if (!syncDate) return alert("동기화 일자를 선택해주세요.");
+            
+            const btn = document.getElementById('run-btn');
+            const originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = "⏳ 동기화 요청 중...";
+
+            try {
+                const res = await fetch(`https://api.github.com/repos/${githubId}/${repoName}/dispatches`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        event_type: 'manual_sync',
+                        client_payload: { sync_date: syncDate }
+                    })
+                });
+
+                if (res.ok || res.status === 204) {
+                    alert(`🚀 OMS 수동 동기화가 성공적으로 요청되었습니다!\n기준 일자: ${syncDate}\n잠시 후 데이터 동기화가 완료됩니다.`);
+                    executeTabSearch();
+                } else {
+                    alert(`🚀 동기화 요청이 전송되었습니다. (상태: ${res.status})\n기준 일자: ${syncDate}`);
+                }
+            } catch (err) {
+                console.error("수동 동기화 오류:", err);
+                alert(`동기화 요청 중 오류가 발생했습니다: ${err.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = originalText;
             }
         }
 
@@ -262,6 +309,7 @@
         function clearInputField(inputId, storageKey) {
             const el = document.getElementById(inputId);
             if (el) { el.value = ''; safeSetStorage(storageKey, ''); toggleClearBtn(inputId); }
+            executeTabSearch();
         }
         function toggleClearBtn(inputId) {
             const el = document.getElementById(inputId);
@@ -276,7 +324,12 @@
                     const data = await res.json();
                     allBrandList = [...new Set(data.map(r => r.brand_name))].filter(Boolean).sort();
                     const map = new Map();
-                    data.forEach(r => { if (r.item_code || r.item_name) map.set(`${cleanCode(r.item_code)}__${r.item_name}`, { code: cleanCode(r.item_code), name: r.item_name || '' }); });
+                    data.forEach(r => { 
+                        if (r.item_code || r.item_name) {
+                            const c = cleanCode(r.item_code);
+                            if (c !== '-') map.set(c, { code: c, name: r.item_name || '' });
+                        }
+                    });
                     allItemList = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
                 }
             } catch (err) {}
@@ -292,19 +345,20 @@
             dropEl.innerHTML = matched.map(b => `<div class="autocomplete-item" onclick="selectAutocompleteBrand('${b}')"><span>${b}</span></div>`).join('');
             dropEl.style.display = 'block';
         }
-        function selectAutocompleteBrand(bName) { document.getElementById('chart-brand-input').value = bName; safeSetStorage('cached_brand_input', bName); toggleClearBtn('chart-brand-input'); document.getElementById('brand-autocomplete-list').style.display = 'none'; }
+        function selectAutocompleteBrand(bName) { document.getElementById('chart-brand-input').value = bName; safeSetStorage('cached_brand_input', bName); toggleClearBtn('chart-brand-input'); document.getElementById('brand-autocomplete-list').style.display = 'none'; executeTabSearch(); }
         
+        /* 💡 품목명 검색 시 품목코드(i.code)가 정확히 입력되고 조회되도록 구현 */
         function handleItemInput(val) {
             safeSetStorage('cached_item_input', val); toggleClearBtn('chart-item-input');
             const dropEl = document.getElementById('item-autocomplete-list');
             const keyword = val.toLowerCase().trim();
             if (!keyword || allItemList.length === 0) return dropEl.style.display = 'none';
-            const matched = allItemList.filter(i => i.code.toLowerCase().includes(keyword) || i.name.toLowerCase().includes(keyword)).slice(0, 8);
+            const matched = allItemList.filter(i => i.code.toLowerCase().includes(keyword) || i.name.toLowerCase().includes(keyword)).slice(0, 10);
             if (matched.length === 0) return dropEl.style.display = 'none';
-            dropEl.innerHTML = matched.map(i => `<div class="autocomplete-item" onclick="selectAutocompleteItem('${i.code}')"><span><b>${i.name}</b></span><span class="code-tag">[${i.code}]</span></div>`).join('');
+            dropEl.innerHTML = matched.map(i => `<div class="autocomplete-item" onclick="selectAutocompleteItem('${i.code}')"><span><b>${i.name}</b></span><span style="font-family:monospace;color:#0284c7;font-weight:bold;background:#e0f2fe;padding:2px 6px;border-radius:4px;">[${i.code}]</span></div>`).join('');
             dropEl.style.display = 'block';
         }
-        function selectAutocompleteItem(iCode) { document.getElementById('chart-item-input').value = iCode; safeSetStorage('cached_item_input', iCode); toggleClearBtn('chart-item-input'); document.getElementById('item-autocomplete-list').style.display = 'none'; }
+        function selectAutocompleteItem(iCode) { document.getElementById('chart-item-input').value = iCode; safeSetStorage('cached_item_input', iCode); toggleClearBtn('chart-item-input'); document.getElementById('item-autocomplete-list').style.display = 'none'; executeTabSearch(); }
 
         document.addEventListener('click', (e) => {
             if (!e.target.closest('#chart-brand-input') && !e.target.closest('#brand-autocomplete-list')) { const drop = document.getElementById('brand-autocomplete-list'); if (drop) drop.style.display = 'none'; }
@@ -314,6 +368,7 @@
         function toggleAiChatWidget() { const widget = document.getElementById('ai-chat-modal'); widget.style.display = (widget.style.display === 'flex') ? 'none' : 'flex'; if(widget.style.display === 'flex') document.getElementById('ai-user-input').focus(); }
         function saveGeminiKey() { const keyVal = document.getElementById('gemini-key-input').value.trim(); if(keyVal){ localStorage.setItem('gemini_api_key', keyVal); alert("저장됨!"); } }
         
+        /* 💡 [복원 유지] 발주량 숫자 배지 표기 원본 캘린더 */
         function openCalendarModal() { document.getElementById('calendar-modal').style.display = 'flex'; loadCalendarData(); }
         function closeCalendarModal() { document.getElementById('calendar-modal').style.display = 'none'; }
         async function loadCalendarData() {
@@ -356,7 +411,7 @@
         }
         function filterBrandModalList() { renderBrandModalList(); }
         function toggleAllBrandCheck(status) { document.querySelectorAll('.brand-modal-chk').forEach(c => c.checked = status); }
-        function applyBrandSelection() { const vals = Array.from(document.querySelectorAll('.brand-modal-chk:checked')).map(c => c.value).join(', '); document.getElementById('chart-brand-input').value = vals; toggleClearBtn('chart-brand-input'); closeBrandModal(); }
+        function applyBrandSelection() { const vals = Array.from(document.querySelectorAll('.brand-modal-chk:checked')).map(c => c.value).join(', '); document.getElementById('chart-brand-input').value = vals; toggleClearBtn('chart-brand-input'); closeBrandModal(); executeTabSearch(); }
 
         function openItemModal() { document.getElementById('item-modal').style.display = 'flex'; renderItemModalList(); }
         function closeItemModal() { document.getElementById('item-modal').style.display = 'none'; }
@@ -366,11 +421,11 @@
             const listEl = document.getElementById('item-modal-list');
             const filtered = allItemList.filter(i => i.code.toLowerCase().includes(kw) || i.name.toLowerCase().includes(kw));
             if (filtered.length === 0) { listEl.innerHTML = '<div style="text-align:center; padding:15px;">검색 결과가 없습니다.</div>'; return; }
-            listEl.innerHTML = filtered.map(i => `<div class="search-list-item"><label><input type="checkbox" class="item-modal-chk" value="${i.code}" ${cur.includes(i.code) ? 'checked' : ''}><span><span style="font-family:monospace; color:#64748b;">[${i.code}]</span> <b>${i.name}</b></span></label></div>`).join('');
+            listEl.innerHTML = filtered.map(i => `<div class="search-list-item"><label><input type="checkbox" class="item-modal-chk" value="${i.code}" ${cur.includes(i.code) ? 'checked' : ''}><span><span style="font-family:monospace; color:#0284c7; font-weight:bold;">[${i.code}]</span> <b>${i.name}</b></span></label></div>`).join('');
         }
         function filterItemModalList() { renderItemModalList(); }
         function toggleAllItemCheck(status) { document.querySelectorAll('.item-modal-chk').forEach(c => c.checked = status); }
-        function applyItemSelection() { const vals = Array.from(document.querySelectorAll('.item-modal-chk:checked')).map(c => c.value).join(', '); document.getElementById('chart-item-input').value = vals; safeSetStorage('cached_item_input', vals); toggleClearBtn('chart-item-input'); closeItemModal(); }
+        function applyItemSelection() { const vals = Array.from(document.querySelectorAll('.item-modal-chk:checked')).map(c => c.value).join(', '); document.getElementById('chart-item-input').value = vals; safeSetStorage('cached_item_input', vals); toggleClearBtn('chart-item-input'); closeItemModal(); executeTabSearch(); }
 
         document.addEventListener('DOMContentLoaded', async () => {
             const today = new Date(), past7 = new Date(); past7.setDate(today.getDate() - 7);
