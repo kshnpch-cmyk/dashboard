@@ -18,7 +18,6 @@
         .btn-view-stores { background-color: #f59e0b; color: white; border: none; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; cursor: pointer; }
         .chart-container { position: relative; height: 380px; width: 100%; margin-top: 15px; }
         
-        /* 점포 모달 */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 20px; border-radius: 12px; width: 420px; max-width: 90%; max-height: 85vh; display: flex; flex-direction: column; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
@@ -76,7 +75,6 @@
             return [clean, withDotZero];
         }
 
-        // 🌤️ 날씨 상태 코드 기반 이모지 변환 (강수량 수치는 미표기)
         function getWeatherEmoji(code, rain) {
             if (rain && rain >= 2) return '🌧️';
             if (code === 0) return '☀️';
@@ -89,7 +87,6 @@
             return '☀️';
         }
 
-        // 🌤️ 날씨 API 연동 (서울 기준: 최저/최고기온, 날씨코드 로드)
         async function fetchWeatherData(startDate, endDate) {
             try {
                 let url = `https://archive-api.open-meteo.com/v1/archive?latitude=37.5665&longitude=126.9780&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode&timezone=Asia%2FSeoul`;
@@ -115,16 +112,17 @@
                     return wMap;
                 }
             } catch (err) {
-                console.warn("날씨 데이터 로드 실패 (차트는 정상 유지):", err);
+                console.warn("날씨 데이터 로드 실패:", err);
             }
             return {};
         }
 
         async function fetchChartData(params) {
             const currentToken = ++fetchToken;
-            const { startDate, endDate, brandName, itemName } = params;
+            const { startDate, endDate, brandName, itemCode, itemName } = params;
             if (!startDate || !endDate) return;
 
+            const targetInput = (itemCode || itemName || '').trim();
             let dailyUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
             
             if (brandName) {
@@ -132,22 +130,22 @@
                 if (bList.length === 1) dailyUrl += `&brand_name=ilike.*${encodeURIComponent(safeSearchKeyword(bList[0]))}*`;
                 else if (bList.length > 1) dailyUrl += `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(safeSearchKeyword(b))}*`).join(',')})`;
             }
-            if (itemName) {
-                const iList = itemName.split(',').map(i => i.trim()).filter(Boolean);
-                if (iList.length === 1) { 
-                    const safe = encodeURIComponent(safeSearchKeyword(iList[0]));
-                    dailyUrl += `&or=(item_code.ilike.*${safe}*,item_name.ilike.*${safe}*)`; 
-                } else if (iList.length > 1) { 
-                    const orConds = iList.map(i => {
-                        const safe = encodeURIComponent(safeSearchKeyword(i));
-                        return `item_code.ilike.*${safe}*,item_name.ilike.*${safe}*`;
-                    }).join(','); 
-                    dailyUrl += `&or=(${orConds})`; 
-                }
+
+            let validCodeList = [];
+            if (targetInput) {
+                const rawCodes = targetInput.split(',').map(s => s.trim()).filter(Boolean);
+                const codeSet = new Set();
+                rawCodes.forEach(rc => {
+                    expandCodeVariants(rc).forEach(v => codeSet.add(v));
+                });
+                validCodeList = Array.from(codeSet);
+                
+                // 💡 PostgREST 400 에러를 원천 차단하는 or=(item_code.eq...) 구문 적용
+                const orConds = validCodeList.map(c => `item_code.eq.${encodeURIComponent(c)}`).join(',');
+                dailyUrl += `&or=(${orConds})`;
             }
 
             try {
-                // 1단계: 주문 요약 데이터 + 날씨 데이터 병렬 호출
                 const [resDaily, weatherMap] = await Promise.all([
                     fetch(dailyUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } }),
                     fetchWeatherData(startDate, endDate)
@@ -158,26 +156,8 @@
                 currentBrandStoreMap = {};
                 renderDashboard(dailyData, weatherMap);
 
-                // 2단계: 점포수 산출 (.0 코드 포맷 완벽 매칭 유지)
-                if (itemName) {
-                    const codeTargets = new Set();
-                    const userInputs = itemName.split(',').map(s => s.trim()).filter(Boolean);
-                    userInputs.forEach(input => {
-                        expandCodeVariants(input).forEach(c => codeTargets.add(c));
-                    });
-
-                    dailyData.forEach(r => {
-                        if (r.item_code && r.item_code !== '-') {
-                            expandCodeVariants(r.item_code).forEach(c => codeTargets.add(c));
-                        }
-                    });
-
-                    const finalCodes = Array.from(codeTargets);
-                    if (finalCodes.length === 0) {
-                        recalculateStores([], true);
-                        return;
-                    }
-
+                // 💡 [핵심 버그 수정] 피자박스 점포수가 0개점으로 뜨던 PostgREST in(...) 쿼리 교정
+                if (validCodeList.length > 0) {
                     let storeUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_name,brand_name`;
 
                     if (brandName) {
@@ -186,7 +166,9 @@
                         else if (bList.length > 1) storeUrl += `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(safeSearchKeyword(b))}*`).join(',')})`;
                     }
 
-                    storeUrl += `&item_code=in.(${finalCodes.map(encodeURIComponent).join(',')})`;
+                    // 💡 in(...) 대신 400 에러가 전혀 없는 or=(item_code.eq...) 구문으로 안전 조회
+                    const itemOrConds = validCodeList.map(c => `item_code.eq.${encodeURIComponent(c)}`).join(',');
+                    storeUrl += `&or=(${itemOrConds})`;
 
                     let offset = 0, limit = 1000, hasMore = true;
                     let storeDataAccumulated = [];
@@ -229,7 +211,7 @@
             data.forEach(r => {
                 const q = cleanNumber(r.total_qty || r.qty), amt = cleanNumber(r.total_amount) || (q * cleanNumber(r.price));
                 totalQty += q; totalAmount += amt;
-                if (r.item_name) items.add(r.item_name);
+                if (r.item_code) items.add(r.item_code);
                 const dKey = formatDisplayDate(r.delivery_date);
                 if (!dailyMap[dKey]) dailyMap[dKey] = { qty: 0, amount: 0 };
                 dailyMap[dKey].qty += q; dailyMap[dKey].amount += amt;
@@ -243,7 +225,6 @@
             const qtyData = rawDates.map(k => dailyMap[k].qty);
             const amtData = rawDates.map(k => dailyMap[k].amount);
 
-            // 💡 [핵심] 1줄: 날짜 / 2줄: 날씨 이모지 + 최저/최고기온만 생성 (강수량 제외)
             const chartLabels = rawDates.map(dKey => {
                 const labelLines = [dKey];
                 const w = weatherMap[dKey];
@@ -309,7 +290,7 @@
                         x: {
                             ticks: {
                                 font: { size: 10, weight: 'bold' },
-                                maxRotation: 0,   /* 💡 수평으로 반듯하게 정렬 (대각선 회전 제거) */
+                                maxRotation: 0,
                                 minRotation: 0,
                                 autoSkip: true,
                                 autoSkipPadding: 8
