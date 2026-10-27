@@ -18,6 +18,7 @@
         .btn-view-stores { background-color: #f59e0b; color: white; border: none; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; cursor: pointer; }
         .chart-container { position: relative; height: 380px; width: 100%; margin-top: 15px; }
         
+        /* 점포 모달 */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 20px; border-radius: 12px; width: 420px; max-width: 90%; max-height: 85vh; display: flex; flex-direction: column; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
@@ -75,6 +76,7 @@
             return [clean, withDotZero];
         }
 
+        // 🌤️ 날씨 상태 코드 기반 이모지 변환 (강수량 수치는 미표기)
         function getWeatherEmoji(code, rain) {
             if (rain && rain >= 2) return '🌧️';
             if (code === 0) return '☀️';
@@ -87,6 +89,7 @@
             return '☀️';
         }
 
+        // 🌤️ 날씨 API 연동 (서울 기준: 최저/최고기온, 날씨코드 로드)
         async function fetchWeatherData(startDate, endDate) {
             try {
                 let url = `https://archive-api.open-meteo.com/v1/archive?latitude=37.5665&longitude=126.9780&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode&timezone=Asia%2FSeoul`;
@@ -112,7 +115,7 @@
                     return wMap;
                 }
             } catch (err) {
-                console.warn("날씨 데이터 로드 실패:", err);
+                console.warn("날씨 데이터 로드 실패 (차트는 정상 유지):", err);
             }
             return {};
         }
@@ -144,6 +147,7 @@
             }
 
             try {
+                // 1단계: 주문 요약 데이터 + 날씨 데이터 병렬 호출
                 const [resDaily, weatherMap] = await Promise.all([
                     fetch(dailyUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } }),
                     fetchWeatherData(startDate, endDate)
@@ -154,7 +158,7 @@
                 currentBrandStoreMap = {};
                 renderDashboard(dailyData, weatherMap);
 
-                // 점포수 집계 (.0 지원)
+                // 2단계: 점포수 산출 (.0 코드 포맷 완벽 매칭 유지)
                 if (itemName) {
                     const codeTargets = new Set();
                     const userInputs = itemName.split(',').map(s => s.trim()).filter(Boolean);
@@ -239,6 +243,7 @@
             const qtyData = rawDates.map(k => dailyMap[k].qty);
             const amtData = rawDates.map(k => dailyMap[k].amount);
 
+            // 💡 [핵심] 1줄: 날짜 / 2줄: 날씨 이모지 + 최저/최고기온만 생성 (강수량 제외)
             const chartLabels = rawDates.map(dKey => {
                 const labelLines = [dKey];
                 const w = weatherMap[dKey];
@@ -304,7 +309,7 @@
                         x: {
                             ticks: {
                                 font: { size: 10, weight: 'bold' },
-                                maxRotation: 0,
+                                maxRotation: 0,   /* 💡 수평으로 반듯하게 정렬 (대각선 회전 제거) */
                                 minRotation: 0,
                                 autoSkip: true,
                                 autoSkipPadding: 8
