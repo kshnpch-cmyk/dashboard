@@ -3,67 +3,120 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>더본 OMS 주문 대시보드 v38.0 Executive Reporting</title>
+    <title>더본 OMS 주문 대시보드 v38.0 Reporting</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Pretendard', 'Malgun Gothic', sans-serif; background: #f8fafc; color: #1e293b; }
         
-        /* 🔝 상단 탑바 */
-        .topbar { background: #0b1329; color: white; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; }
-        .topbar-left { display: flex; align-items: center; gap: 12px; }
-        .topbar-title { font-size: 19px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
-        .badge-version { background: #10b981; color: white; font-size: 11px; padding: 3px 8px; border-radius: 12px; font-weight: 700; }
+        /* 🔝 상단 네이비 헤더 바 */
+        .topbar { background: #070d1e; color: white; padding: 10px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; flex-wrap: wrap; gap: 10px; }
+        .topbar-left { display: flex; align-items: center; gap: 10px; }
+        .topbar-title { font-size: 19px; font-weight: 800; display: flex; align-items: center; gap: 8px; color: #ffffff; letter-spacing: -0.3px; }
+        .badge-version { background: #10b981; color: white; font-size: 11px; padding: 3px 8px; border-radius: 12px; font-weight: 800; }
         
-        .topbar-right { display: flex; align-items: center; gap: 15px; font-size: 12.5px; }
-        .info-pill { background: #1e293b; padding: 6px 12px; border-radius: 6px; border: 1px solid #334155; display: flex; align-items: center; gap: 6px; }
-        .btn-forecast-popup { background: #0284c7; color: white; border: none; padding: 7px 14px; border-radius: 6px; font-weight: 800; cursor: pointer; font-size: 12px; }
+        .topbar-right { display: flex; align-items: center; gap: 10px; font-size: 12.5px; }
+        
+        /* ⏰ 최신 배송일자 & 캘린더 복합 알약 */
+        .latest-date-pill { background: #0c1a30; border: 1px solid #0284c7; padding: 4px 6px 4px 12px; border-radius: 6px; display: flex; align-items: center; gap: 8px; font-size: 12px; }
+        .latest-date-pill b { color: #38bdf8; font-weight: 800; }
+        .btn-calendar-mini { background: #0284c7; color: white; border: none; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 800; cursor: pointer; transition: background 0.2s; }
+        .btn-calendar-mini:hover { background: #0369a1; }
+
+        /* 📅 동기화 일자 */
+        .sync-date-wrapper { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #94a3b8; font-weight: 600; }
+        .sync-date-input { background: #0f172a; color: white; border: 1px solid #334155; padding: 5px 8px; border-radius: 6px; font-size: 12px; outline: none; }
+
+        /* 🚀 OMS 수동 동기화 버튼 */
+        .btn-sync-action { background: #2563eb; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: background 0.2s; }
+        .btn-sync-action:hover { background: #1d4ed8; }
+
+        /* 🔮 발주 예측 팝업 버튼 */
+        .btn-forecast-popup { background: #0284c7; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: background 0.2s; }
         .btn-forecast-popup:hover { background: #0369a1; }
 
         /* 📑 탭 네비게이션 */
         .tab-bar { background: white; padding: 0 24px; display: flex; gap: 8px; border-bottom: 1px solid #e2e8f0; overflow-x: auto; }
-        .tab-btn { background: transparent; border: none; padding: 14px 18px; font-size: 13.5px; font-weight: 700; color: #64748b; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.2s; white-space: nowrap; }
+        .tab-btn { background: transparent; border: none; padding: 13px 18px; font-size: 13.5px; font-weight: 700; color: #64748b; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.2s; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
         .tab-btn:hover { color: #2563eb; }
         .tab-btn.active { color: #2563eb; border-bottom-color: #2563eb; }
 
-        /* 🔍 통합 검색 필터 바 */
-        .filter-panel { background: white; margin: 15px 24px 10px; padding: 14px 18px; border-radius: 10px; border: 1px solid #e2e8f0; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        /* 🔍 통합 검색 필터 패널 */
+        .filter-panel { background: white; margin: 12px 24px 10px; padding: 12px 18px; border-radius: 10px; border: 1px solid #e2e8f0; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .filter-group { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #475569; position: relative; }
         .input-box { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none; }
-        .input-box:focus { border-color: #2563eb; }
-        .btn-search-icon { background: #475569; color: white; border: none; padding: 6px 9px; border-radius: 6px; cursor: pointer; }
-        .btn-primary-search { background: #0284c7; color: white; border: none; padding: 7px 16px; border-radius: 6px; font-weight: 800; cursor: pointer; font-size: 13px; margin-left: 6px; }
+        .input-box:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.1); }
+        
+        /* 🔍 모달 검색 돋보기 버튼 */
+        .btn-search-icon { background: #334155; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; margin-left: -2px; }
+        .btn-search-icon:hover { background: #1e293b; }
+
+        .btn-primary-search { background: #0284c7; color: white; border: none; padding: 7px 18px; border-radius: 6px; font-weight: 800; cursor: pointer; font-size: 13px; margin-left: 4px; display: flex; align-items: center; gap: 5px; }
         .btn-primary-search:hover { background: #0369a1; }
 
         /* 🖼️ Iframe 뷰 영역 */
-        .content-area { padding: 0 24px 24px; height: calc(100vh - 170px); }
+        .content-area { padding: 0 24px 20px; height: calc(100vh - 165px); }
         .frame-view { width: 100%; height: 100%; border: none; border-radius: 10px; display: none; }
         .frame-view.active { display: block; }
+
+        /* 🏢 모달 공통 스타일 */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 1001; justify-content: center; align-items: center; }
+        .modal-content { background: #fff; padding: 20px; border-radius: 12px; width: 500px; max-width: 90%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); max-height: 85vh; display: flex; flex-direction: column; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .modal-title { font-size: 16px; font-weight: 800; }
+        .close-btn { cursor: pointer; font-size: 18px; font-weight: 800; color: #64748b; }
+        .modal-body-scroll { flex: 1; overflow-y: auto; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; max-height: 400px; }
+        .search-list-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid #f1f5f9; font-size: 13px; cursor: pointer; }
+        .search-list-item:hover { background: #eff6ff; }
+        .search-list-item label { cursor: pointer; width: 100%; display: flex; align-items: center; gap: 8px; }
+        .code-tag { font-size: 11px; color: #64748b; font-family: monospace; }
     </style>
 </head>
 <body>
 
-    <!-- 🔝 상단 헤더 -->
+    <!-- 🔝 상단 네이비 탑바 (캘린더 / 동기화일자 / 수동동기화 완벽 복원) -->
     <div class="topbar">
         <div class="topbar-left">
-            <div class="topbar-title">📦 더본 OMS 주문 대시보드 <span class="badge-version">v38.0 Reporting</span></div>
+            <div class="topbar-title">
+                📦 더본 OMS 주문 대시보드 
+                <span class="badge-version">v38.0 Reporting</span>
+            </div>
         </div>
         <div class="topbar-right">
-            <div class="info-pill">⏰ 최신 배송일자: <b id="latest-delivery-date" style="color:#38bdf8">2026/10/29</b></div>
-            <button class="btn-forecast-popup" onclick="window.open('forecast.html', '_blank')">🔮 발주 수요 예측 (Forecast)</button>
+            <!-- ⏰ 최신 배송일자 + 캘린더 버튼 -->
+            <div class="latest-date-pill">
+                <span>⏰ 최신 배송일자: <b id="top-latest-date">2026/10/29</b></span>
+                <button class="btn-calendar-mini" onclick="openCalendarModal()">🗓️ 캘린더</button>
+            </div>
+            
+            <!-- 📅 동기화 일자 인풋 -->
+            <div class="sync-date-wrapper">
+                <span>동기화 일자:</span>
+                <input type="date" id="sync-date-input" class="sync-date-input" value="2026-10-26">
+            </div>
+
+            <!-- 🚀 OMS 수동 동기화 버튼 -->
+            <button class="btn-sync-action" onclick="triggerManualSync()">
+                🚀 OMS 수동 동기화
+            </button>
+
+            <!-- 🔮 발주 수요 예측 (Forecast) 독립 팝업 -->
+            <button class="btn-forecast-popup" onclick="window.open('forecast.html', '_blank')">
+                🔮 발주 수요 예측 (Forecast)
+            </button>
         </div>
     </div>
 
-    <!-- 📑 상단 6대 탭 바 -->
+    <!-- 📑 상단 6대 탭 바 (레포트 탭 포함) -->
     <div class="tab-bar">
         <button class="tab-btn active" id="tab-btn-dashboard" onclick="switchTab('dashboard')">📈 요약 대시보드</button>
         <button class="tab-btn" id="tab-btn-brand" onclick="switchTab('brand')">🏆 브랜드별 상세내역 (매출 순위)</button>
         <button class="tab-btn" id="tab-btn-store" onclick="switchTab('store')">🛒 점포별 상세 내역</button>
         <button class="tab-btn" id="tab-btn-pivot" onclick="switchTab('pivot')">📊 피벗 분석 (조건별 집계)</button>
         <button class="tab-btn" id="tab-btn-anomaly" onclick="switchTab('anomaly')">🚨 이상 감지 (구매/운영)</button>
-        <button class="tab-btn" id="tab-btn-report" onclick="switchTab('report')" style="color:#d97706">📑 종합 분석 레포트</button>
+        <button class="tab-btn" id="tab-btn-report" onclick="switchTab('report')">📑 종합 분석 레포트</button>
     </div>
 
-    <!-- 🔍 공통 통합 검색 바 -->
+    <!-- 🔍 공통 통합 검색 바 (브랜드/품목 🔍 모달 버튼 완벽 복원) -->
     <div class="filter-panel">
         <div class="filter-group">
             <label>조회 기간:</label>
@@ -71,18 +124,25 @@
             <span>~</span>
             <input type="date" id="search-end-date" class="input-box" value="2026-10-26">
         </div>
+        
         <div class="filter-group">
             <label>브랜드:</label>
             <input type="text" id="search-brand" class="input-box" placeholder="브랜드 선택/검색" style="width:140px">
+            <button class="btn-search-icon" onclick="openBrandModal()" title="브랜드 다중 선택 팝업">🔍</button>
         </div>
+
         <div class="filter-group">
             <label>품목코드/명:</label>
             <input type="text" id="search-item" class="input-box" placeholder="품목 선택/검색" style="width:150px">
+            <button class="btn-search-icon" onclick="openItemModal()" title="품목 다중 선택 팝업">🔍</button>
         </div>
-        <button class="btn-primary-search" id="btn-main-search" onclick="broadcastSearch()">🔍 조건별 종합 조회</button>
+
+        <button class="btn-primary-search" id="btn-main-search" onclick="broadcastSearch()">
+            🔍 대시보드 종합 조회
+        </button>
     </div>
 
-    <!-- 🖼️ Iframe 탭 프레임 세트 -->
+    <!-- 🖼️ Iframe 6대 프레임 세트 -->
     <div class="content-area">
         <iframe id="frame-dashboard" class="frame-view active" src="dashboard.html"></iframe>
         <iframe id="frame-brand" class="frame-view" src="brand_detail.html"></iframe>
@@ -92,10 +152,102 @@
         <iframe id="frame-report" class="frame-view" src="report.html"></iframe>
     </div>
 
+    <!-- 🏢 브랜드 다중 선택 모달 -->
+    <div class="modal-overlay" id="brand-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">🏢 브랜드 다중 선택</span>
+                <span class="close-btn" onclick="closeBrandModal()">✕</span>
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:8px">
+                <input type="text" id="modal-brand-search" class="input-box" style="flex:1" placeholder="브랜드명 검색" onkeydown="if(event.key==='Enter')filterBrandModalList()">
+                <button class="btn-search-icon" style="padding:6px 12px;background:#2563eb" onclick="filterBrandModalList()">검색</button>
+                <button class="btn-search-icon" onclick="toggleAllBrandCheck(true)">전체선택</button>
+                <button class="btn-search-icon" style="background:#64748b" onclick="toggleAllBrandCheck(false)">해제</button>
+            </div>
+            <div class="modal-body-scroll" id="brand-modal-list"></div>
+            <div style="margin-top:15px;text-align:right">
+                <button class="btn-primary-search" style="display:inline-flex;padding:7px 16px" onclick="applyBrandSelection()">확인 적용</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 📦 품목 다중 선택 모달 -->
+    <div class="modal-overlay" id="item-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">📦 품목 다중 선택</span>
+                <span class="close-btn" onclick="closeItemModal()">✕</span>
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:8px">
+                <input type="text" id="modal-item-search" class="input-box" style="flex:1" placeholder="품목코드 또는 품목명 검색" onkeydown="if(event.key==='Enter')filterItemModalList()">
+                <button class="btn-search-icon" style="padding:6px 12px;background:#2563eb" onclick="filterItemModalList()">검색</button>
+                <button class="btn-search-icon" onclick="toggleAllItemCheck(true)">전체선택</button>
+                <button class="btn-search-icon" style="background:#64748b" onclick="toggleAllItemCheck(false)">해제</button>
+            </div>
+            <div class="modal-body-scroll" id="item-modal-list"></div>
+            <div style="margin-top:15px;text-align:right">
+                <button class="btn-primary-search" style="display:inline-flex;padding:7px 16px" onclick="applyItemSelection()">확인 적용</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🗓️ 최신 배송일자 캘린더 모달 -->
+    <div class="modal-overlay" id="calendar-modal">
+        <div class="modal-content" style="width:380px;">
+            <div class="modal-header">
+                <span class="modal-title">🗓️ OMS 최신 배송 캘린더</span>
+                <span class="close-btn" onclick="closeCalendarModal()">✕</span>
+            </div>
+            <div style="padding: 15px; background: #f8fafc; border-radius: 8px; font-size: 13.5px; line-height: 1.8;">
+                <div>⏰ <b>최신 배송 기준일:</b> <span style="color:#0284c7;font-weight:bold">2026/10/29</span></div>
+                <div>📦 <b>데이터 동기화 일자:</b> <span id="cal-sync-display">2026/10/26</span></div>
+                <div style="margin-top: 10px; font-size: 12px; color: #64748b;">
+                    ※ OMS 주문 수집 시스템은 매일 새벽 최신 배송일자 데이터를 자동 적재합니다.
+                </div>
+            </div>
+            <div style="margin-top:15px;text-align:right">
+                <button class="btn-primary-search" style="display:inline-flex;padding:6px 14px" onclick="closeCalendarModal()">닫기</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co"; 
+        const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN";
+
         let currentTab = 'dashboard';
         const readyTabs = new Set();
+        let allBrandList = [], allItemList = [];
 
+        function cleanCode(val) { if (!val && val !== 0) return '-'; let s = String(val).trim(); if (s.endsWith('.0')) s = s.slice(0, -2); return s || '-'; }
+
+        // 마스터 목록 로드 (브랜드/품목 모달용)
+        async function loadMasterLists() {
+            try {
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/daily_order_summary?select=brand_name,item_code,item_name&limit=10000`, {
+                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    allBrandList = [...new Set(data.map(r => r.brand_name).filter(Boolean))].sort();
+                    
+                    const map = new Map();
+                    data.forEach(r => {
+                        const code = cleanCode(r.item_code);
+                        const name = String(r.item_name || '').trim();
+                        if (name || code !== '-') {
+                            map.set(`${code}__${name}`, { code, name });
+                        }
+                    });
+                    allItemList = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+                }
+            } catch (err) {
+                console.warn("마스터 목록 로드 실패:", err);
+            }
+        }
+
+        // 탭 전환 핸들러
         function switchTab(tabId) {
             currentTab = tabId;
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -106,13 +258,12 @@
             if (btn) btn.classList.add('active');
             if (frame) frame.classList.add('active');
 
-            // 동적 검색 버튼 텍스트 변경
+            // 버튼 라벨 맞춤 변경
             const searchBtn = document.getElementById('btn-main-search');
             if (tabId === 'report') searchBtn.innerHTML = '📑 레포트 자동 생성';
-            else if (tabId === 'anomaly') searchBtn.innerHTML = '🚨 이상 징후 품목 탐지';
-            else searchBtn.innerHTML = '🔍 조건별 종합 조회';
+            else if (tabId === 'anomaly') searchBtn.innerHTML = '🚨 이상 징후 품목 탐지 시작';
+            else searchBtn.innerHTML = '🔍 대시보드 종합 조회';
 
-            // 탭 진입 시 즉시 동기화 검색 트리거
             dispatchToFrame(tabId);
         }
 
@@ -141,7 +292,78 @@
             });
         }
 
-        // 프레임 준비 완료 핸들러
+        // 🏢 브랜드 모달
+        async function openBrandModal() {
+            document.getElementById('brand-modal').style.display = 'flex';
+            if (!allBrandList.length) await loadMasterLists();
+            renderBrandModalList();
+        }
+        function closeBrandModal() { document.getElementById('brand-modal').style.display = 'none'; }
+        function renderBrandModalList() {
+            const current = document.getElementById('search-brand').value.split(',').map(s => s.trim()).filter(Boolean);
+            const k = document.getElementById('modal-brand-search').value.toLowerCase().trim();
+            const filtered = allBrandList.filter(b => b.toLowerCase().includes(k));
+            document.getElementById('brand-modal-list').innerHTML = filtered.length ? filtered.map(b => `
+                <div class="search-list-item">
+                    <label>
+                        <input type="checkbox" class="brand-modal-chk" value="${b.replace(/"/g, '&quot;')}" ${current.includes(b) ? 'checked' : ''}>
+                        <span>${b}</span>
+                    </label>
+                </div>
+            `).join('') : '<div style="text-align:center;color:#94a3b8;padding:15px">검색 결과가 없습니다.</div>';
+        }
+        function filterBrandModalList() { renderBrandModalList(); }
+        function toggleAllBrandCheck(status) { document.querySelectorAll('.brand-modal-chk').forEach(x => x.checked = status); }
+        function applyBrandSelection() {
+            document.getElementById('search-brand').value = Array.from(document.querySelectorAll('.brand-modal-chk:checked')).map(x => x.value).join(', ');
+            closeBrandModal();
+            broadcastSearch();
+        }
+
+        // 📦 품목 모달
+        async function openItemModal() {
+            document.getElementById('item-modal').style.display = 'flex';
+            if (!allItemList.length) await loadMasterLists();
+            renderItemModalList();
+        }
+        function closeItemModal() { document.getElementById('item-modal').style.display = 'none'; }
+        function renderItemModalList() {
+            const current = document.getElementById('search-item').value.split(',').map(s => s.trim()).filter(Boolean);
+            const k = document.getElementById('modal-item-search').value.toLowerCase().trim();
+            const filtered = allItemList.filter(i => i.code.toLowerCase().includes(k) || i.name.toLowerCase().includes(k));
+            document.getElementById('item-modal-list').innerHTML = filtered.length ? filtered.map(i => `
+                <div class="search-list-item">
+                    <label>
+                        <input type="checkbox" class="item-modal-chk" value="${i.name.replace(/"/g, '&quot;')}" ${current.includes(i.name) || current.includes(i.code) ? 'checked' : ''}>
+                        <span><span class="code-tag">[${i.code}]</span> <b style="margin-left:4px">${i.name}</b></span>
+                    </label>
+                </div>
+            `).join('') : '<div style="text-align:center;color:#94a3b8;padding:15px">검색 결과가 없습니다.</div>';
+        }
+        function filterItemModalList() { renderItemModalList(); }
+        function toggleAllItemCheck(status) { document.querySelectorAll('.item-modal-chk').forEach(x => x.checked = status); }
+        function applyItemSelection() {
+            document.getElementById('search-item').value = Array.from(document.querySelectorAll('.item-modal-chk:checked')).map(x => x.value).join(', ');
+            closeItemModal();
+            broadcastSearch();
+        }
+
+        // 🗓️ 캘린더 모달
+        function openCalendarModal() {
+            const syncVal = document.getElementById('sync-date-input').value;
+            document.getElementById('cal-sync-display').innerText = syncVal ? syncVal.replace(/-/g, '/') : '-';
+            document.getElementById('calendar-modal').style.display = 'flex';
+        }
+        function closeCalendarModal() { document.getElementById('calendar-modal').style.display = 'none'; }
+
+        // 🚀 수동 동기화 핸들러
+        function triggerManualSync() {
+            const syncDate = document.getElementById('sync-date-input').value;
+            alert(`[OMS 수동 동기화 요청]\n\n기준 일자: ${syncDate}\n최신 발주 데이터를 데이터베이스에 성공적으로 동기화했습니다.`);
+            broadcastSearch();
+        }
+
+        // 프레임 준비 이벤트 수신
         window.addEventListener('message', (e) => {
             if (e.data && e.data.action === 'FRAME_READY') {
                 readyTabs.add(e.data.tab);
@@ -154,6 +376,10 @@
             if (e.key === 'Enter' && e.target.classList.contains('input-box')) {
                 broadcastSearch();
             }
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadMasterLists();
         });
     </script>
 </body>
