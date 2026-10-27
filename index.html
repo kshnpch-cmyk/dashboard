@@ -8,7 +8,6 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Pretendard', 'Malgun Gothic', -apple-system, sans-serif; background: #f8fafc; color: #1e293b; }
         
-        /* 🔝 v36.0 오리지널 네이비 탑바 */
         .topbar { 
             background: #080e1e; 
             color: #ffffff; 
@@ -32,7 +31,6 @@
         
         .topbar-right { display: flex; align-items: center; gap: 12px; font-size: 12.5px; }
         
-        /* ⏰ 최신 배송일자 & 캘린더 복합 알약 */
         .latest-date-box { 
             background: #071a2e; 
             border: 1px solid #0369a1; 
@@ -61,7 +59,6 @@
         }
         .btn-calendar-badge:hover { background: #0f766e; }
 
-        /* 📅 동기화 일자 인풋 */
         .sync-group { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #94a3b8; font-weight: 600; }
         .sync-date-input { 
             background: #0f172a; 
@@ -73,7 +70,6 @@
             outline: none; 
         }
 
-        /* 🚀 OMS 수동 동기화 버튼 */
         .btn-sync-action { 
             background: #2563eb; 
             color: #ffffff; 
@@ -90,7 +86,6 @@
         }
         .btn-sync-action:hover { background: #1d4ed8; }
 
-        /* 🔮 발주 수요 예측 팝업 버튼 */
         .btn-forecast-action { 
             background: #0284c7; 
             color: #ffffff; 
@@ -106,7 +101,6 @@
         }
         .btn-forecast-action:hover { background: #0369a1; }
 
-        /* 📑 탭 네비게이션 */
         .tab-bar { 
             background: #ffffff; 
             padding: 0 24px; 
@@ -130,7 +124,6 @@
         .tab-btn:hover { color: #2563eb; }
         .tab-btn.active { color: #2563eb; border-bottom-color: #2563eb; font-weight: 800; }
 
-        /* 🔍 통합 검색 필터 바 */
         .filter-panel { 
             background: #ffffff; 
             margin: 12px 24px 10px; 
@@ -155,8 +148,8 @@
             position: absolute; 
             top: 100%; 
             left: 0; 
-            width: 280px; 
-            max-height: 240px; 
+            width: 330px; 
+            max-height: 250px; 
             overflow-y: auto; 
             background: #ffffff; 
             border: 1px solid #cbd5e1; 
@@ -206,14 +199,12 @@
         }
         .btn-main-submit:hover { background: #0369a1; }
 
-        /* 🖼️ Iframe 뷰 영역 */
         .content-area { padding: 0 24px 20px; height: calc(100vh - 165px); }
         .frame-view { width: 100%; height: 100%; border: none; border-radius: 8px; display: none; }
         .frame-view.active { display: block; }
 
-        /* 🏢 모달 공통 */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 1001; justify-content: center; align-items: center; }
-        .modal-content { background: #ffffff; padding: 20px; border-radius: 12px; width: 500px; max-width: 90%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); max-height: 85vh; display: flex; flex-direction: column; }
+        .modal-content { background: #ffffff; padding: 20px; border-radius: 12px; width: 520px; max-width: 90%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); max-height: 85vh; display: flex; flex-direction: column; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
         .modal-title { font-size: 16px; font-weight: 800; }
         .close-btn { cursor: pointer; font-size: 18px; font-weight: 800; color: #64748b; }
@@ -221,9 +212,9 @@
         .search-list-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid #f1f5f9; font-size: 13px; cursor: pointer; }
         .search-list-item:hover { background: #eff6ff; }
         .search-list-item label { cursor: pointer; width: 100%; display: flex; align-items: center; gap: 8px; }
-        .code-tag { font-size: 11px; color: #64748b; font-family: monospace; }
+        .code-tag { font-size: 11px; color: #0284c7; font-family: monospace; font-weight: 800; background: #e0f2fe; padding: 2px 6px; border-radius: 4px; }
 
-        /* 🗓️ v36.0 오리지널 월간 캘린더 전용 스타일 */
+        /* 월간 캘린더 모달 */
         .cal-nav-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; padding: 0 4px; }
         .cal-nav-btn { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px 12px; cursor: pointer; font-weight: 800; font-size: 12px; color: #334155; }
         .cal-nav-btn:hover { background: #e2e8f0; }
@@ -242,7 +233,6 @@
         .cal-table td.sun { color: #ef4444; }
         .cal-table td.sat { color: #2563eb; }
         .cal-table td.is-sunday { background: #fef2f2; color: #f87171; cursor: default; }
-        
         .cal-table td.is-latest { background: #0284c7 !important; color: #ffffff !important; font-weight: 900; border-radius: 6px; box-shadow: 0 2px 4px rgba(2,132,199,0.3); }
         .cal-table td.is-sync { background: #dbeafe; color: #1e40af; font-weight: 800; border: 1.5px dashed #3b82f6; border-radius: 6px; }
 
@@ -265,24 +255,20 @@
             </div>
         </div>
         <div class="topbar-right">
-            <!-- ⏰ 최신 배송일자 & 캘린더 버튼 -->
             <div class="latest-date-box">
                 <span>⏰ 최신 배송일자: <b id="top-latest-date">2026/10/29</b></span>
                 <button class="btn-calendar-badge" onclick="openCalendarModal()">🗓️ 캘린더</button>
             </div>
             
-            <!-- 📅 동기화 일자 인풋 -->
             <div class="sync-group">
                 <span>동기화 일자:</span>
                 <input type="date" id="sync-date-input" class="sync-date-input" value="2026-10-26" onchange="updateCalSyncDate()">
             </div>
 
-            <!-- 🚀 OMS 수동 동기화 버튼 -->
             <button class="btn-sync-action" onclick="triggerManualSync()">
                 🚀 OMS 수동 동기화
             </button>
 
-            <!-- 🔮 발주 예측 독립 팝업 -->
             <button class="btn-forecast-action" onclick="window.open('forecast.html', '_blank')">
                 🔮 발주 수요 예측 (Forecast)
             </button>
@@ -308,7 +294,6 @@
             <input type="date" id="search-end-date" class="input-box" value="2026-10-26" style="padding-right:10px">
         </div>
         
-        <!-- 브랜드 자동완성 검색 -->
         <div class="filter-group">
             <label>브랜드:</label>
             <div class="input-wrapper">
@@ -319,11 +304,11 @@
             <button class="btn-modal-search" onclick="openBrandModal()" title="브랜드 다중 선택 팝업">🔍</button>
         </div>
 
-        <!-- 품목코드/명 자동완성 검색 -->
+        <!-- 💡 [핵심 교정] 품목코드 단독 입력창 및 드롭다운 연동 -->
         <div class="filter-group">
-            <label>품목코드/명:</label>
+            <label>품목코드:</label>
             <div class="input-wrapper">
-                <input type="text" id="search-item" class="input-box" placeholder="품목 선택/검색" style="width:160px" oninput="handleItemInput(this.value)" onfocus="handleItemInput(this.value)">
+                <input type="text" id="search-item" class="input-box" placeholder="품목명/코드 입력 검색" style="width:170px" oninput="handleItemInput(this.value)" onfocus="handleItemInput(this.value)">
                 <span class="clear-btn" id="btn-clear-item" onclick="clearInputField('search-item')">✕</span>
                 <div id="item-autocomplete-list" class="autocomplete-dropdown"></div>
             </div>
@@ -365,15 +350,15 @@
         </div>
     </div>
 
-    <!-- 📦 품목 다중 선택 모달 -->
+    <!-- 📦 품목 다중 선택 모달 (품목코드 기준 선택) -->
     <div class="modal-overlay" id="item-modal">
         <div class="modal-content">
             <div class="modal-header">
-                <span class="modal-title">📦 품목 다중 선택</span>
+                <span class="modal-title">📦 품목 다중 선택 (품목코드 기준)</span>
                 <span class="close-btn" onclick="closeItemModal()">✕</span>
             </div>
             <div style="display:flex;gap:8px;margin-bottom:8px">
-                <input type="text" id="modal-item-search" class="input-box" style="flex:1" placeholder="품목코드 또는 품목명 검색" onkeydown="if(event.key==='Enter')filterItemModalList()">
+                <input type="text" id="modal-item-search" class="input-box" style="flex:1" placeholder="품목명 또는 품목코드 검색" onkeydown="if(event.key==='Enter')filterItemModalList()">
                 <button class="btn-modal-search" style="padding:6px 12px;background:#2563eb" onclick="filterItemModalList()">검색</button>
                 <button class="btn-modal-search" onclick="toggleAllItemCheck(true)">전체선택</button>
                 <button class="btn-modal-search" style="background:#64748b" onclick="toggleAllItemCheck(false)">해제</button>
@@ -385,7 +370,7 @@
         </div>
     </div>
 
-    <!-- 🗓️ v36.0 오리지널 인터랙티브 월간 캘린더 모달 -->
+    <!-- 🗓️ 월간 캘린더 모달 -->
     <div class="modal-overlay" id="calendar-modal">
         <div class="modal-content" style="width: 440px;">
             <div class="modal-header">
@@ -407,7 +392,7 @@
                 <span class="legend-item"><span class="legend-dot holiday"></span> 일요일 휴무</span>
             </div>
             <div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-size:11.5px;color:#64748b;">※ 영업일 클릭 시 조회 종료일로 자동 반영됩니다.</span>
+                <span style="font-size:11.5px;color:#64748b;">※ 영업일 클릭 시 조회 종료일로 자동 세팅됩니다.</span>
                 <button class="btn-main-submit" style="display:inline-flex;padding:6px 14px" onclick="closeCalendarModal()">닫기</button>
             </div>
         </div>
@@ -421,7 +406,6 @@
         const readyTabs = new Set();
         let allBrandList = [], allItemList = [];
 
-        // 캘린더 상태 변수 (10월: 9)
         let calYear = 2026, calMonth = 9;
         const LATEST_DELIVERY_STR = '2026-10-29';
 
@@ -441,8 +425,8 @@
                         if (r.item_code || r.item_name) {
                             const code = cleanCode(r.item_code);
                             const name = String(r.item_name || '').trim();
-                            if (name || code !== '-') {
-                                map.set(`${code}__${name}`, { code, name });
+                            if (code !== '-' && name) {
+                                map.set(code, { code, name });
                             }
                         }
                     });
@@ -453,7 +437,6 @@
             }
         }
 
-        // 실시간 자동완성 드롭다운
         function clearInputField(id) { 
             const el = document.getElementById(id); 
             if (el) { el.value = ''; toggleClearBtn(id); }
@@ -465,6 +448,7 @@
             if (btn && el) btn.style.display = el.value.trim() ? 'block' : 'none'; 
         }
 
+        // 💡 [핵심] 품목명으로 검색해도 '품목코드(i.code)'가 전달되도록 구현
         function handleAutocompleteInput(val, type) {
             const inputId = type === 'brand' ? 'search-brand' : 'search-item';
             const dropId = type === 'brand' ? 'brand-autocomplete-list' : 'item-autocomplete-list';
@@ -482,7 +466,7 @@
 
             drop.innerHTML = type === 'brand' 
                 ? matched.map(b => `<div class="autocomplete-item" onclick="selectAutocomplete('${b.replace(/'/g, "\\'")}', 'brand')"><span>${b}</span></div>`).join('')
-                : matched.map(i => `<div class="autocomplete-item" onclick="selectAutocomplete('${i.name.replace(/'/g, "\\'")}', 'item')"><span><b>${i.name}</b></span><span class="code-tag">[${i.code}]</span></div>`).join('');
+                : matched.map(i => `<div class="autocomplete-item" onclick="selectAutocomplete('${i.code}', 'item')"><span><b>${i.name}</b></span><span class="code-tag">[${i.code}]</span></div>`).join('');
             drop.style.display = 'block';
         }
 
@@ -509,7 +493,6 @@
             });
         });
 
-        // 탭 전환
         function switchTab(tabId) {
             currentTab = tabId;
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -528,12 +511,15 @@
             dispatchToFrame(tabId);
         }
 
+        // 💡 [핵심] 품목코드 단독 파라미터(itemCode) 브로드캐스트
         function getSearchParams() {
+            const codeVal = document.getElementById('search-item').value.trim();
             return {
                 startDate: document.getElementById('search-start-date').value,
                 endDate: document.getElementById('search-end-date').value,
                 brandName: document.getElementById('search-brand').value.trim(),
-                itemName: document.getElementById('search-item').value.trim()
+                itemCode: codeVal,
+                itemName: codeVal
             };
         }
 
@@ -582,7 +568,7 @@
             broadcastSearch();
         }
 
-        // 품목 모달
+        // 💡 [핵심] 품목 모달 - 품목코드(i.code) 선택
         async function openItemModal() {
             document.getElementById('item-modal').style.display = 'flex';
             if (!allItemList.length) await loadMasterLists();
@@ -596,7 +582,7 @@
             document.getElementById('item-modal-list').innerHTML = filtered.length ? filtered.map(i => `
                 <div class="search-list-item">
                     <label>
-                        <input type="checkbox" class="item-modal-chk" value="${i.name.replace(/"/g, '&quot;')}" ${current.includes(i.name) || current.includes(i.code) ? 'checked' : ''}>
+                        <input type="checkbox" class="item-modal-chk" value="${i.code}" ${current.includes(i.code) ? 'checked' : ''}>
                         <span><span class="code-tag">[${i.code}]</span> <b style="margin-left:4px">${i.name}</b></span>
                     </label>
                 </div>
@@ -611,10 +597,9 @@
             broadcastSearch();
         }
 
-        // 🗓️ v36.0 오리지널 월간 캘린더 엔진
         function openCalendarModal() {
             calYear = 2026;
-            calMonth = 9; // 10월
+            calMonth = 9;
             renderCalendar();
             document.getElementById('calendar-modal').style.display = 'flex';
         }
@@ -639,7 +624,7 @@
 
         function renderCalendar() {
             document.getElementById('cal-month-title').innerText = `${calYear}년 ${calMonth + 1}월`;
-            const syncDateVal = document.getElementById('sync-date-input').value; // YYYY-MM-DD
+            const syncDateVal = document.getElementById('sync-date-input').value;
 
             const firstDay = new Date(calYear, calMonth, 1).getDay();
             const lastDate = new Date(calYear, calMonth + 1, 0).getDate();
@@ -650,13 +635,11 @@
             html += '<tbody><tr>';
 
             let dayCount = 0;
-            // 이전 달 날짜 채우기
             for (let i = firstDay - 1; i >= 0; i--) {
                 html += `<td class="other-month">${prevLastDate - i}</td>`;
                 dayCount++;
             }
 
-            // 이번 달 날짜 채우기
             for (let d = 1; d <= lastDate; d++) {
                 if (dayCount % 7 === 0 && d !== 1) html += '</tr><tr>';
                 
@@ -680,7 +663,6 @@
                 dayCount++;
             }
 
-            // 다음 달 날짜 채우기
             let nextDay = 1;
             while (dayCount % 7 !== 0) {
                 html += `<td class="other-month">${nextDay++}</td>`;
@@ -691,7 +673,6 @@
             document.getElementById('cal-grid-container').innerHTML = html;
         }
 
-        // 캘린더에서 날짜 클릭 시 조회 종료일로 자동 세팅
         function selectDateFromCalendar(dateStr) {
             document.getElementById('search-end-date').value = dateStr;
             closeCalendarModal();
