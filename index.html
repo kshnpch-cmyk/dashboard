@@ -46,9 +46,27 @@
         .input-box { padding: 6px 26px 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none; }
         .clear-btn { position: absolute; right: 8px; cursor: pointer; color: #94a3b8; font-size: 12px; font-weight: bold; display: none; background: #e2e8f0; border-radius: 50%; width: 16px; height: 16px; text-align: center; line-height: 15px; }
         .clear-btn:hover { background: #cbd5e1; color: #475569; }
-        .autocomplete-dropdown { position: absolute; top: 100%; left: 0; width: 100%; max-height: 220px; overflow-y: auto; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); z-index: 1000; display: none; margin-top: 4px; }
+        .autocomplete-dropdown { position: absolute; top: 100%; left: 0; width: 330px; max-height: 240px; overflow-y: auto; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); z-index: 1000; display: none; margin-top: 4px; }
         .autocomplete-item { padding: 8px 12px; font-size: 12.5px; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
         .autocomplete-item:hover { background-color: #eff6ff; color: #2563eb; font-weight: bold; }
+
+        /* 💡 품목명 표시 알약 뱃지 스타일 */
+        .item-name-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #0369a1;
+            background: #e0f2fe;
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: 1px solid #bae6fd;
+            max-width: 260px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
 
         .iframe-viewport { width: 100%; height: calc(100vh - 215px); min-height: 750px; border: none; border-radius: 12px; background: transparent; }
 
@@ -96,7 +114,6 @@
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 대시보드</h1>
-            <!-- 💡 버전 v39.0 공식 카운트업 -->
             <span class="version-tag">v39.0 SCM & Reporting</span>
         </div>
         <div class="control-panel">
@@ -125,13 +142,17 @@
         <div class="ai-chat-input-area"><input type="text" id="ai-user-input" onkeydown="if(event.key==='Enter') sendAiMessage()"><button class="btn-ai-send" id="ai-send-btn" onclick="sendAiMessage()">전송</button></div>
     </div>
 
-    <!-- 🗓️ 오리지널 캘린더 모달 (발주량 숫자 배지 유지) -->
+    <!-- 🗓️ 캘린더 모달 -->
     <div class="modal-overlay" id="calendar-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">📅 배송일자 데이터 존재 현황</span><span class="close-btn" onclick="closeCalendarModal()">✕</span></div><div style="display: flex; gap: 8px; margin-bottom: 10px; align-items: center;"><label style="font-size: 12px; font-weight: bold;">월 선택:</label><input type="month" id="calendar-month-picker" class="input-box" onchange="loadCalendarData()"></div><div class="calendar-grid" id="calendar-grid"></div></div></div>
+    
+    <!-- 🏢 브랜드 모달 -->
     <div class="modal-overlay" id="brand-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">🏢 브랜드 다중 선택</span><span class="close-btn" onclick="closeBrandModal()">✕</span></div><div style="display: flex; gap: 8px; margin-bottom: 8px;"><input type="text" id="modal-brand-search" class="input-box" style="flex:1;" placeholder="브랜드명 검색 (Enter)" onkeydown="if(event.key==='Enter') filterBrandModalList()"><button class="btn btn-cal" style="background:#2563eb;" onclick="filterBrandModalList()">검색</button><button class="btn btn-cal" style="background:#475569;" onclick="toggleAllBrandCheck(true)">전체선택</button><button class="btn btn-cal" style="background:#64748b;" onclick="toggleAllBrandCheck(false)">해제</button></div><div class="modal-body-scroll" id="brand-modal-list"></div><div style="margin-top: 15px; text-align: right;"><button class="btn" onclick="applyBrandSelection()">확인 적용</button></div></div></div>
+    
+    <!-- 📦 품목 모달 -->
     <div class="modal-overlay" id="item-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">📦 품목 다중 선택 (품목코드 기준)</span><span class="close-btn" onclick="closeItemModal()">✕</span></div><div style="display: flex; gap: 8px; margin-bottom: 8px;"><input type="text" id="modal-item-search" class="input-box" style="flex:1;" placeholder="품목코드 또는 품목명 검색 (Enter)" onkeydown="if(event.key==='Enter') filterItemModalList()"><button class="btn btn-cal" style="background:#2563eb;" onclick="filterItemModalList()">검색</button><button class="btn btn-cal" style="background:#475569;" onclick="toggleAllItemCheck(true)">전체선택</button><button class="btn btn-cal" style="background:#64748b;" onclick="toggleAllItemCheck(false)">해제</button></div><div class="modal-body-scroll" id="item-modal-list"></div><div style="margin-top: 15px; text-align: right;"><button class="btn" onclick="applyItemSelection()">확인 적용</button></div></div></div>
 
     <div class="container">
-        <!-- 📑 6대 탭 메뉴 (종합 분석 레포트 탭 추가) -->
+        <!-- 📑 6대 탭 메뉴 -->
         <div class="tab-container">
             <button class="tab-btn active" id="tab-btn-dashboard" onclick="switchTab('dashboard')">📈 요약 대시보드</button>
             <button class="tab-btn" id="tab-btn-brand_detail" onclick="switchTab('brand_detail')">🏆 브랜드별 상세내역 (매출 순위)</button>
@@ -159,15 +180,20 @@
                     <button class="btn-search-icon" onclick="openBrandModal()">🔍</button>
                     <div id="brand-autocomplete-list" class="autocomplete-dropdown"></div>
                 </div>
+                
+                <!-- 💡 [핵심] 품목코드 입력창 + 품목명 실시간 안내 뱃지 영역 -->
                 <div class="filter-group">
                     <label>품목코드/명:</label>
                     <div class="input-wrapper">
-                        <input type="text" id="chart-item-input" class="input-box" placeholder="품목명/코드 입력 검색" style="width: 160px;" oninput="handleItemInput(this.value)" onfocus="handleItemInput(this.value)">
+                        <input type="text" id="chart-item-input" class="input-box" placeholder="품목명/코드 입력 검색" style="width: 155px;" oninput="handleItemInput(this.value)" onfocus="handleItemInput(this.value)">
                         <span class="clear-btn" id="btn-clear-item" onclick="clearInputField('chart-item-input', 'cached_item_input')">✕</span>
                     </div>
                     <button class="btn-search-icon" onclick="openItemModal()">🔍</button>
+                    <!-- 💡 실시간 품목명 표시 뱃지 -->
+                    <span id="selected-item-name-badge" class="item-name-badge" style="display: none;"></span>
                     <div id="item-autocomplete-list" class="autocomplete-dropdown"></div>
                 </div>
+
                 <button class="btn btn-query" id="tab-query-btn" onclick="executeTabSearch()">🔍 대시보드 종합 조회</button>
             </div>
             <div id="anomaly-notice" style="display: none; margin-top: 10px; font-size: 13px; color: #f43f5e; font-weight: 700;">
@@ -175,7 +201,7 @@
             </div>
         </div>
 
-        <!-- 🚀 Iframe 뷰포트 영역 (레포트 iframe 추가) -->
+        <!-- 🚀 Iframe 뷰포트 영역 -->
         <iframe id="frame-dashboard" class="iframe-viewport" src="dashboard.html" style="display: block;"></iframe>
         <iframe id="frame-brand_detail" class="iframe-viewport" src="brand_detail.html" style="display: none;"></iframe>
         <iframe id="frame-detail" class="iframe-viewport" src="detail.html" style="display: none;"></iframe>
@@ -190,12 +216,50 @@
         const githubId = 'kshnpch-cmyk'; const repoName = 'dashboard'; const token = "ghp_DPLQYilEaFD" + "g2jVxPlK8Kh18uwaCu220wnZB";
 
         let allBrandList = [], allItemList = [];
+        let itemCodeToNameMap = new Map(); // 💡 품목코드 -> 품목명 빠른 조회 맵
         let activeTab = 'dashboard';
         let aiChatHistory = [];
 
         function formatDate(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
         function cleanCode(val) { return (!val && val !== 0) ? '-' : String(val).replace(/\.0$/, '').trim(); }
         function safeSetStorage(key, value) { try { localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); } catch (e) {} }
+
+        // 💡 [핵심] 품목코드에 해당하는 품목명을 실시간 뱃지에 반영하는 함수
+        function updateItemNameBadge(inputVal) {
+            const badge = document.getElementById('selected-item-name-badge');
+            if (!badge) return;
+            const trimmed = String(inputVal || '').trim();
+            if (!trimmed) {
+                badge.style.display = 'none';
+                badge.innerText = '';
+                return;
+            }
+
+            const codes = trimmed.split(',').map(s => cleanCode(s)).filter(Boolean);
+            const foundNames = [];
+
+            codes.forEach(c => {
+                if (itemCodeToNameMap.has(c)) {
+                    foundNames.push(itemCodeToNameMap.get(c));
+                } else {
+                    // 혹시 코드가 아니라 이름을 직접 쳤을 때
+                    const found = allItemList.find(i => i.name.toLowerCase() === c.toLowerCase());
+                    if (found) foundNames.push(found.name);
+                }
+            });
+
+            if (foundNames.length === 1) {
+                badge.innerHTML = `📦 <b>${foundNames[0]}</b>`;
+                badge.title = foundNames[0];
+                badge.style.display = 'inline-flex';
+            } else if (foundNames.length > 1) {
+                badge.innerHTML = `📦 <b>${foundNames[0]}</b> 외 ${foundNames.length - 1}건`;
+                badge.title = foundNames.join(', ');
+                badge.style.display = 'inline-flex';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
 
         /* 💡 6대 탭 전환 제어 */
         function switchTab(tabId) {
@@ -221,7 +285,6 @@
             executeTabSearch();
         }
 
-        /* 💡 품목코드(itemCode)와 품목명(itemName)을 모두 정확히 전달 */
         function getCurrentSearchParams() {
             const itemVal = document.getElementById('chart-item-input').value.trim();
             return {
@@ -247,53 +310,50 @@
             }
         }
 
-       /* 🚀 정확한 GitHub 에러 사유를 알려주는 triggerBot */
-/* 🚀 capture.yml 규격(trigger-oms-sync, start_date, end_date)에 맞춘 수동 동기화 */
-async function triggerBot() {
-    const syncDate = document.getElementById('sync-target-date').value;
-    if (!syncDate) return alert("동기화 일자를 선택해주세요.");
-    
-    // OMS 시스템 검색창 규격에 맞춰 YYYY/MM/DD 형태로 변환
-    const formattedDate = syncDate.replace(/-/g, '/');
+        /* 🚀 capture.yml 규격에 맞춘 수동 동기화 */
+        async function triggerBot() {
+            const syncDate = document.getElementById('sync-target-date').value;
+            if (!syncDate) return alert("동기화 일자를 선택해주세요.");
+            
+            const formattedDate = syncDate.replace(/-/g, '/');
+            const btn = document.getElementById('run-btn');
+            const originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = "⏳ 깃허브 봇 기동 중...";
 
-    const btn = document.getElementById('run-btn');
-    const originalText = btn.innerText;
-    btn.disabled = true;
-    btn.innerText = "⏳ 깃허브 봇 기동 중...";
+            try {
+                const res = await fetch(`https://api.github.com/repos/${githubId}/${repoName}/dispatches`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        event_type: 'trigger-oms-sync',
+                        client_payload: {
+                            start_date: formattedDate,
+                            end_date: formattedDate
+                        }
+                    })
+                });
 
-    try {
-        const res = await fetch(`https://api.github.com/repos/${githubId}/${repoName}/dispatches`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Accept': 'application/vnd.github.v3+json',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                event_type: 'trigger-oms-sync', // 💡 capture.yml의 수신 이벤트명과 일치
-                client_payload: {
-                    start_date: formattedDate,   // 💡 capture.yml의 START_DATE 환경변수로 매핑
-                    end_date: formattedDate      // 💡 capture.yml의 END_DATE 환경변수로 매핑
+                if (res.status === 204 || res.ok) {
+                    alert(`🚀 OMS 수동 동기화 봇이 성공적으로 실행되었습니다!\n\n기준 일자: ${formattedDate}\nGitHub Actions에 새로운 워크플로우(#150)가 생성되었습니다.`);
+                    executeTabSearch();
+                } else {
+                    const errData = await res.json().catch(() => ({}));
+                    const errMsg = errData.message || '알 수 없는 오류';
+                    alert(`❌ 깃허브 연동 실패 (코드: ${res.status})\n사유: ${errMsg}`);
                 }
-            })
-        });
-
-        if (res.status === 204 || res.ok) {
-            alert(`🚀 OMS 수동 동기화 봇이 성공적으로 실행되었습니다!\n\n기준 일자: ${formattedDate}\nGitHub Actions에 새로운 워크플로우(#150)가 생성되었습니다.`);
-            executeTabSearch();
-        } else {
-            const errData = await res.json().catch(() => ({}));
-            const errMsg = errData.message || '알 수 없는 오류';
-            alert(`❌ 깃허브 연동 실패 (코드: ${res.status})\n사유: ${errMsg}`);
+            } catch (err) {
+                console.error("수동 동기화 오류:", err);
+                alert(`❌ 네트워크 통신 오류: ${err.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = originalText;
+            }
         }
-    } catch (err) {
-        console.error("수동 동기화 오류:", err);
-        alert(`❌ 네트워크 통신 오류: ${err.message}`);
-    } finally {
-        btn.disabled = false;
-        btn.innerText = originalText;
-    }
-}
 
         window.addEventListener('message', (e) => {
             if (e.data && e.data.action === 'FRAME_READY') {
@@ -318,6 +378,7 @@ async function triggerBot() {
         function clearInputField(inputId, storageKey) {
             const el = document.getElementById(inputId);
             if (el) { el.value = ''; safeSetStorage(storageKey, ''); toggleClearBtn(inputId); }
+            if (inputId === 'chart-item-input') updateItemNameBadge('');
             executeTabSearch();
         }
         function toggleClearBtn(inputId) {
@@ -333,13 +394,23 @@ async function triggerBot() {
                     const data = await res.json();
                     allBrandList = [...new Set(data.map(r => r.brand_name))].filter(Boolean).sort();
                     const map = new Map();
+                    itemCodeToNameMap.clear();
+
                     data.forEach(r => { 
                         if (r.item_code || r.item_name) {
                             const c = cleanCode(r.item_code);
-                            if (c !== '-') map.set(c, { code: c, name: r.item_name || '' });
+                            const n = (r.item_name || '').trim();
+                            if (c !== '-') {
+                                map.set(c, { code: c, name: n });
+                                if (n) itemCodeToNameMap.set(c, n);
+                            }
                         }
                     });
                     allItemList = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+                    
+                    // 초기 로드 시 캐시된 품목코드의 품목명 뱃지 업데이트
+                    const currentItemVal = document.getElementById('chart-item-input').value;
+                    if (currentItemVal) updateItemNameBadge(currentItemVal);
                 }
             } catch (err) {}
         }
@@ -356,9 +427,11 @@ async function triggerBot() {
         }
         function selectAutocompleteBrand(bName) { document.getElementById('chart-brand-input').value = bName; safeSetStorage('cached_brand_input', bName); toggleClearBtn('chart-brand-input'); document.getElementById('brand-autocomplete-list').style.display = 'none'; executeTabSearch(); }
         
-        /* 💡 품목명 검색 시 품목코드(i.code)가 정확히 입력되고 조회되도록 구현 */
         function handleItemInput(val) {
-            safeSetStorage('cached_item_input', val); toggleClearBtn('chart-item-input');
+            safeSetStorage('cached_item_input', val); 
+            toggleClearBtn('chart-item-input');
+            updateItemNameBadge(val); // 💡 실시간 뱃지 갱신
+
             const dropEl = document.getElementById('item-autocomplete-list');
             const keyword = val.toLowerCase().trim();
             if (!keyword || allItemList.length === 0) return dropEl.style.display = 'none';
@@ -367,7 +440,15 @@ async function triggerBot() {
             dropEl.innerHTML = matched.map(i => `<div class="autocomplete-item" onclick="selectAutocompleteItem('${i.code}')"><span><b>${i.name}</b></span><span style="font-family:monospace;color:#0284c7;font-weight:bold;background:#e0f2fe;padding:2px 6px;border-radius:4px;">[${i.code}]</span></div>`).join('');
             dropEl.style.display = 'block';
         }
-        function selectAutocompleteItem(iCode) { document.getElementById('chart-item-input').value = iCode; safeSetStorage('cached_item_input', iCode); toggleClearBtn('chart-item-input'); document.getElementById('item-autocomplete-list').style.display = 'none'; executeTabSearch(); }
+
+        function selectAutocompleteItem(iCode) { 
+            document.getElementById('chart-item-input').value = iCode; 
+            safeSetStorage('cached_item_input', iCode); 
+            toggleClearBtn('chart-item-input'); 
+            updateItemNameBadge(iCode); // 💡 뱃지에 품목명 표시
+            document.getElementById('item-autocomplete-list').style.display = 'none'; 
+            executeTabSearch(); 
+        }
 
         document.addEventListener('click', (e) => {
             if (!e.target.closest('#chart-brand-input') && !e.target.closest('#brand-autocomplete-list')) { const drop = document.getElementById('brand-autocomplete-list'); if (drop) drop.style.display = 'none'; }
@@ -377,7 +458,6 @@ async function triggerBot() {
         function toggleAiChatWidget() { const widget = document.getElementById('ai-chat-modal'); widget.style.display = (widget.style.display === 'flex') ? 'none' : 'flex'; if(widget.style.display === 'flex') document.getElementById('ai-user-input').focus(); }
         function saveGeminiKey() { const keyVal = document.getElementById('gemini-key-input').value.trim(); if(keyVal){ localStorage.setItem('gemini_api_key', keyVal); alert("저장됨!"); } }
         
-        /* 💡 [복원 유지] 발주량 숫자 배지 표기 원본 캘린더 */
         function openCalendarModal() { document.getElementById('calendar-modal').style.display = 'flex'; loadCalendarData(); }
         function closeCalendarModal() { document.getElementById('calendar-modal').style.display = 'none'; }
         async function loadCalendarData() {
@@ -434,7 +514,15 @@ async function triggerBot() {
         }
         function filterItemModalList() { renderItemModalList(); }
         function toggleAllItemCheck(status) { document.querySelectorAll('.item-modal-chk').forEach(c => c.checked = status); }
-        function applyItemSelection() { const vals = Array.from(document.querySelectorAll('.item-modal-chk:checked')).map(c => c.value).join(', '); document.getElementById('chart-item-input').value = vals; safeSetStorage('cached_item_input', vals); toggleClearBtn('chart-item-input'); closeItemModal(); executeTabSearch(); }
+        function applyItemSelection() { 
+            const vals = Array.from(document.querySelectorAll('.item-modal-chk:checked')).map(c => c.value).join(', '); 
+            document.getElementById('chart-item-input').value = vals; 
+            safeSetStorage('cached_item_input', vals); 
+            toggleClearBtn('chart-item-input'); 
+            updateItemNameBadge(vals); // 💡 모달 선택 시 뱃지 갱신
+            closeItemModal(); 
+            executeTabSearch(); 
+        }
 
         document.addEventListener('DOMContentLoaded', async () => {
             const today = new Date(), past7 = new Date(); past7.setDate(today.getDate() - 7);
@@ -442,10 +530,12 @@ async function triggerBot() {
             document.getElementById('chart-end-date').value = localStorage.getItem('cached_chart_end_date') || formatDate(today);
             document.getElementById('sync-target-date').value = formatDate(today);
             document.getElementById('chart-brand-input').value = localStorage.getItem('cached_brand_input') || '';
-            document.getElementById('chart-item-input').value = localStorage.getItem('cached_item_input') || '';
+            const initialItemCode = localStorage.getItem('cached_item_input') || '';
+            document.getElementById('chart-item-input').value = initialItemCode;
             toggleClearBtn('chart-brand-input'); toggleClearBtn('chart-item-input');
             document.getElementById('calendar-month-picker').value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2, '0')}`;
-            await loadMasterLists(); loadCalendarData();
+            await loadMasterLists(); 
+            loadCalendarData();
         });
     </script>
 </body>
