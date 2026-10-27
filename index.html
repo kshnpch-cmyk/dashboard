@@ -143,9 +143,41 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.02); 
         }
         .filter-group { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #475569; position: relative; }
-        .input-box { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none; }
-        .input-box:focus { border-color: #2563eb; }
         
+        /* 💡 입력창 래퍼 및 자동완성 드롭다운 스타일 */
+        .input-wrapper { position: relative; display: flex; align-items: center; }
+        .input-box { padding: 6px 26px 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none; }
+        .input-box:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.1); }
+        .clear-btn { position: absolute; right: 8px; cursor: pointer; color: #94a3b8; font-size: 12px; font-weight: 800; display: none; background: #e2e8f0; border-radius: 50%; width: 16px; height: 16px; text-align: center; line-height: 15px; }
+        .clear-btn:hover { background: #cbd5e1; color: #475569; }
+
+        .autocomplete-dropdown { 
+            position: absolute; 
+            top: 100%; 
+            left: 0; 
+            width: 280px; 
+            max-height: 240px; 
+            overflow-y: auto; 
+            background: #ffffff; 
+            border: 1px solid #cbd5e1; 
+            border-radius: 6px; 
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); 
+            z-index: 1000; 
+            display: none; 
+            margin-top: 4px; 
+        }
+        .autocomplete-item { 
+            padding: 8px 12px; 
+            font-size: 12.5px; 
+            cursor: pointer; 
+            border-bottom: 1px solid #f1f5f9; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+        }
+        .autocomplete-item:hover { background: #eff6ff; color: #2563eb; font-weight: 700; }
+        .autocomplete-item:last-child { border-bottom: none; }
+
         .btn-modal-search { 
             background: #334155; 
             color: #ffffff; 
@@ -203,20 +235,24 @@
             </div>
         </div>
         <div class="topbar-right">
+            <!-- ⏰ 최신 배송일자 & 캘린더 버튼 -->
             <div class="latest-date-box">
                 <span>⏰ 최신 배송일자: <b id="top-latest-date">2026/10/29</b></span>
                 <button class="btn-calendar-badge" onclick="openCalendarModal()">🗓️ 캘린더</button>
             </div>
             
+            <!-- 📅 동기화 일자 인풋 -->
             <div class="sync-group">
                 <span>동기화 일자:</span>
                 <input type="date" id="sync-date-input" class="sync-date-input" value="2026-10-26">
             </div>
 
+            <!-- 🚀 OMS 수동 동기화 버튼 -->
             <button class="btn-sync-action" onclick="triggerManualSync()">
                 🚀 OMS 수동 동기화
             </button>
 
+            <!-- 🔮 발주 예측 독립 팝업 -->
             <button class="btn-forecast-action" onclick="window.open('forecast.html', '_blank')">
                 🔮 발주 수요 예측 (Forecast)
             </button>
@@ -233,24 +269,34 @@
         <button class="tab-btn" id="tab-btn-report" onclick="switchTab('report')">📑 종합 분석 레포트</button>
     </div>
 
-    <!-- 🔍 통합 검색 필터 바 -->
+    <!-- 🔍 통합 검색 필터 바 (자동완성 드롭다운 탑재) -->
     <div class="filter-panel">
         <div class="filter-group">
             <label>조회 기간:</label>
-            <input type="date" id="search-start-date" class="input-box" value="2026-09-01">
+            <input type="date" id="search-start-date" class="input-box" value="2026-09-01" style="padding-right:10px">
             <span>~</span>
-            <input type="date" id="search-end-date" class="input-box" value="2026-10-26">
+            <input type="date" id="search-end-date" class="input-box" value="2026-10-26" style="padding-right:10px">
         </div>
         
+        <!-- 브랜드 자동완성 검색 -->
         <div class="filter-group">
             <label>브랜드:</label>
-            <input type="text" id="search-brand" class="input-box" placeholder="브랜드 선택/검색" style="width:140px">
+            <div class="input-wrapper">
+                <input type="text" id="search-brand" class="input-box" placeholder="브랜드 선택/검색" style="width:140px" oninput="handleBrandInput(this.value)" onfocus="handleBrandInput(this.value)">
+                <span class="clear-btn" id="btn-clear-brand" onclick="clearInputField('search-brand')">✕</span>
+                <div id="brand-autocomplete-list" class="autocomplete-dropdown"></div>
+            </div>
             <button class="btn-modal-search" onclick="openBrandModal()" title="브랜드 다중 선택 팝업">🔍</button>
         </div>
 
+        <!-- 품목코드/명 자동완성 검색 (하단 자동완성 드롭다운) -->
         <div class="filter-group">
             <label>품목코드/명:</label>
-            <input type="text" id="search-item" class="input-box" placeholder="품목 선택/검색" style="width:150px">
+            <div class="input-wrapper">
+                <input type="text" id="search-item" class="input-box" placeholder="품목 선택/검색" style="width:160px" oninput="handleItemInput(this.value)" onfocus="handleItemInput(this.value)">
+                <span class="clear-btn" id="btn-clear-item" onclick="clearInputField('search-item')">✕</span>
+                <div id="item-autocomplete-list" class="autocomplete-dropdown"></div>
+            </div>
             <button class="btn-modal-search" onclick="openItemModal()" title="품목 다중 선택 팝업">🔍</button>
         </div>
 
@@ -339,6 +385,7 @@
 
         function cleanCode(val) { if (!val && val !== 0) return '-'; let s = String(val).trim(); if (s.endsWith('.0')) s = s.slice(0, -2); return s || '-'; }
 
+        // 마스터 목록 로드
         async function loadMasterLists() {
             try {
                 const res = await fetch(`${SUPABASE_URL}/rest/v1/daily_order_summary?select=brand_name,item_code,item_name&limit=10000`, {
@@ -350,10 +397,12 @@
                     
                     const map = new Map();
                     data.forEach(r => {
-                        const code = cleanCode(r.item_code);
-                        const name = String(r.item_name || '').trim();
-                        if (name || code !== '-') {
-                            map.set(`${code}__${name}`, { code, name });
+                        if (r.item_code || r.item_name) {
+                            const code = cleanCode(r.item_code);
+                            const name = String(r.item_name || '').trim();
+                            if (name || code !== '-') {
+                                map.set(`${code}__${name}`, { code, name });
+                            }
                         }
                     });
                     allItemList = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
@@ -362,6 +411,63 @@
                 console.warn("마스터 목록 로드 실패:", err);
             }
         }
+
+        // 💡 [실시간 자동완성 드롭다운 엔진]
+        function clearInputField(id) { 
+            const el = document.getElementById(id); 
+            if (el) { el.value = ''; toggleClearBtn(id); }
+            broadcastSearch();
+        }
+        function toggleClearBtn(id) { 
+            const el = document.getElementById(id); 
+            const btn = id === 'search-brand' ? document.getElementById('btn-clear-brand') : document.getElementById('btn-clear-item'); 
+            if (btn && el) btn.style.display = el.value.trim() ? 'block' : 'none'; 
+        }
+
+        function handleAutocompleteInput(val, type) {
+            const inputId = type === 'brand' ? 'search-brand' : 'search-item';
+            const dropId = type === 'brand' ? 'brand-autocomplete-list' : 'item-autocomplete-list';
+            const list = type === 'brand' ? allBrandList : allItemList;
+            toggleClearBtn(inputId);
+            const drop = document.getElementById(dropId);
+            const key = String(val || '').toLowerCase().trim();
+            if (!key || !list.length) { drop.style.display = 'none'; return; }
+
+            const matched = type === 'brand' 
+                ? list.filter(b => b.toLowerCase().includes(key)).slice(0, 15)
+                : list.filter(i => i.code.toLowerCase().includes(key) || i.name.toLowerCase().includes(key)).slice(0, 15);
+
+            if (!matched.length) { drop.style.display = 'none'; return; }
+
+            drop.innerHTML = type === 'brand' 
+                ? matched.map(b => `<div class="autocomplete-item" onclick="selectAutocomplete('${b.replace(/'/g, "\\'")}', 'brand')"><span>${b}</span></div>`).join('')
+                : matched.map(i => `<div class="autocomplete-item" onclick="selectAutocomplete('${i.name.replace(/'/g, "\\'")}', 'item')"><span><b>${i.name}</b></span><span class="code-tag">[${i.code}]</span></div>`).join('');
+            drop.style.display = 'block';
+        }
+
+        function handleBrandInput(v) { handleAutocompleteInput(v, 'brand'); }
+        function handleItemInput(v) { handleAutocompleteInput(v, 'item'); }
+
+        function selectAutocomplete(v, type) {
+            const inputId = type === 'brand' ? 'search-brand' : 'search-item';
+            const dropId = type === 'brand' ? 'brand-autocomplete-list' : 'item-autocomplete-list';
+            document.getElementById(inputId).value = v;
+            toggleClearBtn(inputId);
+            document.getElementById(dropId).style.display = 'none';
+            broadcastSearch(); // 선택 즉시 조회
+        }
+
+        // 바깥 클릭 시 드롭다운 닫기
+        document.addEventListener('click', e => {
+            ['brand', 'item'].forEach(type => {
+                const inId = type === 'brand' ? 'search-brand' : 'search-item';
+                const dId = type === 'brand' ? 'brand-autocomplete-list' : 'item-autocomplete-list';
+                if (!e.target.closest('#' + inId) && !e.target.closest('#' + dId)) {
+                    const drop = document.getElementById(dId);
+                    if (drop) drop.style.display = 'none';
+                }
+            });
+        });
 
         function switchTab(tabId) {
             currentTab = tabId;
@@ -406,6 +512,7 @@
             });
         }
 
+        // 브랜드 모달
         async function openBrandModal() {
             document.getElementById('brand-modal').style.display = 'flex';
             if (!allBrandList.length) await loadMasterLists();
@@ -429,10 +536,12 @@
         function toggleAllBrandCheck(status) { document.querySelectorAll('.brand-modal-chk').forEach(x => x.checked = status); }
         function applyBrandSelection() {
             document.getElementById('search-brand').value = Array.from(document.querySelectorAll('.brand-modal-chk:checked')).map(x => x.value).join(', ');
+            toggleClearBtn('search-brand');
             closeBrandModal();
             broadcastSearch();
         }
 
+        // 품목 모달
         async function openItemModal() {
             document.getElementById('item-modal').style.display = 'flex';
             if (!allItemList.length) await loadMasterLists();
@@ -456,6 +565,7 @@
         function toggleAllItemCheck(status) { document.querySelectorAll('.item-modal-chk').forEach(x => x.checked = status); }
         function applyItemSelection() {
             document.getElementById('search-item').value = Array.from(document.querySelectorAll('.item-modal-chk:checked')).map(x => x.value).join(', ');
+            toggleClearBtn('search-item');
             closeItemModal();
             broadcastSearch();
         }
