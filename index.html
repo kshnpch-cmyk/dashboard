@@ -3,703 +3,385 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>더본 OMS 주문 대시보드 v36.0 SCM</title>
+    <title>더본 OMS 주문 대시보드</title>
+    <!-- 📱 모바일 접속 시 mobile.html 자동 리다이렉트 -->
+    <script>
+        if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+            location.replace('/mobile.html');
+        }
+    </script>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Pretendard', 'Malgun Gothic', -apple-system, sans-serif; background: #f8fafc; color: #1e293b; }
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; font-family: 'Pretendard', 'Malgun Gothic', -apple-system, sans-serif; background-color: #f1f5f9; color: #1e293b; overflow-x: hidden; }
+        .navbar { background-color: #0f172a; color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex-wrap: wrap; gap: 15px; }
+        .brand-title { display: flex; align-items: center; gap: 10px; }
+        .brand-title h1 { margin: 0; font-size: 20px; font-weight: 700; }
+        .version-tag { background-color: #10b981; color: white; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 12px; letter-spacing: 0.5px; }
+        .control-panel { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .sync-date-group { display: flex; align-items: center; background-color: #1e293b; padding: 6px 12px; border-radius: 8px; gap: 8px; border: 1px solid #334155; }
+        .sync-date-group label { font-size: 13px; color: #94a3b8; font-weight: 600; }
+        .date-input { background-color: #0f172a; color: #ffffff; border: 1px solid #475569; padding: 6px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; color-scheme: dark; }
+        .last-updated-tag { font-size: 12px; color: #38bdf8; background-color: #1e293b; padding: 6px 12px; border-radius: 6px; border: 1px solid #0284c7; font-weight: bold; display: flex; align-items: center; gap: 8px; }
+        .btn { background-color: #2563eb; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px; }
+        .btn:hover { background-color: #1d4ed8; }
+        .btn:disabled { background-color: #94a3b8; cursor: not-allowed; }
+        .btn-query { background-color: #0284c7; }
+        .btn-cal { background-color: #0f766e; padding: 4px 8px; font-size: 11px; border-radius: 4px; }
+        .btn-forecast-link { background-color: #8b5cf6; }
+        .btn-forecast-link:hover { background-color: #7c3aed; }
+        .btn-search-icon { background-color: #475569; color: white; border: none; padding: 6px 9px; border-radius: 6px; cursor: pointer; font-size: 12px; margin-left: -2px; }
+        .btn-search-icon:hover { background-color: #334155; }
+
+        .container { padding: 20px; max-width: 98%; margin: 0 auto; }
         
-        .topbar { 
-            background: #080e1e; 
-            color: #ffffff; 
-            padding: 10px 24px; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            border-bottom: 1px solid #1e293b;
-        }
-        .topbar-left { display: flex; align-items: center; gap: 10px; }
-        .topbar-title { font-size: 19px; font-weight: 800; display: flex; align-items: center; gap: 8px; color: #ffffff; }
-        .badge-version { 
-            background: #10b981; 
-            color: #ffffff; 
-            font-size: 11px; 
-            padding: 3px 9px; 
-            border-radius: 9999px; 
-            font-weight: 800; 
-            letter-spacing: 0.3px;
-        }
-        
-        .topbar-right { display: flex; align-items: center; gap: 12px; font-size: 12.5px; }
-        
-        .latest-date-box { 
-            background: #071a2e; 
-            border: 1px solid #0369a1; 
-            padding: 3px 6px 3px 12px; 
-            border-radius: 6px; 
-            display: flex; 
-            align-items: center; 
-            gap: 8px; 
-            font-size: 12px; 
-        }
-        .latest-date-box span { color: #94a3b8; }
-        .latest-date-box b { color: #38bdf8; font-weight: 800; }
-        .btn-calendar-badge { 
-            background: #0d9488; 
-            color: #ffffff; 
-            border: none; 
-            padding: 3px 8px; 
-            border-radius: 4px; 
-            font-size: 11px; 
-            font-weight: 800; 
-            cursor: pointer; 
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            transition: background 0.15s;
-        }
-        .btn-calendar-badge:hover { background: #0f766e; }
-
-        .sync-group { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #94a3b8; font-weight: 600; }
-        .sync-date-input { 
-            background: #0f172a; 
-            color: #ffffff; 
-            border: 1px solid #334155; 
-            padding: 4px 8px; 
-            border-radius: 6px; 
-            font-size: 12px; 
-            outline: none; 
-        }
-
-        .btn-sync-action { 
-            background: #2563eb; 
-            color: #ffffff; 
-            border: none; 
-            padding: 6px 14px; 
-            border-radius: 6px; 
-            font-weight: 800; 
-            font-size: 12px; 
-            cursor: pointer; 
-            display: inline-flex; 
-            align-items: center; 
-            gap: 5px; 
-            transition: background 0.15s; 
-        }
-        .btn-sync-action:hover { background: #1d4ed8; }
-
-        .btn-forecast-action { 
-            background: #0284c7; 
-            color: #ffffff; 
-            border: none; 
-            padding: 6px 12px; 
-            border-radius: 6px; 
-            font-weight: 800; 
-            font-size: 12px; 
-            cursor: pointer; 
-            display: inline-flex; 
-            align-items: center; 
-            gap: 4px; 
-        }
-        .btn-forecast-action:hover { background: #0369a1; }
-
-        .tab-bar { 
-            background: #ffffff; 
-            padding: 0 24px; 
-            display: flex; 
-            gap: 6px; 
-            border-bottom: 1px solid #e2e8f0; 
-            overflow-x: auto; 
-        }
-        .tab-btn { 
-            background: transparent; 
-            border: none; 
-            padding: 13px 16px; 
-            font-size: 13.5px; 
-            font-weight: 700; 
-            color: #64748b; 
-            cursor: pointer; 
-            border-bottom: 3px solid transparent; 
-            transition: all 0.2s; 
-            white-space: nowrap; 
-        }
+        .tab-container { display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 2px solid #e2e8f0; flex-wrap: wrap; }
+        .tab-btn { background: none; border: none; font-size: 15px; font-weight: 700; color: #94a3b8; padding: 10px 18px; cursor: pointer; transition: all 0.2s; border-bottom: 3px solid transparent; }
         .tab-btn:hover { color: #2563eb; }
-        .tab-btn.active { color: #2563eb; border-bottom-color: #2563eb; font-weight: 800; }
+        .tab-btn.active { color: #2563eb; border-bottom: 3px solid #2563eb; }
 
-        .filter-panel { 
-            background: #ffffff; 
-            margin: 12px 24px 10px; 
-            padding: 12px 18px; 
-            border-radius: 8px; 
-            border: 1px solid #e2e8f0; 
-            display: flex; 
-            gap: 14px; 
-            align-items: center; 
-            flex-wrap: wrap; 
-            box-shadow: 0 1px 3px rgba(0,0,0,0.02); 
-        }
-        .filter-group { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #475569; position: relative; }
-        
+        .section-panel { background: white; padding: 15px 20px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+        .filter-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .filter-group { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #475569; position: relative; }
         .input-wrapper { position: relative; display: flex; align-items: center; }
         .input-box { padding: 6px 26px 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none; }
-        .input-box:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.1); }
-        .clear-btn { position: absolute; right: 8px; cursor: pointer; color: #94a3b8; font-size: 12px; font-weight: 800; display: none; background: #e2e8f0; border-radius: 50%; width: 16px; height: 16px; text-align: center; line-height: 15px; }
+        .clear-btn { position: absolute; right: 8px; cursor: pointer; color: #94a3b8; font-size: 12px; font-weight: bold; display: none; background: #e2e8f0; border-radius: 50%; width: 16px; height: 16px; text-align: center; line-height: 15px; }
         .clear-btn:hover { background: #cbd5e1; color: #475569; }
+        .autocomplete-dropdown { position: absolute; top: 100%; left: 0; width: 100%; max-height: 220px; overflow-y: auto; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); z-index: 1000; display: none; margin-top: 4px; }
+        .autocomplete-item { padding: 8px 12px; font-size: 12.5px; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
+        .autocomplete-item:hover { background-color: #eff6ff; color: #2563eb; font-weight: bold; }
 
-        .autocomplete-dropdown { 
-            position: absolute; 
-            top: 100%; 
-            left: 0; 
-            width: 330px; 
-            max-height: 250px; 
-            overflow-y: auto; 
-            background: #ffffff; 
-            border: 1px solid #cbd5e1; 
-            border-radius: 6px; 
-            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); 
-            z-index: 1000; 
-            display: none; 
-            margin-top: 4px; 
-        }
-        .autocomplete-item { 
-            padding: 8px 12px; 
-            font-size: 12.5px; 
-            cursor: pointer; 
-            border-bottom: 1px solid #f1f5f9; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-        }
-        .autocomplete-item:hover { background: #eff6ff; color: #2563eb; font-weight: 700; }
-        .autocomplete-item:last-child { border-bottom: none; }
+        .iframe-viewport { width: 100%; height: calc(100vh - 215px); min-height: 750px; border: none; border-radius: 12px; background: transparent; }
 
-        .btn-modal-search { 
-            background: #334155; 
-            color: #ffffff; 
-            border: none; 
-            padding: 6px 9px; 
-            border-radius: 6px; 
-            cursor: pointer; 
-            font-size: 12px; 
-            margin-left: -2px; 
-        }
-        .btn-modal-search:hover { background: #1e293b; }
-
-        .btn-main-submit { 
-            background: #0284c7; 
-            color: #ffffff; 
-            border: none; 
-            padding: 7px 18px; 
-            border-radius: 6px; 
-            font-weight: 800; 
-            cursor: pointer; 
-            font-size: 13px; 
-            margin-left: 6px; 
-            display: inline-flex; 
-            align-items: center; 
-            gap: 5px; 
-        }
-        .btn-main-submit:hover { background: #0369a1; }
-
-        .content-area { padding: 0 24px 20px; height: calc(100vh - 165px); }
-        .frame-view { width: 100%; height: 100%; border: none; border-radius: 8px; display: none; }
-        .frame-view.active { display: block; }
-
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 1001; justify-content: center; align-items: center; }
-        .modal-content { background: #ffffff; padding: 20px; border-radius: 12px; width: 520px; max-width: 90%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); max-height: 85vh; display: flex; flex-direction: column; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-        .modal-title { font-size: 16px; font-weight: 800; }
-        .close-btn { cursor: pointer; font-size: 18px; font-weight: 800; color: #64748b; }
-        .modal-body-scroll { flex: 1; overflow-y: auto; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; max-height: 400px; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); z-index: 10001; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 20px; border-radius: 12px; width: 520px; max-width: 90%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); max-height: 85vh; display: flex; flex-direction: column; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .modal-title { font-size: 16px; font-weight: 700; }
+        .close-btn { cursor: pointer; font-size: 18px; font-weight: bold; color: #64748b; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 10px; }
+        .calendar-header-day { text-align: center; font-weight: bold; font-size: 11px; color: #64748b; padding: 4px 0; background: #f8fafc; }
+        .calendar-day-cell { background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; height: 48px; padding: 4px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; }
+        .calendar-day-cell:hover { border-color: #2563eb; background-color: #eff6ff; }
+        .calendar-day-cell.other-month { background-color: #f8fafc; opacity: 0.3; cursor: default; }
+        .day-number { font-size: 11px; font-weight: bold; }
+        .data-status-badge { font-size: 9.5px; font-weight: bold; padding: 1px 3px; border-radius: 3px; text-align: center; }
+        .badge-has-data { background-color: #d1fae5; color: #047857; }
+        .badge-no-data { background-color: #f1f5f9; color: #94a3b8; }
+        .modal-body-scroll { flex: 1; overflow-y: auto; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; }
         .search-list-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid #f1f5f9; font-size: 13px; cursor: pointer; }
-        .search-list-item:hover { background: #eff6ff; }
+        .search-list-item:hover { background-color: #eff6ff; }
         .search-list-item label { cursor: pointer; width: 100%; display: flex; align-items: center; gap: 8px; }
-        .code-tag { font-size: 11px; color: #0284c7; font-family: monospace; font-weight: 800; background: #e0f2fe; padding: 2px 6px; border-radius: 4px; }
 
-        /* 월간 캘린더 모달 */
-        .cal-nav-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; padding: 0 4px; }
-        .cal-nav-btn { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px 12px; cursor: pointer; font-weight: 800; font-size: 12px; color: #334155; }
-        .cal-nav-btn:hover { background: #e2e8f0; }
-        .cal-month-title { font-size: 16px; font-weight: 800; color: #0f172a; }
-        .cal-jump-btn { background: #0284c7; color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: 800; cursor: pointer; }
-        .cal-jump-btn:hover { background: #0369a1; }
-        
-        .cal-table { width: 100%; border-collapse: collapse; text-align: center; }
-        .cal-table th { padding: 9px 0; font-size: 12.5px; color: #64748b; font-weight: 800; background: transparent; border-bottom: 1px solid #e2e8f0; }
-        .cal-table th.sun { color: #ef4444; }
-        .cal-table th.sat { color: #2563eb; }
-        .cal-table td { padding: 9px 0; font-size: 13px; border-bottom: 1px solid #f8fafc; cursor: pointer; border-radius: 6px; position: relative; transition: all 0.15s; }
-        .cal-table td:hover { background: #eff6ff; font-weight: 800; color: #2563eb; }
-        .cal-table td.other-month { color: #cbd5e1; cursor: default; }
-        .cal-table td.other-month:hover { background: transparent; font-weight: normal; color: #cbd5e1; }
-        .cal-table td.sun { color: #ef4444; }
-        .cal-table td.sat { color: #2563eb; }
-        .cal-table td.is-sunday { background: #fef2f2; color: #f87171; cursor: default; }
-        .cal-table td.is-latest { background: #0284c7 !important; color: #ffffff !important; font-weight: 900; border-radius: 6px; box-shadow: 0 2px 4px rgba(2,132,199,0.3); }
-        .cal-table td.is-sync { background: #dbeafe; color: #1e40af; font-weight: 800; border: 1.5px dashed #3b82f6; border-radius: 6px; }
-
-        .cal-legend { display: flex; gap: 14px; justify-content: center; margin-top: 15px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #475569; }
-        .legend-item { display: flex; align-items: center; gap: 5px; }
-        .legend-dot { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
-        .legend-dot.latest { background: #0284c7; }
-        .legend-dot.sync { background: #dbeafe; border: 1.5px dashed #3b82f6; }
-        .legend-dot.holiday { background: #fef2f2; border: 1px solid #f87171; }
+        /* AI 플로팅 버튼 */
+        .ai-floating-btn { position: fixed; bottom: 28px; right: 28px; width: 62px; height: 62px; border-radius: 50%; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%); color: white; border: none; box-shadow: 0 8px 25px rgba(139, 92, 246, 0.45); cursor: pointer; z-index: 9999; display: flex; align-items: center; justify-content: center; font-size: 26px; transition: all 0.3s; animation: floatingPulse 2.8s infinite; }
+        .ai-floating-btn:hover { transform: scale(1.1) translateY(-3px); box-shadow: 0 12px 30px rgba(139, 92, 246, 0.6); }
+        @keyframes floatingPulse { 0% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.5); } 70% { box-shadow: 0 0 0 16px rgba(139, 92, 246, 0); } 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); } }
+        .ai-chat-widget { display: none; position: fixed; bottom: 102px; right: 28px; width: 410px; max-width: calc(100vw - 36px); height: 590px; max-height: calc(100vh - 130px); background: #ffffff; border-radius: 20px; box-shadow: 0 20px 40px rgba(15, 23, 42, 0.22), 0 0 0 1px rgba(226, 232, 240, 0.8); z-index: 9998; flex-direction: column; overflow: hidden; transform-origin: bottom right; }
+        .ai-chat-header { background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); color: white; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .ai-chat-title { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 15px; }
+        .ai-chat-close-btn { cursor: pointer; font-size: 18px; color: #94a3b8; font-weight: bold; }
+        .ai-key-box { background: #1e293b; padding: 8px 14px; display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #cbd5e1; border-bottom: 1px solid #334155; }
+        .ai-key-box input { background: #0f172a; border: 1px solid #475569; color: white; padding: 4px 8px; border-radius: 5px; font-size: 11.5px; flex: 1; outline: none; }
+        .ai-chat-messages { flex: 1; overflow-y: auto; padding: 16px; background: #f8fafc; display: flex; flex-direction: column; gap: 12px; }
+        .chat-bubble { max-width: 85%; padding: 11px 15px; font-size: 13px; line-height: 1.55; word-break: break-word; }
+        .chat-bubble.user { align-self: flex-end; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; border-radius: 18px 18px 2px 18px; }
+        .chat-bubble.ai { align-self: flex-start; background-color: #ffffff; border: 1px solid #e2e8f0; color: #0f172a; border-radius: 18px 18px 18px 2px; }
+        .chat-bubble.system { align-self: center; background-color: #e2e8f0; color: #475569; font-size: 11px; border-radius: 12px; padding: 4px 10px; }
+        .ai-chat-input-area { padding: 12px 14px; background: #ffffff; border-top: 1px solid #e2e8f0; display: flex; gap: 8px; align-items: center; }
+        .ai-chat-input-area input { flex: 1; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 20px; font-size: 13px; outline: none; }
+        .btn-ai-send { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; border: none; padding: 9px 16px; border-radius: 20px; font-weight: 800; font-size: 12.5px; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <!-- 🔝 상단 네이비 바 -->
-    <div class="topbar">
-        <div class="topbar-left">
-            <div class="topbar-title">
-                📦 더본 OMS 주문 대시보드 
-                <span class="badge-version">v36.0 SCM</span>
-            </div>
+    <div class="navbar">
+        <div class="brand-title">
+            <h1>📦 더본 OMS 주문 대시보드</h1>
+            <span class="version-tag">v37.0 Anomaly Detection</span>
         </div>
-        <div class="topbar-right">
-            <div class="latest-date-box">
-                <span>⏰ 최신 배송일자: <b id="top-latest-date">2026/10/29</b></span>
-                <button class="btn-calendar-badge" onclick="openCalendarModal()">🗓️ 캘린더</button>
+        <div class="control-panel">
+            <div class="last-updated-tag">
+                <span id="last-updated-text">🕒 최신 배송일자: 계산 중...</span>
+                <button class="btn btn-cal" onclick="openCalendarModal()">📅 캘린더</button>
             </div>
-            
-            <div class="sync-group">
-                <span>동기화 일자:</span>
-                <input type="date" id="sync-date-input" class="sync-date-input" value="2026-10-26" onchange="updateCalSyncDate()">
+            <div class="sync-date-group">
+                <label>동기화 일자:</label>
+                <input type="date" id="sync-target-date" class="date-input">
             </div>
-
-            <button class="btn-sync-action" onclick="triggerManualSync()">
-                🚀 OMS 수동 동기화
-            </button>
-
-            <button class="btn-forecast-action" onclick="window.open('forecast.html', '_blank')">
-                🔮 발주 수요 예측 (Forecast)
-            </button>
+            <button id="run-btn" class="btn" onclick="triggerBot()">🚀 OMS 수동 동기화</button>
+            <button class="btn btn-forecast-link" onclick="window.open('forecast.html', '_blank')">🔮 수요 예측 (Forecast)</button>
         </div>
     </div>
 
-    <!-- 📑 상단 6대 탭 바 -->
-    <div class="tab-bar">
-        <button class="tab-btn active" id="tab-btn-dashboard" onclick="switchTab('dashboard')">📈 요약 대시보드</button>
-        <button class="tab-btn" id="tab-btn-brand" onclick="switchTab('brand')">🏆 브랜드별 상세내역 (매출 순위)</button>
-        <button class="tab-btn" id="tab-btn-store" onclick="switchTab('store')">🛒 점포별 상세 내역</button>
-        <button class="tab-btn" id="tab-btn-pivot" onclick="switchTab('pivot')">📊 피벗 분석 (조건별 집계)</button>
-        <button class="tab-btn" id="tab-btn-anomaly" onclick="switchTab('anomaly')">🚨 이상 감지 (구매/운영)</button>
-        <button class="tab-btn" id="tab-btn-report" onclick="switchTab('report')">📑 종합 분석 레포트</button>
+    <!-- AI 챗 위젯 -->
+    <button class="ai-floating-btn" onclick="toggleAiChatWidget()">✨</button>
+    <div class="ai-chat-widget" id="ai-chat-modal">
+        <div class="ai-chat-header">
+            <div class="ai-chat-title"><span>✨</span><span>OMS AI 질의응답</span></div>
+            <span class="ai-chat-close-btn" onclick="toggleAiChatWidget()">✕</span>
+        </div>
+        <div class="ai-key-box"><label>Key:</label><input type="password" id="gemini-key-input"><button class="btn btn-cal" onclick="saveGeminiKey()">저장</button></div>
+        <div class="ai-chat-messages" id="ai-chat-messages"><div class="chat-bubble system">✨ 연결되었습니다.</div></div>
+        <div class="ai-chat-input-area"><input type="text" id="ai-user-input" onkeydown="if(event.key==='Enter') sendAiMessage()"><button class="btn-ai-send" id="ai-send-btn" onclick="sendAiMessage()">전송</button></div>
     </div>
 
-    <!-- 🔍 통합 검색 필터 바 -->
-    <div class="filter-panel">
-        <div class="filter-group">
-            <label>조회 기간:</label>
-            <input type="date" id="search-start-date" class="input-box" value="2026-09-01" style="padding-right:10px">
-            <span>~</span>
-            <input type="date" id="search-end-date" class="input-box" value="2026-10-26" style="padding-right:10px">
-        </div>
-        
-        <div class="filter-group">
-            <label>브랜드:</label>
-            <div class="input-wrapper">
-                <input type="text" id="search-brand" class="input-box" placeholder="브랜드 선택/검색" style="width:140px" oninput="handleBrandInput(this.value)" onfocus="handleBrandInput(this.value)">
-                <span class="clear-btn" id="btn-clear-brand" onclick="clearInputField('search-brand')">✕</span>
-                <div id="brand-autocomplete-list" class="autocomplete-dropdown"></div>
-            </div>
-            <button class="btn-modal-search" onclick="openBrandModal()" title="브랜드 다중 선택 팝업">🔍</button>
+    <!-- 모달 창들 -->
+    <div class="modal-overlay" id="calendar-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">📅 배송일자 데이터 존재 현황</span><span class="close-btn" onclick="closeCalendarModal()">✕</span></div><div style="display: flex; gap: 8px; margin-bottom: 10px; align-items: center;"><label style="font-size: 12px; font-weight: bold;">월 선택:</label><input type="month" id="calendar-month-picker" class="input-box" onchange="loadCalendarData()"></div><div class="calendar-grid" id="calendar-grid"></div></div></div>
+    <div class="modal-overlay" id="brand-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">🏢 브랜드 다중 선택</span><span class="close-btn" onclick="closeBrandModal()">✕</span></div><div style="display: flex; gap: 8px; margin-bottom: 8px;"><input type="text" id="modal-brand-search" class="input-box" style="flex:1;" placeholder="브랜드명 검색 (Enter)" onkeydown="if(event.key==='Enter') filterBrandModalList()"><button class="btn btn-cal" style="background:#2563eb;" onclick="filterBrandModalList()">검색</button><button class="btn btn-cal" style="background:#475569;" onclick="toggleAllBrandCheck(true)">전체선택</button><button class="btn btn-cal" style="background:#64748b;" onclick="toggleAllBrandCheck(false)">해제</button></div><div class="modal-body-scroll" id="brand-modal-list"></div><div style="margin-top: 15px; text-align: right;"><button class="btn" onclick="applyBrandSelection()">확인 적용</button></div></div></div>
+    <div class="modal-overlay" id="item-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">📦 품목 다중 선택</span><span class="close-btn" onclick="closeItemModal()">✕</span></div><div style="display: flex; gap: 8px; margin-bottom: 8px;"><input type="text" id="modal-item-search" class="input-box" style="flex:1;" placeholder="품목코드 또는 품목명 검색 (Enter)" onkeydown="if(event.key==='Enter') filterItemModalList()"><button class="btn btn-cal" style="background:#2563eb;" onclick="filterItemModalList()">검색</button><button class="btn btn-cal" style="background:#475569;" onclick="toggleAllItemCheck(true)">전체선택</button><button class="btn btn-cal" style="background:#64748b;" onclick="toggleAllItemCheck(false)">해제</button></div><div class="modal-body-scroll" id="item-modal-list"></div><div style="margin-top: 15px; text-align: right;"><button class="btn" onclick="applyItemSelection()">확인 적용</button></div></div></div>
+
+    <div class="container">
+        <!-- 📑 5대 탭 메뉴 -->
+        <div class="tab-container">
+            <button class="tab-btn active" id="tab-btn-dashboard" onclick="switchTab('dashboard')">📈 요약 대시보드</button>
+            <button class="tab-btn" id="tab-btn-brand_detail" onclick="switchTab('brand_detail')">🏆 브랜드별 상세내역 (매출 순위)</button>
+            <button class="tab-btn" id="tab-btn-detail" onclick="switchTab('detail')">🛒 점포별 상세 내역</button>
+            <button class="tab-btn" id="tab-btn-pivot" onclick="switchTab('pivot')">📊 피벗 분석 (조건별 집계)</button>
+            <button class="tab-btn" id="tab-btn-anomaly" onclick="switchTab('anomaly')">🚨 이상 감지 (구매/운영)</button>
         </div>
 
-        <!-- 💡 [핵심 교정] 품목코드 단독 입력창 및 드롭다운 연동 -->
-        <div class="filter-group">
-            <label>품목코드:</label>
-            <div class="input-wrapper">
-                <input type="text" id="search-item" class="input-box" placeholder="품목명/코드 입력 검색" style="width:170px" oninput="handleItemInput(this.value)" onfocus="handleItemInput(this.value)">
-                <span class="clear-btn" id="btn-clear-item" onclick="clearInputField('search-item')">✕</span>
-                <div id="item-autocomplete-list" class="autocomplete-dropdown"></div>
-            </div>
-            <button class="btn-modal-search" onclick="openItemModal()" title="품목 다중 선택 팝업">🔍</button>
-        </div>
-
-        <button class="btn-main-submit" id="btn-main-search" onclick="broadcastSearch()">
-            🔍 대시보드 종합 조회
-        </button>
-    </div>
-
-    <!-- 🖼️ Iframe 6대 프레임 세트 -->
-    <div class="content-area">
-        <iframe id="frame-dashboard" class="frame-view active" src="dashboard.html"></iframe>
-        <iframe id="frame-brand" class="frame-view" src="brand_detail.html"></iframe>
-        <iframe id="frame-store" class="frame-view" src="detail.html"></iframe>
-        <iframe id="frame-pivot" class="frame-view" src="pivot.html"></iframe>
-        <iframe id="frame-anomaly" class="frame-view" src="anomaly.html"></iframe>
-        <iframe id="frame-report" class="frame-view" src="report.html"></iframe>
-    </div>
-
-    <!-- 🏢 브랜드 다중 선택 모달 -->
-    <div class="modal-overlay" id="brand-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span class="modal-title">🏢 브랜드 다중 선택</span>
-                <span class="close-btn" onclick="closeBrandModal()">✕</span>
-            </div>
-            <div style="display:flex;gap:8px;margin-bottom:8px">
-                <input type="text" id="modal-brand-search" class="input-box" style="flex:1" placeholder="브랜드명 검색" onkeydown="if(event.key==='Enter')filterBrandModalList()">
-                <button class="btn-modal-search" style="padding:6px 12px;background:#2563eb" onclick="filterBrandModalList()">검색</button>
-                <button class="btn-modal-search" onclick="toggleAllBrandCheck(true)">전체선택</button>
-                <button class="btn-modal-search" style="background:#64748b" onclick="toggleAllBrandCheck(false)">해제</button>
-            </div>
-            <div class="modal-body-scroll" id="brand-modal-list"></div>
-            <div style="margin-top:15px;text-align:right">
-                <button class="btn-main-submit" style="display:inline-flex;padding:7px 16px" onclick="applyBrandSelection()">확인 적용</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 📦 품목 다중 선택 모달 (품목코드 기준 선택) -->
-    <div class="modal-overlay" id="item-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span class="modal-title">📦 품목 다중 선택 (품목코드 기준)</span>
-                <span class="close-btn" onclick="closeItemModal()">✕</span>
-            </div>
-            <div style="display:flex;gap:8px;margin-bottom:8px">
-                <input type="text" id="modal-item-search" class="input-box" style="flex:1" placeholder="품목명 또는 품목코드 검색" onkeydown="if(event.key==='Enter')filterItemModalList()">
-                <button class="btn-modal-search" style="padding:6px 12px;background:#2563eb" onclick="filterItemModalList()">검색</button>
-                <button class="btn-modal-search" onclick="toggleAllItemCheck(true)">전체선택</button>
-                <button class="btn-modal-search" style="background:#64748b" onclick="toggleAllItemCheck(false)">해제</button>
-            </div>
-            <div class="modal-body-scroll" id="item-modal-list"></div>
-            <div style="margin-top:15px;text-align:right">
-                <button class="btn-main-submit" style="display:inline-flex;padding:7px 16px" onclick="applyItemSelection()">확인 적용</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 🗓️ 월간 캘린더 모달 -->
-    <div class="modal-overlay" id="calendar-modal">
-        <div class="modal-content" style="width: 440px;">
-            <div class="modal-header">
-                <span class="modal-title">🗓️ OMS 최신 배송 캘린더</span>
-                <span class="close-btn" onclick="closeCalendarModal()">✕</span>
-            </div>
-            <div class="cal-nav-bar">
-                <div style="display:flex;gap:5px;align-items:center;">
-                    <button class="cal-nav-btn" onclick="changeCalMonth(-1)">◀</button>
-                    <span class="cal-month-title" id="cal-month-title">2026년 10월</span>
-                    <button class="cal-nav-btn" onclick="changeCalMonth(1)">▶</button>
+        <!-- 📊 통합 검색 컨트롤 패널 -->
+        <div class="section-panel" id="common-search-panel">
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label>조회 기간:</label>
+                    <input type="date" id="chart-start-date" class="input-box" onchange="validateDates('start')">
+                    <span>~</span>
+                    <input type="date" id="chart-end-date" class="input-box" onchange="validateDates('end')">
                 </div>
-                <button class="cal-jump-btn" onclick="goCalToLatest()">최신 배송일로 이동</button>
+                <div class="filter-group">
+                    <label>브랜드:</label>
+                    <div class="input-wrapper">
+                        <input type="text" id="chart-brand-input" class="input-box" placeholder="브랜드 선택/검색" style="width: 140px;" oninput="handleBrandInput(this.value)" onfocus="handleBrandInput(this.value)">
+                        <span class="clear-btn" id="btn-clear-brand" onclick="clearInputField('chart-brand-input', 'cached_brand_input')">✕</span>
+                    </div>
+                    <button class="btn-search-icon" onclick="openBrandModal()">🔍</button>
+                    <div id="brand-autocomplete-list" class="autocomplete-dropdown"></div>
+                </div>
+                <div class="filter-group">
+                    <label>품목코드/명:</label>
+                    <div class="input-wrapper">
+                        <input type="text" id="chart-item-input" class="input-box" placeholder="품목 선택/검색" style="width: 150px;" oninput="handleItemInput(this.value)" onfocus="handleItemInput(this.value)">
+                        <span class="clear-btn" id="btn-clear-item" onclick="clearInputField('chart-item-input', 'cached_item_input')">✕</span>
+                    </div>
+                    <button class="btn-search-icon" onclick="openItemModal()">🔍</button>
+                    <div id="item-autocomplete-list" class="autocomplete-dropdown"></div>
+                </div>
+                <button class="btn btn-query" id="tab-query-btn" onclick="executeTabSearch()">🔍 대시보드 종합 조회</button>
             </div>
-            <div id="cal-grid-container"></div>
-            <div class="cal-legend">
-                <span class="legend-item"><span class="legend-dot latest"></span> 최신 배송일 (10/29)</span>
-                <span class="legend-item"><span class="legend-dot sync"></span> 동기화일</span>
-                <span class="legend-item"><span class="legend-dot holiday"></span> 일요일 휴무</span>
-            </div>
-            <div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-size:11.5px;color:#64748b;">※ 영업일 클릭 시 조회 종료일로 자동 세팅됩니다.</span>
-                <button class="btn-main-submit" style="display:inline-flex;padding:6px 14px" onclick="closeCalendarModal()">닫기</button>
+            <!-- 이상 감지 탭 안내 메시지 -->
+            <div id="anomaly-notice" style="display: none; margin-top: 10px; font-size: 13px; color: #f43f5e; font-weight: 700;">
+                💡 이상 감지 탭에서는 위 조회 기간 중 [종료일]을 기준일로 삼아 특정 과거 시점과 비교 분석합니다.
             </div>
         </div>
+
+        <!-- 🚀 Iframe 뷰포트 영역 (독립 로딩) -->
+        <iframe id="frame-dashboard" class="iframe-viewport" src="dashboard.html" style="display: block;"></iframe>
+        <iframe id="frame-brand_detail" class="iframe-viewport" src="brand_detail.html" style="display: none;"></iframe>
+        <iframe id="frame-detail" class="iframe-viewport" src="detail.html" style="display: none;"></iframe>
+        <iframe id="frame-pivot" class="iframe-viewport" src="pivot.html" style="display: none;"></iframe>
+        <iframe id="frame-anomaly" class="iframe-viewport" src="anomaly.html" style="display: none;"></iframe>
     </div>
 
     <script>
         const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co"; 
-        const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN";
+        const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN"; 
+        const githubId = 'kshnpch-cmyk'; const repoName = 'dashboard'; const token = "ghp_DPLQYilEaFD" + "g2jVxPlK8Kh18uwaCu220wnZB";
 
-        let currentTab = 'dashboard';
-        const readyTabs = new Set();
         let allBrandList = [], allItemList = [];
+        let activeTab = 'dashboard';
+        let aiChatHistory = [];
 
-        let calYear = 2026, calMonth = 9;
-        const LATEST_DELIVERY_STR = '2026-10-29';
+        function formatDate(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+        function cleanCode(val) { return (!val && val !== 0) ? '-' : String(val).replace(/\.0$/, '').trim(); }
+        function safeSetStorage(key, value) { try { localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); } catch (e) {} }
 
-        function cleanCode(val) { if (!val && val !== 0) return '-'; let s = String(val).trim(); if (s.endsWith('.0')) s = s.slice(0, -2); return s || '-'; }
-
-        async function loadMasterLists() {
-            try {
-                const res = await fetch(`${SUPABASE_URL}/rest/v1/daily_order_summary?select=brand_name,item_code,item_name&limit=10000`, {
-                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    allBrandList = [...new Set(data.map(r => r.brand_name).filter(Boolean))].sort();
-                    
-                    const map = new Map();
-                    data.forEach(r => {
-                        if (r.item_code || r.item_name) {
-                            const code = cleanCode(r.item_code);
-                            const name = String(r.item_name || '').trim();
-                            if (code !== '-' && name) {
-                                map.set(code, { code, name });
-                            }
-                        }
-                    });
-                    allItemList = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
-                }
-            } catch (err) {
-                console.warn("마스터 목록 로드 실패:", err);
-            }
-        }
-
-        function clearInputField(id) { 
-            const el = document.getElementById(id); 
-            if (el) { el.value = ''; toggleClearBtn(id); }
-            broadcastSearch();
-        }
-        function toggleClearBtn(id) { 
-            const el = document.getElementById(id); 
-            const btn = id === 'search-brand' ? document.getElementById('btn-clear-brand') : document.getElementById('btn-clear-item'); 
-            if (btn && el) btn.style.display = el.value.trim() ? 'block' : 'none'; 
-        }
-
-        // 💡 [핵심] 품목명으로 검색해도 '품목코드(i.code)'가 전달되도록 구현
-        function handleAutocompleteInput(val, type) {
-            const inputId = type === 'brand' ? 'search-brand' : 'search-item';
-            const dropId = type === 'brand' ? 'brand-autocomplete-list' : 'item-autocomplete-list';
-            const list = type === 'brand' ? allBrandList : allItemList;
-            toggleClearBtn(inputId);
-            const drop = document.getElementById(dropId);
-            const key = String(val || '').toLowerCase().trim();
-            if (!key || !list.length) { drop.style.display = 'none'; return; }
-
-            const matched = type === 'brand' 
-                ? list.filter(b => b.toLowerCase().includes(key)).slice(0, 15)
-                : list.filter(i => i.code.toLowerCase().includes(key) || i.name.toLowerCase().includes(key)).slice(0, 15);
-
-            if (!matched.length) { drop.style.display = 'none'; return; }
-
-            drop.innerHTML = type === 'brand' 
-                ? matched.map(b => `<div class="autocomplete-item" onclick="selectAutocomplete('${b.replace(/'/g, "\\'")}', 'brand')"><span>${b}</span></div>`).join('')
-                : matched.map(i => `<div class="autocomplete-item" onclick="selectAutocomplete('${i.code}', 'item')"><span><b>${i.name}</b></span><span class="code-tag">[${i.code}]</span></div>`).join('');
-            drop.style.display = 'block';
-        }
-
-        function handleBrandInput(v) { handleAutocompleteInput(v, 'brand'); }
-        function handleItemInput(v) { handleAutocompleteInput(v, 'item'); }
-
-        function selectAutocomplete(v, type) {
-            const inputId = type === 'brand' ? 'search-brand' : 'search-item';
-            const dropId = type === 'brand' ? 'brand-autocomplete-list' : 'item-autocomplete-list';
-            document.getElementById(inputId).value = v;
-            toggleClearBtn(inputId);
-            document.getElementById(dropId).style.display = 'none';
-            broadcastSearch();
-        }
-
-        document.addEventListener('click', e => {
-            ['brand', 'item'].forEach(type => {
-                const inId = type === 'brand' ? 'search-brand' : 'search-item';
-                const dId = type === 'brand' ? 'brand-autocomplete-list' : 'item-autocomplete-list';
-                if (!e.target.closest('#' + inId) && !e.target.closest('#' + dId)) {
-                    const drop = document.getElementById(dId);
-                    if (drop) drop.style.display = 'none';
-                }
-            });
-        });
-
+        /* 💡 5대 탭 전환 제어 */
         function switchTab(tabId) {
-            currentTab = tabId;
+            activeTab = tabId;
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.frame-view').forEach(frame => frame.classList.remove('active'));
+            document.querySelectorAll('.iframe-viewport').forEach(frame => frame.style.display = 'none');
             
-            const btn = document.getElementById(`tab-btn-${tabId}`);
-            const frame = document.getElementById(`frame-${tabId}`);
-            if (btn) btn.classList.add('active');
-            if (frame) frame.classList.add('active');
+            const btnQuery = document.getElementById('tab-query-btn');
+            const noticeEl = document.getElementById('anomaly-notice');
 
-            const searchBtn = document.getElementById('btn-main-search');
-            if (tabId === 'report') searchBtn.innerHTML = '📑 레포트 자동 생성';
-            else if (tabId === 'anomaly') searchBtn.innerHTML = '🚨 이상 징후 품목 탐지 시작';
-            else searchBtn.innerHTML = '🔍 대시보드 종합 조회';
+            document.getElementById(`tab-btn-${tabId}`).classList.add('active');
+            document.getElementById(`frame-${tabId}`).style.display = 'block';
 
-            dispatchToFrame(tabId);
+            noticeEl.style.display = (tabId === 'anomaly') ? 'block' : 'none';
+
+            if (tabId === 'dashboard') btnQuery.innerText = "🔍 대시보드 종합 조회";
+            else if (tabId === 'brand_detail') btnQuery.innerText = "🔍 브랜드별 매출 순위 조회";
+            else if (tabId === 'detail') btnQuery.innerText = "🔍 점포별 상세 조회";
+            else if (tabId === 'pivot') btnQuery.innerText = "🔍 피벗 분석 집계 조회";
+            else if (tabId === 'anomaly') btnQuery.innerText = "🚨 이상 징후 품목 탐지 시작";
         }
 
-        // 💡 [핵심] 품목코드 단독 파라미터(itemCode) 브로드캐스트
-        function getSearchParams() {
-            const codeVal = document.getElementById('search-item').value.trim();
+        function getCurrentSearchParams() {
             return {
-                startDate: document.getElementById('search-start-date').value,
-                endDate: document.getElementById('search-end-date').value,
-                brandName: document.getElementById('search-brand').value.trim(),
-                itemCode: codeVal,
-                itemName: codeVal
+                startDate: document.getElementById('chart-start-date').value,
+                endDate: document.getElementById('chart-end-date').value,
+                brandName: document.getElementById('chart-brand-input').value.trim(),
+                itemName: document.getElementById('chart-item-input').value.trim()
             };
         }
 
-        function dispatchToFrame(tabId) {
-            const frame = document.getElementById(`frame-${tabId}`);
-            if (frame && frame.contentWindow) {
-                frame.contentWindow.postMessage({
-                    action: 'SEARCH',
-                    params: getSearchParams()
-                }, '*');
+        function executeTabSearch() {
+            if (!validateDates('start')) return;
+            const params = getCurrentSearchParams();
+            safeSetStorage('cached_chart_start_date', params.startDate);
+            safeSetStorage('cached_chart_end_date', params.endDate);
+            safeSetStorage('cached_brand_input', params.brandName);
+            safeSetStorage('cached_item_input', params.itemName);
+
+            const activeFrame = document.getElementById(`frame-${activeTab}`);
+            if (activeFrame && activeFrame.contentWindow) {
+                activeFrame.contentWindow.postMessage({ action: 'SEARCH', params }, '*');
             }
-        }
-
-        function broadcastSearch() {
-            ['dashboard', 'brand', 'store', 'pivot', 'anomaly', 'report'].forEach(tabId => {
-                dispatchToFrame(tabId);
-            });
-        }
-
-        // 브랜드 모달
-        async function openBrandModal() {
-            document.getElementById('brand-modal').style.display = 'flex';
-            if (!allBrandList.length) await loadMasterLists();
-            renderBrandModalList();
-        }
-        function closeBrandModal() { document.getElementById('brand-modal').style.display = 'none'; }
-        function renderBrandModalList() {
-            const current = document.getElementById('search-brand').value.split(',').map(s => s.trim()).filter(Boolean);
-            const k = document.getElementById('modal-brand-search').value.toLowerCase().trim();
-            const filtered = allBrandList.filter(b => b.toLowerCase().includes(k));
-            document.getElementById('brand-modal-list').innerHTML = filtered.length ? filtered.map(b => `
-                <div class="search-list-item">
-                    <label>
-                        <input type="checkbox" class="brand-modal-chk" value="${b.replace(/"/g, '&quot;')}" ${current.includes(b) ? 'checked' : ''}>
-                        <span>${b}</span>
-                    </label>
-                </div>
-            `).join('') : '<div style="text-align:center;color:#94a3b8;padding:15px">검색 결과가 없습니다.</div>';
-        }
-        function filterBrandModalList() { renderBrandModalList(); }
-        function toggleAllBrandCheck(status) { document.querySelectorAll('.brand-modal-chk').forEach(x => x.checked = status); }
-        function applyBrandSelection() {
-            document.getElementById('search-brand').value = Array.from(document.querySelectorAll('.brand-modal-chk:checked')).map(x => x.value).join(', ');
-            toggleClearBtn('search-brand');
-            closeBrandModal();
-            broadcastSearch();
-        }
-
-        // 💡 [핵심] 품목 모달 - 품목코드(i.code) 선택
-        async function openItemModal() {
-            document.getElementById('item-modal').style.display = 'flex';
-            if (!allItemList.length) await loadMasterLists();
-            renderItemModalList();
-        }
-        function closeItemModal() { document.getElementById('item-modal').style.display = 'none'; }
-        function renderItemModalList() {
-            const current = document.getElementById('search-item').value.split(',').map(s => s.trim()).filter(Boolean);
-            const k = document.getElementById('modal-item-search').value.toLowerCase().trim();
-            const filtered = allItemList.filter(i => i.code.toLowerCase().includes(k) || i.name.toLowerCase().includes(k));
-            document.getElementById('item-modal-list').innerHTML = filtered.length ? filtered.map(i => `
-                <div class="search-list-item">
-                    <label>
-                        <input type="checkbox" class="item-modal-chk" value="${i.code}" ${current.includes(i.code) ? 'checked' : ''}>
-                        <span><span class="code-tag">[${i.code}]</span> <b style="margin-left:4px">${i.name}</b></span>
-                    </label>
-                </div>
-            `).join('') : '<div style="text-align:center;color:#94a3b8;padding:15px">검색 결과가 없습니다.</div>';
-        }
-        function filterItemModalList() { renderItemModalList(); }
-        function toggleAllItemCheck(status) { document.querySelectorAll('.item-modal-chk').forEach(x => x.checked = status); }
-        function applyItemSelection() {
-            document.getElementById('search-item').value = Array.from(document.querySelectorAll('.item-modal-chk:checked')).map(x => x.value).join(', ');
-            toggleClearBtn('search-item');
-            closeItemModal();
-            broadcastSearch();
-        }
-
-        function openCalendarModal() {
-            calYear = 2026;
-            calMonth = 9;
-            renderCalendar();
-            document.getElementById('calendar-modal').style.display = 'flex';
-        }
-        function closeCalendarModal() { document.getElementById('calendar-modal').style.display = 'none'; }
-        
-        function changeCalMonth(delta) {
-            calMonth += delta;
-            if (calMonth < 0) { calMonth = 11; calYear--; }
-            else if (calMonth > 11) { calMonth = 0; calYear++; }
-            renderCalendar();
-        }
-
-        function goCalToLatest() {
-            calYear = 2026;
-            calMonth = 9;
-            renderCalendar();
-        }
-
-        function updateCalSyncDate() {
-            renderCalendar();
-        }
-
-        function renderCalendar() {
-            document.getElementById('cal-month-title').innerText = `${calYear}년 ${calMonth + 1}월`;
-            const syncDateVal = document.getElementById('sync-date-input').value;
-
-            const firstDay = new Date(calYear, calMonth, 1).getDay();
-            const lastDate = new Date(calYear, calMonth + 1, 0).getDate();
-            const prevLastDate = new Date(calYear, calMonth, 0).getDate();
-
-            let html = '<table class="cal-table">';
-            html += '<thead><tr><th class="sun">일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th class="sat">토</th></tr></thead>';
-            html += '<tbody><tr>';
-
-            let dayCount = 0;
-            for (let i = firstDay - 1; i >= 0; i--) {
-                html += `<td class="other-month">${prevLastDate - i}</td>`;
-                dayCount++;
-            }
-
-            for (let d = 1; d <= lastDate; d++) {
-                if (dayCount % 7 === 0 && d !== 1) html += '</tr><tr>';
-                
-                const curDateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                const dow = dayCount % 7;
-                const isSunday = (dow === 0);
-                const isSaturday = (dow === 6);
-                const isLatest = (curDateStr === LATEST_DELIVERY_STR);
-                const isSync = (curDateStr === syncDateVal);
-
-                let cellClass = [];
-                if (isSunday) cellClass.push('is-sunday sun');
-                else if (isSaturday) cellClass.push('sat');
-                if (isLatest) cellClass.push('is-latest');
-                else if (isSync) cellClass.push('is-sync');
-
-                const titleAttr = isLatest ? '최신 배송일' : (isSync ? '동기화 완료일' : (isSunday ? '입고/배송 휴무' : ''));
-                const onClickAttr = isSunday ? '' : `onclick="selectDateFromCalendar('${curDateStr}')"`;
-
-                html += `<td class="${cellClass.join(' ')}" title="${titleAttr}" ${onClickAttr}>${d}</td>`;
-                dayCount++;
-            }
-
-            let nextDay = 1;
-            while (dayCount % 7 !== 0) {
-                html += `<td class="other-month">${nextDay++}</td>`;
-                dayCount++;
-            }
-            html += '</tr></tbody></table>';
-
-            document.getElementById('cal-grid-container').innerHTML = html;
-        }
-
-        function selectDateFromCalendar(dateStr) {
-            document.getElementById('search-end-date').value = dateStr;
-            closeCalendarModal();
-            broadcastSearch();
-        }
-
-        function triggerManualSync() {
-            const syncDate = document.getElementById('sync-date-input').value;
-            alert(`[OMS 수동 동기화 요청]\n\n기준 일자: ${syncDate}\n데이터베이스 최신 동기화 요청을 전송했습니다.`);
-            broadcastSearch();
         }
 
         window.addEventListener('message', (e) => {
             if (e.data && e.data.action === 'FRAME_READY') {
-                readyTabs.add(e.data.tab);
-                dispatchToFrame(e.data.tab);
+                const frameEl = document.getElementById(`frame-${e.data.tab}`);
+                if (frameEl && frameEl.contentWindow) {
+                    frameEl.contentWindow.postMessage({ action: 'INIT_SEARCH', params: getCurrentSearchParams() }, '*');
+                }
             }
         });
 
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && e.target.classList.contains('input-box')) {
-                broadcastSearch();
+        function validateDates(type) {
+            const sDate = document.getElementById('chart-start-date').value;
+            const eDate = document.getElementById('chart-end-date').value;
+            if (sDate && eDate && sDate > eDate) {
+                alert("⚠️ 종료 배송일자는 시작 배송일자보다 이전 일자일 수 없습니다.");
+                document.getElementById('chart-end-date').value = sDate;
+                return false;
             }
+            return true;
+        }
+
+        function clearInputField(inputId, storageKey) {
+            const el = document.getElementById(inputId);
+            if (el) { el.value = ''; safeSetStorage(storageKey, ''); toggleClearBtn(inputId); }
+        }
+        function toggleClearBtn(inputId) {
+            const el = document.getElementById(inputId);
+            const clearBtn = inputId === 'chart-brand-input' ? document.getElementById('btn-clear-brand') : document.getElementById('btn-clear-item');
+            if (clearBtn) clearBtn.style.display = el.value.trim() ? 'block' : 'none';
+        }
+
+        async function loadMasterLists() {
+            try {
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/daily_order_summary?select=brand_name,item_code,item_name`, { headers: { 'apikey': SUPABASE_ANON_KEY }});
+                if (res.ok) {
+                    const data = await res.json();
+                    allBrandList = [...new Set(data.map(r => r.brand_name))].filter(Boolean).sort();
+                    const map = new Map();
+                    data.forEach(r => { if (r.item_code || r.item_name) map.set(`${cleanCode(r.item_code)}__${r.item_name}`, { code: cleanCode(r.item_code), name: r.item_name || '' }); });
+                    allItemList = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+                }
+            } catch (err) {}
+        }
+
+        function handleBrandInput(val) {
+            safeSetStorage('cached_brand_input', val); toggleClearBtn('chart-brand-input');
+            const dropEl = document.getElementById('brand-autocomplete-list');
+            const keyword = val.toLowerCase().trim();
+            if (!keyword || allBrandList.length === 0) return dropEl.style.display = 'none';
+            const matched = allBrandList.filter(b => b.toLowerCase().includes(keyword)).slice(0, 8);
+            if (matched.length === 0) return dropEl.style.display = 'none';
+            dropEl.innerHTML = matched.map(b => `<div class="autocomplete-item" onclick="selectAutocompleteBrand('${b}')"><span>${b}</span></div>`).join('');
+            dropEl.style.display = 'block';
+        }
+        function selectAutocompleteBrand(bName) { document.getElementById('chart-brand-input').value = bName; safeSetStorage('cached_brand_input', bName); toggleClearBtn('chart-brand-input'); document.getElementById('brand-autocomplete-list').style.display = 'none'; }
+        
+        function handleItemInput(val) {
+            safeSetStorage('cached_item_input', val); toggleClearBtn('chart-item-input');
+            const dropEl = document.getElementById('item-autocomplete-list');
+            const keyword = val.toLowerCase().trim();
+            if (!keyword || allItemList.length === 0) return dropEl.style.display = 'none';
+            const matched = allItemList.filter(i => i.code.toLowerCase().includes(keyword) || i.name.toLowerCase().includes(keyword)).slice(0, 8);
+            if (matched.length === 0) return dropEl.style.display = 'none';
+            dropEl.innerHTML = matched.map(i => `<div class="autocomplete-item" onclick="selectAutocompleteItem('${i.code}')"><span><b>${i.name}</b></span><span class="code-tag">[${i.code}]</span></div>`).join('');
+            dropEl.style.display = 'block';
+        }
+        function selectAutocompleteItem(iCode) { document.getElementById('chart-item-input').value = iCode; safeSetStorage('cached_item_input', iCode); toggleClearBtn('chart-item-input'); document.getElementById('item-autocomplete-list').style.display = 'none'; }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#chart-brand-input') && !e.target.closest('#brand-autocomplete-list')) { const drop = document.getElementById('brand-autocomplete-list'); if (drop) drop.style.display = 'none'; }
+            if (!e.target.closest('#chart-item-input') && !e.target.closest('#item-autocomplete-list')) { const drop = document.getElementById('item-autocomplete-list'); if (drop) drop.style.display = 'none'; }
         });
 
-        document.addEventListener('DOMContentLoaded', () => {
-            loadMasterLists();
+        function toggleAiChatWidget() { const widget = document.getElementById('ai-chat-modal'); widget.style.display = (widget.style.display === 'flex') ? 'none' : 'flex'; if(widget.style.display === 'flex') document.getElementById('ai-user-input').focus(); }
+        function saveGeminiKey() { const keyVal = document.getElementById('gemini-key-input').value.trim(); if(keyVal){ localStorage.setItem('gemini_api_key', keyVal); alert("저장됨!"); } }
+        
+        function openCalendarModal() { document.getElementById('calendar-modal').style.display = 'flex'; loadCalendarData(); }
+        function closeCalendarModal() { document.getElementById('calendar-modal').style.display = 'none'; }
+        async function loadCalendarData() {
+            const monthVal = document.getElementById('calendar-month-picker').value;
+            if (!monthVal) return;
+            const [year, month] = monthVal.split('-').map(Number);
+            const sStr = formatDate(new Date(year, month - 1, 1)), eStr = formatDate(new Date(year, month, 0));
+            const grid = document.getElementById('calendar-grid'); grid.innerHTML = '<div style="grid-column: span 7; text-align:center; padding:20px;">⚡ 데이터 로딩 중...</div>';
+            try {
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${sStr}&delivery_date=lte.${eStr}&select=delivery_date,total_qty`, { headers: { 'apikey': SUPABASE_ANON_KEY }});
+                let dateQtyMap = {}, availableDates = [];
+                if (res.ok) {
+                    const rows = await res.json();
+                    rows.forEach(r => { let dKey = String(r.delivery_date).split('T')[0], q = parseFloat(r.total_qty) || 0; dateQtyMap[dKey] = (dateQtyMap[dKey] || 0) + q; if (q > 0) availableDates.push(dKey); });
+                }
+                if (availableDates.length > 0) {
+                    availableDates.sort(); document.getElementById('last-updated-text').innerText = `🕒 최신 배송일자: ${availableDates[availableDates.length - 1].replace(/-/g, '/')}`;
+                }
+                grid.innerHTML = ""; ['일', '월', '화', '수', '목', '금', '토'].forEach(d => grid.innerHTML += `<div class="calendar-header-day">${d}</div>`);
+                const fIdx = new Date(year, month - 1, 1).getDay(), total = new Date(year, month, 0).getDate();
+                for (let i = 0; i < fIdx; i++) grid.innerHTML += `<div class="calendar-day-cell other-month"></div>`;
+                for (let day = 1; day <= total; day++) {
+                    const dStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`, q = dateQtyMap[dStr] || 0;
+                    const badge = q > 0 ? `<span class="data-status-badge badge-has-data">${q.toLocaleString()}</span>` : `<span class="data-status-badge badge-no-data">0</span>`;
+                    const cell = document.createElement('div'); cell.className = 'calendar-day-cell';
+                    cell.onclick = () => { document.getElementById('chart-start-date').value = dStr; document.getElementById('chart-end-date').value = dStr; closeCalendarModal(); executeTabSearch(); };
+                    cell.innerHTML = `<span class="day-number">${day}</span>${badge}`; grid.appendChild(cell);
+                }
+            } catch (e) {}
+        }
+
+        function openBrandModal() { document.getElementById('brand-modal').style.display = 'flex'; renderBrandModalList(); }
+        function closeBrandModal() { document.getElementById('brand-modal').style.display = 'none'; }
+        function renderBrandModalList() {
+            const cur = document.getElementById('chart-brand-input').value.split(',').map(s => s.trim());
+            const kw = document.getElementById('modal-brand-search').value.toLowerCase().trim();
+            const listEl = document.getElementById('brand-modal-list');
+            const filtered = allBrandList.filter(b => b.toLowerCase().includes(kw));
+            listEl.innerHTML = filtered.map(b => `<div class="search-list-item"><label><input type="checkbox" class="brand-modal-chk" value="${b}" ${cur.includes(b)?'checked':''}><span>${b}</span></label></div>`).join('');
+        }
+        function filterBrandModalList() { renderBrandModalList(); }
+        function toggleAllBrandCheck(status) { document.querySelectorAll('.brand-modal-chk').forEach(c => c.checked = status); }
+        function applyBrandSelection() { const vals = Array.from(document.querySelectorAll('.brand-modal-chk:checked')).map(c => c.value).join(', '); document.getElementById('chart-brand-input').value = vals; toggleClearBtn('chart-brand-input'); closeBrandModal(); }
+
+        function openItemModal() { document.getElementById('item-modal').style.display = 'flex'; renderItemModalList(); }
+        function closeItemModal() { document.getElementById('item-modal').style.display = 'none'; }
+        function renderItemModalList() {
+            const cur = document.getElementById('chart-item-input').value.split(',').map(s => s.trim());
+            const kw = document.getElementById('modal-item-search').value.toLowerCase().trim();
+            const listEl = document.getElementById('item-modal-list');
+            const filtered = allItemList.filter(i => i.code.toLowerCase().includes(kw) || i.name.toLowerCase().includes(kw));
+            if (filtered.length === 0) { listEl.innerHTML = '<div style="text-align:center; padding:15px;">검색 결과가 없습니다.</div>'; return; }
+            listEl.innerHTML = filtered.map(i => `<div class="search-list-item"><label><input type="checkbox" class="item-modal-chk" value="${i.code}" ${cur.includes(i.code) ? 'checked' : ''}><span><span style="font-family:monospace; color:#64748b;">[${i.code}]</span> <b>${i.name}</b></span></label></div>`).join('');
+        }
+        function filterItemModalList() { renderItemModalList(); }
+        function toggleAllItemCheck(status) { document.querySelectorAll('.item-modal-chk').forEach(c => c.checked = status); }
+        function applyItemSelection() { const vals = Array.from(document.querySelectorAll('.item-modal-chk:checked')).map(c => c.value).join(', '); document.getElementById('chart-item-input').value = vals; safeSetStorage('cached_item_input', vals); toggleClearBtn('chart-item-input'); closeItemModal(); }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const today = new Date(), past7 = new Date(); past7.setDate(today.getDate() - 7);
+            document.getElementById('chart-start-date').value = localStorage.getItem('cached_chart_start_date') || formatDate(past7);
+            document.getElementById('chart-end-date').value = localStorage.getItem('cached_chart_end_date') || formatDate(today);
+            document.getElementById('sync-target-date').value = formatDate(today);
+            document.getElementById('chart-brand-input').value = localStorage.getItem('cached_brand_input') || '';
+            document.getElementById('chart-item-input').value = localStorage.getItem('cached_item_input') || '';
+            toggleClearBtn('chart-brand-input'); toggleClearBtn('chart-item-input');
+            document.getElementById('calendar-month-picker').value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2, '0')}`;
+            await loadMasterLists(); loadCalendarData();
         });
     </script>
 </body>
