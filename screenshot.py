@@ -4,13 +4,16 @@ import glob
 import time
 import json
 import warnings
-import requests
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
+
+# TiDB (PostgreSQL) 드라이버
+import psycopg2
+from psycopg2.extras import execute_values
 
 # openpyxl CellStyle count 속성 오류 방지 패치
 import openpyxl.styles.cell_style
@@ -24,12 +27,8 @@ openpyxl.styles.cell_style.CellStyle.__init__ = _patched_cell_style_init
 
 warnings.filterwarnings('ignore')
 
-# 💡 GitHub Secrets 환경변수 수신 및 정규식 URL 파싱
-raw_url = os.environ.get("SUPABASE_URL", "https://zbilhsgfgyfrolveaego.supabase.co").strip()
-url_match = re.search(r'https?://[^\s\)\>\]\"\']+', raw_url)
-SUPABASE_URL = url_match.group(0) if url_match else "https://zbilhsgfgyfrolveaego.supabase.co"
-
-SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY", "").strip()
+# 💡 TiDB Cloud 접속 정보 수신
+TIDB_DATABASE_URL = os.environ.get("TIDB_DATABASE_URL", "").strip()
 
 OMS_COMPANY_CODE = os.environ.get("OMS_COMPANY_CODE", "1000").strip()
 OMS_ID = os.environ.get("OMS_ID", "1220503").strip()
@@ -66,87 +65,99 @@ driver.execute_script("return null;")
 driver.execute("send_command", params)
 
 
-def delete_existing_period_data(start_date_str, end_date_str, headers):
-    """💡 동기화 대상 기간(start_date ~ end_date)의 기존 DB 데이터를 선-삭제하여 중복 및 취소건을 초기화합니다."""
+def delete_existing_period_data(conn, start_date_str, end_date_str):
+    """동기화 대상 기간(start_date ~ end_date)의 기존 DB 데이터를 선-삭제하여 중복 및 취소건 초기화"""
     s_date = start_date_str.replace('/', '-')
     e_date = end_date_str.replace('/', '-')
 
     print(f"🧹 [선-삭제 실행] DB 기존 배송일자 범위 데이터 삭제 진행 ({s_date} ~ {e_date})...", flush=True)
 
-    delete_endpoint = f"{SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.{s_date}&delivery_date=lte.{e_date}"
-    
     try:
-        del_res = requests.delete(delete_endpoint, headers=headers)
-        if del_res.status_code in [200, 204]:
-            print(f"🗑️ 기존 데이터 삭제 성공 ({s_date} ~ {e_date})", flush=True)
-        else:
-            print(f"⚠️ 기존 데이터 삭제 실패/경고 ({del_res.status_code}): {del_res.text}", flush=True)
+        with conn.cursor() as cur:
+            delete_sql = """
+                DELETE FROM public.oms_orders 
+                WHERE delivery_date >= %s::date AND delivery_date <= %s::date;
+            """
+            cur.execute(delete_sql, (s_date, e_date))
+        conn.commit()
+        print(f"🗑️ 기존 데이터 삭제 성공 ({s_date} ~ {e_date})", flush=True)
     except Exception as e:
+        conn.rollback()
         print(f"❌ 데이터 삭제 중 오류 발생: {e}", flush=True)
+        raise e
 
 
-def sync_to_supabase(combined_df):
-    """수집된 Dataframe을 기존 데이터 삭제 후 Supabase oms_orders 테이블로 깔끔하게 재업로드"""
+def sync_to_tidb(combined_df):
+    """수집된 Dataframe을 기존 데이터 삭제 후 TiDB Cloud oms_orders 테이블로 초고속 재업로드"""
     if combined_df is None or combined_df.empty:
-        print("⚠️ Supabase에 업로드할 데이터가 없습니다.", flush=True)
+        print("⚠️ TiDB에 업로드할 데이터가 없습니다.", flush=True)
         return
 
-    print(f"🚀 Supabase 클라우드 DB 동기화를 시작합니다... (Target: {SUPABASE_URL})", flush=True)
+    if not TIDB_DATABASE_URL:
+        raise ValueError("TIDB_DATABASE_URL 환경 변수가 설정되지 않았습니다.")
 
-    headers = {
-        "apikey": SUPABASE_SECRET_KEY,
-        "Authorization": f"Bearer {SUPABASE_SECRET_KEY}",
-        "Content-Type": "application/json",
-        "Prefer": "return=minimal"
-    }
+    print(f"🚀 TiDB Cloud DB 동기화를 시작합니다...", flush=True)
 
-    delete_existing_period_data(target_start_date, target_end_date, headers)
+    # TiDB 연결
+    conn = psycopg2.connect(TIDB_DATABASE_URL)
 
-    df_clean = combined_df.fillna('').astype(str)
-    records = []
+    try:
+        # 기존 기간 데이터 선-삭제
+        delete_existing_period_data(conn, target_start_date, target_end_date)
 
-    for _, row in df_clean.iterrows():
-        def parse_num(val):
-            try:
-                s = str(val).replace(',', '').strip()
-                return float(s) if s else 0
-            except:
-                return 0
+        df_clean = combined_df.fillna('').astype(str)
+        records = []
 
-        def parse_date(val):
-            s = str(val).split('T')[0].replace('/', '-').strip()
-            return s if len(s) >= 8 else None
+        for _, row in df_clean.iterrows():
+            def parse_num(val):
+                try:
+                    s = str(val).replace(',', '').strip()
+                    return float(s) if s else 0.0
+                except:
+                    return 0.0
 
-        # 💡 센터명 안전 매핑 (물류센터 / 배송센터 / 센터명)
-        center_val = str(row.get("distribution_center", row.get("물류센터", row.get("배송센터", row.get("센터명", ""))))).strip()
+            def parse_date(val):
+                s = str(val).split('T')[0].replace('/', '-').strip()
+                return s if len(s) >= 8 else None
 
-        record = {
-            "order_date": parse_date(row.get("주문일자", "")),
-            "delivery_date": parse_date(row.get("배송일자", "")),
-            "store_code": str(row.get("거래처코드", row.get("점포코드", ""))),
-            "store_name": str(row.get("거래처명", row.get("점포명", ""))),
-            "brand_name": str(row.get("브랜드명", row.get("브랜드", ""))),
-            "distribution_center": center_val,
-            "item_code": str(row.get("품목코드", "")),
-            "item_name": str(row.get("품목명", "")),
-            "qty": int(parse_num(row.get("수량", row.get("주문수량", 0)))),
-            "price": parse_num(row.get("단가", row.get("공급단가", 0))),
-            "total_amount": parse_num(row.get("금액", row.get("공급가액", 0)))
-        }
-        records.append(record)
+            center_val = str(row.get("distribution_center", row.get("물류센터", row.get("배송센터", row.get("센터명", ""))))).strip()
 
-    batch_size = 1000
-    total_records = len(records)
-    endpoint = f"{SUPABASE_URL}/rest/v1/oms_orders"
+            record_tuple = (
+                parse_date(row.get("주문일자", "")),
+                parse_date(row.get("배송일자", "")),
+                str(row.get("거래처코드", row.get("점포코드", ""))),
+                str(row.get("거래처명", row.get("점포명", ""))),
+                str(row.get("브랜드명", row.get("브랜드", ""))),
+                center_val,
+                str(row.get("품목코드", "")),
+                str(row.get("품목명", "")),
+                int(parse_num(row.get("수량", row.get("주문수량", 0)))),
+                parse_num(row.get("단가", row.get("공급단가", 0))),
+                parse_num(row.get("금액", row.get("공급가액", 0)))
+            )
+            records.append(record_tuple)
 
-    for i in range(0, total_records, batch_size):
-        batch = records[i:i + batch_size]
-        res = requests.post(endpoint, headers=headers, json=batch)
+        insert_sql = """
+            INSERT INTO public.oms_orders (
+                order_date, delivery_date, store_code, store_name, brand_name,
+                distribution_center, item_code, item_name, qty, price, total_amount
+            ) VALUES %s
+        """
 
-        if res.status_code in [200, 201]:
-            print(f"✅ DB 동기화(새로 재업로드) 완료: {min(i + batch_size, total_records)} / {total_records} 건", flush=True)
-        else:
-            print(f"❌ DB 동기화 오류 ({res.status_code}): {res.text}", flush=True)
+        batch_size = 1000
+        total_records = len(records)
+
+        with conn.cursor() as cur:
+            for i in range(0, total_records, batch_size):
+                batch = records[i:i + batch_size]
+                execute_values(cur, insert_sql, batch)
+                conn.commit()
+                print(f"✅ DB 동기화(새로 재업로드) 완료: {min(i + batch_size, total_records)} / {total_records} 건", flush=True)
+
+        print("🎉 모든 주문 데이터가 TiDB Cloud에 성공적으로 동기화되었습니다.", flush=True)
+
+    finally:
+        conn.close()
 
 
 try:
@@ -231,8 +242,8 @@ try:
 
     print(f"📥 수신된 원본 데이터: {len(new_df):,}행", flush=True)
 
-    # 10. Supabase DB로 동기화 전송 (선 삭제 후 재업로드)
-    sync_to_supabase(new_df)
+    # 10. TiDB Cloud DB로 동기화 전송 (선 삭제 후 재업로드)
+    sync_to_tidb(new_df)
 
     # 임시 다운로드 파일 정리
     if os.path.exists(latest_file):
