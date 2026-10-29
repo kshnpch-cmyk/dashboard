@@ -1,9 +1,4 @@
-import { Client } from 'pg';
-
-// TiDB 날짜/숫자 타입을 Supabase REST 규격과 동일하게 파싱
-pg.types.setTypeParser(1082, (str) => str); // DATE -> "YYYY-MM-DD"
-pg.types.setTypeParser(1700, (str) => parseFloat(str)); // NUMERIC -> number
-pg.types.setTypeParser(20, (str) => parseInt(str, 10)); // BIGINT -> number
+import postgres from 'postgres';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -11,6 +6,24 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, Prefer, Range',
     'Content-Type': 'application/json'
 };
+
+function getDb(env) {
+    const dbUrl = env.TIDB_DATABASE_URL || "postgresql://1yr8qr4zyjgi7030.postgres:LSj_KcNBk0k589WJ5pawg_NIsZ_AKTxS@1yr8qr4zyjgi7030.gateway01.us-east-1.prod.aws.pg.tidbcloud.com:5432/postgres?sslmode=require";
+    return postgres(dbUrl, {
+        ssl: 'require',
+        max: 5,
+        idle_timeout: 20,
+        types: {
+            // 날짜(1082)를 Date 객체가 아닌 문자열("YYYY-MM-DD")로 반환
+            1082: {
+                to: 1082,
+                from: [1082],
+                serialize: (x) => x,
+                parse: (x) => x
+            }
+        }
+    });
+}
 
 async function handleRestApi(request, env, ctx) {
     const url = new URL(request.url);
@@ -29,7 +42,7 @@ async function handleRestApi(request, env, ctx) {
 
     const endpoint = url.pathname.replace(/^\/rest\/v1\/?/, '').split('?')[0];
 
-    // Supabase RPC 호출 무시 (TiDB는 실시간 일반 뷰이므로 성공 반환)
+    // Supabase RPC 호출 무시 (TiDB 일반 뷰 대응)
     if (endpoint.startsWith('rpc/')) {
         return new Response(JSON.stringify({ ok: true, message: "TiDB view is live." }), { headers: corsHeaders });
     }
@@ -98,9 +111,9 @@ async function handleRestApi(request, env, ctx) {
         }
     }
 
-    let sql = `SELECT ${cols} FROM public."${endpoint}"`;
+    let sqlQuery = `SELECT ${cols} FROM public."${endpoint}"`;
     if (whereClauses.length > 0) {
-        sql += ` WHERE ${whereClauses.join(' AND ')}`;
+        sqlQuery += ` WHERE ${whereClauses.join(' AND ')}`;
     }
 
     const order = url.searchParams.get('order');
@@ -109,43 +122,62 @@ async function handleRestApi(request, env, ctx) {
             let [c, dir] = o.trim().split('.');
             return `"${c}" ${(dir || 'ASC').toUpperCase()}`;
         });
-        sql += ` ORDER BY ${orderParts.join(', ')}`;
+        sqlQuery += ` ORDER BY ${orderParts.join(', ')}`;
     }
 
     const limit = url.searchParams.get('limit');
-    if (limit) sql += ` LIMIT ${parseInt(limit, 10)}`;
+    if (limit) sqlQuery += ` LIMIT ${parseInt(limit, 10)}`;
 
     const offset = url.searchParams.get('offset');
-    if (offset) sql += ` OFFSET ${parseInt(offset, 10)}`;
+    if (offset) sqlQuery += ` OFFSET ${parseInt(offset, 10)}`;
 
-    const dbUrl = env.TIDB_DATABASE_URL || "postgresql://1yr8qr4zyjgi7030.postgres:LSj_KcNBk0k589WJ5pawg_NIsZ_AKTxS@1yr8qr4zyjgi7030.gateway01.us-east-1.prod.aws.pg.tidbcloud.com:5432/postgres?sslmode=require";
-    
-    const client = new Client({
-        connectionString: dbUrl,
-        ssl: { rejectUnauthorized: false }
-    });
+    const sql = getDb(env);
 
     try {
-        await client.connect();
-        const result = await client.query(sql, queryParams);
+        const rows = await sql.unsafe(sqlQuery, queryParams);
 
-        // 3분간 엣지 캐시 저장 헤더 설정
         const responseHeaders = {
             ...corsHeaders,
             'Cache-Control': 'public, max-age=60, s-maxage=180'
         };
-        const response = new Response(JSON.stringify(result.rows), { headers: responseHeaders });
+        const response = new Response(JSON.stringify(rows), { headers: responseHeaders });
 
         ctx.waitUntil(cache.put(cacheKey, response.clone()));
-
         return response;
     } catch (err) {
-        return new Response(JSON.stringify({ error: err.message, sql }), { status: 500, headers: corsHeaders });
-    } finally {
-        try { await client.end(); } catch (e) {}
+        return new Response(JSON.stringify({ error: err.message, sql: sqlQuery }), { status: 500, headers: corsHeaders });
     }
 }
 
 export default {
     async fetch(request, env, ctx) {
-        const url = new
+        const url = new URL(request.url);
+
+        // ⚡ [인덱스 생성용 1회성 엔드포인트] 브라우저에서 /init-index 접속 시 작동
+        if (url.pathname === '/init-index') {
+            const sql = getDb(env);
+            try {
+                await sql.unsafe(`
+                    CREATE INDEX IF NOT EXISTS idx_oms_orders_delivery_date ON public.oms_orders (delivery_date);
+                    CREATE INDEX IF NOT EXISTS idx_oms_orders_brand_delivery ON public.oms_orders (brand_name, delivery_date);
+                    CREATE INDEX IF NOT EXISTS idx_oms_orders_store_delivery ON public.oms_orders (store_name, delivery_date);
+                `);
+                return new Response(JSON.stringify({ ok: true, message: "TiDB 인덱스 생성이 성공적으로 완료되었습니다!" }), { headers: corsHeaders });
+            } catch (err) {
+                return new Response(JSON.stringify({ ok: false, error: err.message }), { status: 500, headers: corsHeaders });
+            }
+        }
+
+        // 1. /rest/v1/ 요청 라우팅
+        if (url.pathname.startsWith('/rest/v1/')) {
+            return handleRestApi(request, env, ctx);
+        }
+
+        // 2. 정적 자산(HTML, JS 등) 반환
+        if (env.ASSETS) {
+            return env.ASSETS.fetch(request);
+        }
+
+        return new Response('Not Found', { status: 404 });
+    }
+};
