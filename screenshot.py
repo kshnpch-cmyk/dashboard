@@ -27,8 +27,11 @@ openpyxl.styles.cell_style.CellStyle.__init__ = _patched_cell_style_init
 
 warnings.filterwarnings('ignore')
 
-# 💡 TiDB Cloud 접속 정보 수신
-TIDB_DATABASE_URL = os.environ.get("TIDB_DATABASE_URL", "").strip()
+# 💡 TiDB Cloud 접속 환경변수 수신 (로컬/깃허브 액션 공용)
+TIDB_DATABASE_URL = os.environ.get(
+    "TIDB_DATABASE_URL",
+    "postgresql://1yr8qr4zyjgi7030.postgres:LSj_KcNBk0k589WJ5pawg_NIsZ_AKTxS@1yr8qr4zyjgi7030.gateway01.us-east-1.prod.aws.pg.tidbcloud.com:5432/postgres?sslmode=require"
+).strip()
 
 OMS_COMPANY_CODE = os.environ.get("OMS_COMPANY_CODE", "1000").strip()
 OMS_ID = os.environ.get("OMS_ID", "1220503").strip()
@@ -66,7 +69,7 @@ driver.execute("send_command", params)
 
 
 def delete_existing_period_data(conn, start_date_str, end_date_str):
-    """동기화 대상 기간(start_date ~ end_date)의 기존 DB 데이터를 선-삭제하여 중복 및 취소건 초기화"""
+    """💡 동기화 대상 기간(start_date ~ end_date)의 기존 DB 데이터를 선-삭제하여 중복 및 취소건을 초기화합니다."""
     s_date = start_date_str.replace('/', '-')
     e_date = end_date_str.replace('/', '-')
 
@@ -88,21 +91,15 @@ def delete_existing_period_data(conn, start_date_str, end_date_str):
 
 
 def sync_to_tidb(combined_df):
-    """수집된 Dataframe을 기존 데이터 삭제 후 TiDB Cloud oms_orders 테이블로 초고속 재업로드"""
+    """수집된 Dataframe을 기존 데이터 삭제 후 TiDB Cloud oms_orders 테이블로 깔끔하게 재업로드"""
     if combined_df is None or combined_df.empty:
         print("⚠️ TiDB에 업로드할 데이터가 없습니다.", flush=True)
         return
 
-    if not TIDB_DATABASE_URL:
-        raise ValueError("TIDB_DATABASE_URL 환경 변수가 설정되지 않았습니다.")
+    print(f"🚀 TiDB 클라우드 DB 동기화를 시작합니다...", flush=True)
 
-    print(f"🚀 TiDB Cloud DB 동기화를 시작합니다...", flush=True)
-
-    # TiDB 연결
     conn = psycopg2.connect(TIDB_DATABASE_URL)
-
     try:
-        # 기존 기간 데이터 선-삭제
         delete_existing_period_data(conn, target_start_date, target_end_date)
 
         df_clean = combined_df.fillna('').astype(str)
@@ -120,9 +117,10 @@ def sync_to_tidb(combined_df):
                 s = str(val).split('T')[0].replace('/', '-').strip()
                 return s if len(s) >= 8 else None
 
+            # 💡 센터명 안전 매핑 (물류센터 / 배송센터 / 센터명)
             center_val = str(row.get("distribution_center", row.get("물류센터", row.get("배송센터", row.get("센터명", ""))))).strip()
 
-            record_tuple = (
+            record = (
                 parse_date(row.get("주문일자", "")),
                 parse_date(row.get("배송일자", "")),
                 str(row.get("거래처코드", row.get("점포코드", ""))),
@@ -135,17 +133,16 @@ def sync_to_tidb(combined_df):
                 parse_num(row.get("단가", row.get("공급단가", 0))),
                 parse_num(row.get("금액", row.get("공급가액", 0)))
             )
-            records.append(record_tuple)
+            records.append(record)
 
+        batch_size = 1000
+        total_records = len(records)
         insert_sql = """
             INSERT INTO public.oms_orders (
                 order_date, delivery_date, store_code, store_name, brand_name,
                 distribution_center, item_code, item_name, qty, price, total_amount
             ) VALUES %s
         """
-
-        batch_size = 1000
-        total_records = len(records)
 
         with conn.cursor() as cur:
             for i in range(0, total_records, batch_size):
@@ -156,6 +153,10 @@ def sync_to_tidb(combined_df):
 
         print("🎉 모든 주문 데이터가 TiDB Cloud에 성공적으로 동기화되었습니다.", flush=True)
 
+    except Exception as e:
+        conn.rollback()
+        print(f"❌ DB 동기화 오류: {e}", flush=True)
+        raise e
     finally:
         conn.close()
 
