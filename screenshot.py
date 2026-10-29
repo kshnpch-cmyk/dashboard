@@ -27,7 +27,7 @@ openpyxl.styles.cell_style.CellStyle.__init__ = _patched_cell_style_init
 
 warnings.filterwarnings('ignore')
 
-# 💡 TiDB Cloud 접속 환경변수 수신 (로컬/깃허브 액션 공용)
+# 💡 TiDB Cloud 접속 환경변수 수신
 TIDB_DATABASE_URL = os.environ.get(
     "TIDB_DATABASE_URL",
     "postgresql://1yr8qr4zyjgi7030.postgres:LSj_KcNBk0k589WJ5pawg_NIsZ_AKTxS@1yr8qr4zyjgi7030.gateway01.us-east-1.prod.aws.pg.tidbcloud.com:5432/postgres?sslmode=require"
@@ -91,7 +91,7 @@ def delete_existing_period_data(conn, start_date_str, end_date_str):
 
 
 def sync_to_tidb(combined_df):
-    """수집된 Dataframe을 기존 데이터 삭제 후 TiDB Cloud oms_orders 테이블로 깔끔하게 재업로드"""
+    """수집된 Dataframe을 기존 데이터 삭제 후 TiDB Cloud oms_orders 테이블로 업로드"""
     if combined_df is None or combined_df.empty:
         print("⚠️ TiDB에 업로드할 데이터가 없습니다.", flush=True)
         return
@@ -117,7 +117,6 @@ def sync_to_tidb(combined_df):
                 s = str(val).split('T')[0].replace('/', '-').strip()
                 return s if len(s) >= 8 else None
 
-            # 💡 센터명 안전 매핑 (물류센터 / 배송센터 / 센터명)
             center_val = str(row.get("distribution_center", row.get("물류센터", row.get("배송센터", row.get("센터명", ""))))).strip()
 
             record = (
@@ -243,7 +242,7 @@ try:
 
     print(f"📥 수신된 원본 데이터: {len(new_df):,}행", flush=True)
 
-    # 10. TiDB Cloud DB로 동기화 전송 (선 삭제 후 재업로드)
+    # 10. TiDB Cloud DB로 동기화 전송
     sync_to_tidb(new_df)
 
     # 임시 다운로드 파일 정리
