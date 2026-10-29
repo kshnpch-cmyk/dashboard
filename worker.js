@@ -1,6 +1,7 @@
 import pg from 'pg';
 const { Client } = pg;
 
+// TiDB 날짜/숫자 타입을 Supabase REST 규격과 동일하게 파싱
 pg.types.setTypeParser(1082, (str) => str); // DATE -> "YYYY-MM-DD"
 pg.types.setTypeParser(1700, (str) => parseFloat(str)); // NUMERIC -> number
 pg.types.setTypeParser(20, (str) => parseInt(str, 10)); // BIGINT -> number
@@ -19,7 +20,7 @@ async function handleRestApi(request, env, ctx) {
         return new Response(null, { headers: corsHeaders });
     }
 
-    // ⚡ 1. Cloudflare Edge 캐시 확인 (동일한 조회가 있으면 미국 TiDB를 안 거치고 즉시 반환)
+    // ⚡ Cloudflare Edge 캐시 확인 (반복 조회 시 미국 왕복 없이 0.03초 즉시 응답)
     const cache = caches.default;
     const cacheKey = new Request(url.toString(), request);
     let cachedResponse = await cache.match(cacheKey);
@@ -29,6 +30,7 @@ async function handleRestApi(request, env, ctx) {
 
     const endpoint = url.pathname.replace(/^\/rest\/v1\/?/, '').split('?')[0];
 
+    // Supabase RPC 호출 무시 (TiDB는 실시간 일반 뷰이므로 성공 반환)
     if (endpoint.startsWith('rpc/')) {
         return new Response(JSON.stringify({ ok: true, message: "TiDB view is live." }), { headers: corsHeaders });
     }
@@ -38,6 +40,7 @@ async function handleRestApi(request, env, ctx) {
         return new Response(JSON.stringify({ error: `Not Found or Invalid Table: ${endpoint}` }), { status: 404, headers: corsHeaders });
     }
 
+    // PostgREST 쿼리 스트링 -> PostgreSQL SQL 파싱
     let whereClauses = [];
     let queryParams = [];
     let pIdx = 1;
@@ -126,15 +129,14 @@ async function handleRestApi(request, env, ctx) {
     try {
         await client.connect();
         const result = await client.query(sql, queryParams);
-        
-        // ⚡ 2. 응답 헤더에 3분간 캐시(s-maxage=180) 설정
+
+        // 3분간 엣지 캐시 저장 헤더 설정
         const responseHeaders = {
             ...corsHeaders,
             'Cache-Control': 'public, max-age=60, s-maxage=180'
         };
         const response = new Response(JSON.stringify(result.rows), { headers: responseHeaders });
 
-        // Cloudflare 캐시 스토리지에 비동기 저장
         ctx.waitUntil(cache.put(cacheKey, response.clone()));
 
         return response;
@@ -147,16 +149,4 @@ async function handleRestApi(request, env, ctx) {
 
 export default {
     async fetch(request, env, ctx) {
-        const url = new URL(request.url);
-
-        if (url.pathname.startsWith('/rest/v1/')) {
-            return handleRestApi(request, env, ctx);
-        }
-
-        if (env.ASSETS) {
-            return env.ASSETS.fetch(request);
-        }
-
-        return new Response('Not Found', { status: 404 });
-    }
-};
+        const url = new
