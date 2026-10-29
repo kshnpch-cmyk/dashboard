@@ -151,7 +151,6 @@
                     <div id="item-autocomplete-list" class="autocomplete-dropdown"></div>
                 </div>
 
-                <!-- 💡 [실시간 연동] 극단값 절단 비율 (Trim %) 입력창 -->
                 <div class="filter-group" style="background:#e0f2fe;padding:6px 12px;border-radius:6px;border:1px solid #bae6fd">
                     <label style="color:#0369a1">✂️ 극단값 절단 비율:</label>
                     <input type="number" id="trim-percent-input" class="input-box" value="25" min="0" max="45" step="5" style="width:60px;text-align:center;font-weight:800;color:#0369a1;padding-right:8px" onkeydown="if(event.key==='Enter')runForecastSimulation()" onchange="runForecastSimulation()" title="상/하위 스파이크를 잘라내는 비율 (기본 25%, 스파이크 반영 시 5~10%)">
@@ -241,8 +240,8 @@
     </div>
 
     <script>
-        const SUPABASE_URL = 'https://zbilhsgfgyfrolveaego.supabase.co';
-        const SUPABASE_ANON_KEY = 'sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN';
+        const SUPABASE_URL = '';
+        const SUPABASE_ANON_KEY = '';
 
         const CFG = {
             historyDays: 210,
@@ -476,9 +475,6 @@
             return vals;
         }
 
-        /* 💡 모델 1: [핵심 개선] 연속 절단 평균 (Continuous Trimmed Mean)
-           - 극단값 절단 비율(0% ~ 45%)에 따라 상하위 가중치를 즉시 비례 감쇠
-           - 5%, 15%, 25% 변경 시 예측치가 100% 실시간으로 변동 */
         function modelContinuousTrimmedMean(target, map, pct = currentTrimPercent) {
             const s = sameWeekdayVals(target, map, 8);
             if (!s.length) return null;
@@ -489,7 +485,6 @@
             const n = sorted.length;
             const trimRatio = clamp(pct / 100, 0, 0.45);
             
-            // 통계학 표준 연속 절단(Continuous Weighting) 수식
             const g = n * trimRatio;
             const gFloor = Math.floor(g);
             const gFrac = g - gFloor;
@@ -513,7 +508,6 @@
             return sumWeights > 0 ? (sumWeighted / sumWeights) : median(sorted);
         }
 
-        /* 💡 모델 2: 동요일 4주 적응형 가중 모델 */
         function modelAdaptiveSameWeekday(target, map) {
             const s = sameWeekdayVals(target, map, 4);
             if (!s.length) return null;
@@ -522,7 +516,6 @@
             return weightedAverage(vals, weights);
         }
 
-        /* 💡 모델 3: 탈계절화 14일 추세 × 요일 지수 결합 모델 (STL-lite) */
         function modelDeseasonalizedTrend(target, map) {
             const targetWd = parseDate(target).getDay();
             if (targetWd === 0) return 0;
@@ -625,12 +618,10 @@
             };
         }
 
-        /* 🔮 시뮬레이션 메인 연산 */
         async function runForecastSimulation() {
             const baseStart = document.getElementById('base-start-date').value, baseEnd = document.getElementById('base-end-date').value, startDate = document.getElementById('forecast-start-date').value, endDate = document.getElementById('forecast-end-date').value;
             const brandVal = document.getElementById('forecast-brand-input').value.trim(), itemVal = document.getElementById('forecast-item-input').value.trim(), boostPercent = cleanNumber(document.getElementById('boost-percent-input').value), boostMultiplier = 1 + boostPercent / 100, isD2 = document.getElementById('chk-d2-cutoff').checked;
             
-            // 💡 [동적 절단율 즉시 읽기]
             const trimInput = document.getElementById('trim-percent-input');
             currentTrimPercent = trimInput ? cleanNumber(trimInput.value) : 25;
             currentTrimPercent = clamp(currentTrimPercent, 0, 45);
@@ -709,7 +700,6 @@
                         const holidayCal = residual.holidayFactor?.[hBucket] || 1;
                         ensemble *= weatherCal * dCal * holidayCal;
 
-                        // 월→화 재고 포화 감쇠
                         if (wd === 2) {
                             const mondayDate = formatDate(addDays(cur, -1));
                             const mondayVal = dailyMap[mondayDate];
@@ -762,7 +752,6 @@
 
                 currentForecastRows = rowsOut;
 
-                // SCM 완충 일치율 산출
                 let strictAccuracy = '-%', bufferAccuracy = '-%', accSub = '실측 겹침 구간 없음';
                 if (overlapDays && totalActual > 0) {
                     const strictWmape = 100 * totalErr / totalActual;
@@ -792,7 +781,6 @@
                 const displayBoostAdded = (remainDays > 0) ? futureBoostAddedQty : totalBoostAddedQty;
                 const displayBoostSub = (remainDays > 0) ? '미래 남은기간 반영분' : '선택 구간 전체 반영분';
 
-                // KPI 카드 업데이트
                 document.getElementById('kpi-base-daily-avg').innerText = `${baseDailyAvgQty.toLocaleString()} 건`;
                 document.getElementById('kpi-accuracy-percent').innerText = `${bufferAccuracy}`;
                 document.getElementById('kpi-accuracy-sub').innerText = accSub;
