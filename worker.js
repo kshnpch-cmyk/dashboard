@@ -31,7 +31,7 @@ async function handleRestApi(request, env, ctx) {
         return new Response(null, { headers: corsHeaders });
     }
 
-    // ⚡ Cloudflare Edge 캐시 확인 (미국 왕복 없이 즉시 응답)
+    // ⚡ Cloudflare Edge 캐시 확인 (반복 조회 시 미국 왕복 없이 즉시 응답)
     const cache = caches.default;
     const cacheKey = new Request(url.toString(), request);
     let cachedResponse = await cache.match(cacheKey);
@@ -150,19 +150,33 @@ export default {
     async fetch(request, env, ctx) {
         const url = new URL(request.url);
 
-        // ⚡ [인덱스 생성 엔드포인트] 브라우저에서 /init-index 접속 시 작동
+        // ⚡ [인덱스 순차 생성 엔드포인트] TiDB DDL 1건씩 안전 실행
         if (url.pathname === '/init-index') {
             const sql = getDb(env);
+            const logs = [];
+            
             try {
-                await sql.unsafe(`
-                    CREATE INDEX IF NOT EXISTS idx_oms_orders_delivery_date ON public.oms_orders (delivery_date);
-                    CREATE INDEX IF NOT EXISTS idx_oms_orders_brand_delivery ON public.oms_orders (brand_name, delivery_date);
-                    CREATE INDEX IF NOT EXISTS idx_oms_orders_store_delivery ON public.oms_orders (store_name, delivery_date);
-                `);
-                return new Response(JSON.stringify({ ok: true, message: "TiDB 인덱스 생성이 성공적으로 완료되었습니다!" }), { headers: corsHeaders });
-            } catch (err) {
-                return new Response(JSON.stringify({ ok: false, error: err.message }), { status: 500, headers: corsHeaders });
+                await sql.unsafe(`CREATE INDEX IF NOT EXISTS idx_oms_orders_delivery_date ON public.oms_orders (delivery_date)`);
+                logs.push("delivery_date 인덱스 생성 성공");
+            } catch (e) {
+                logs.push(`delivery_date 인덱스: ${e.message}`);
             }
+
+            try {
+                await sql.unsafe(`CREATE INDEX IF NOT EXISTS idx_oms_orders_brand_delivery ON public.oms_orders (brand_name, delivery_date)`);
+                logs.push("brand_delivery 인덱스 생성 성공");
+            } catch (e) {
+                logs.push(`brand_delivery 인덱스: ${e.message}`);
+            }
+
+            try {
+                await sql.unsafe(`CREATE INDEX IF NOT EXISTS idx_oms_orders_store_delivery ON public.oms_orders (store_name, delivery_date)`);
+                logs.push("store_delivery 인덱스 생성 성공");
+            } catch (e) {
+                logs.push(`store_delivery 인덱스: ${e.message}`);
+            }
+
+            return new Response(JSON.stringify({ ok: true, details: logs }), { headers: corsHeaders });
         }
 
         // 1. /rest/v1/ 요청 라우팅
