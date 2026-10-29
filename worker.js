@@ -1,7 +1,6 @@
 import pg from 'pg';
 const { Client } = pg;
 
-// TiDB 날짜/숫자 타입을 Supabase REST 규격과 동일하게 파싱
 pg.types.setTypeParser(1082, (str) => str); // DATE -> "YYYY-MM-DD"
 pg.types.setTypeParser(1700, (str) => parseFloat(str)); // NUMERIC -> number
 pg.types.setTypeParser(20, (str) => parseInt(str, 10)); // BIGINT -> number
@@ -13,17 +12,23 @@ const corsHeaders = {
     'Content-Type': 'application/json'
 };
 
-async function handleRestApi(request, env) {
+async function handleRestApi(request, env, ctx) {
     const url = new URL(request.url);
 
     if (request.method === 'OPTIONS') {
         return new Response(null, { headers: corsHeaders });
     }
 
-    // 엔드포인트 추출 (/rest/v1/daily_order_summary -> daily_order_summary)
+    // ⚡ 1. Cloudflare Edge 캐시 확인 (동일한 조회가 있으면 미국 TiDB를 안 거치고 즉시 반환)
+    const cache = caches.default;
+    const cacheKey = new Request(url.toString(), request);
+    let cachedResponse = await cache.match(cacheKey);
+    if (cachedResponse) {
+        return cachedResponse;
+    }
+
     const endpoint = url.pathname.replace(/^\/rest\/v1\/?/, '').split('?')[0];
 
-    // Supabase RPC 호출 무시 (TiDB는 실시간 일반 뷰이므로 성공 반환)
     if (endpoint.startsWith('rpc/')) {
         return new Response(JSON.stringify({ ok: true, message: "TiDB view is live." }), { headers: corsHeaders });
     }
@@ -33,7 +38,6 @@ async function handleRestApi(request, env) {
         return new Response(JSON.stringify({ error: `Not Found or Invalid Table: ${endpoint}` }), { status: 404, headers: corsHeaders });
     }
 
-    // PostgREST 쿼리 스트링 -> PostgreSQL SQL 파싱
     let whereClauses = [];
     let queryParams = [];
     let pIdx = 1;
@@ -112,7 +116,6 @@ async function handleRestApi(request, env) {
     const offset = url.searchParams.get('offset');
     if (offset) sql += ` OFFSET ${parseInt(offset, 10)}`;
 
-    // TiDB 연결 (환경변수 또는 백업 주소)
     const dbUrl = env.TIDB_DATABASE_URL || "postgresql://1yr8qr4zyjgi7030.postgres:LSj_KcNBk0k589WJ5pawg_NIsZ_AKTxS@1yr8qr4zyjgi7030.gateway01.us-east-1.prod.aws.pg.tidbcloud.com:5432/postgres?sslmode=require";
     
     const client = new Client({
@@ -123,7 +126,18 @@ async function handleRestApi(request, env) {
     try {
         await client.connect();
         const result = await client.query(sql, queryParams);
-        return new Response(JSON.stringify(result.rows), { headers: corsHeaders });
+        
+        // ⚡ 2. 응답 헤더에 3분간 캐시(s-maxage=180) 설정
+        const responseHeaders = {
+            ...corsHeaders,
+            'Cache-Control': 'public, max-age=60, s-maxage=180'
+        };
+        const response = new Response(JSON.stringify(result.rows), { headers: responseHeaders });
+
+        // Cloudflare 캐시 스토리지에 비동기 저장
+        ctx.waitUntil(cache.put(cacheKey, response.clone()));
+
+        return response;
     } catch (err) {
         return new Response(JSON.stringify({ error: err.message, sql }), { status: 500, headers: corsHeaders });
     } finally {
@@ -135,12 +149,10 @@ export default {
     async fetch(request, env, ctx) {
         const url = new URL(request.url);
 
-        // 1. /rest/v1/ 요청은 TiDB 쿼리 실행기로 라우팅
         if (url.pathname.startsWith('/rest/v1/')) {
-            return handleRestApi(request, env);
+            return handleRestApi(request, env, ctx);
         }
 
-        // 2. 그 외 모든 요청은 HTML, JS 등 정적 자산 제공
         if (env.ASSETS) {
             return env.ASSETS.fetch(request);
         }
