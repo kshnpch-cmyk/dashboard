@@ -1,5 +1,4 @@
-import pg from 'pg';
-const { Client } = pg;
+import { Client } from 'pg';
 
 // TiDB 날짜/숫자 타입을 Supabase REST 규격과 동일하게 파싱
 pg.types.setTypeParser(1082, (str) => str); // DATE -> "YYYY-MM-DD"
