@@ -11,7 +11,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 
-# TiDB (PostgreSQL) 드라이버
+# TiDB (PostgreSQL 호환) 드라이버
 import psycopg2
 from psycopg2.extras import execute_values
 
@@ -90,6 +90,30 @@ def delete_existing_period_data(conn, start_date_str, end_date_str):
         raise e
 
 
+def ensure_indexes_safely(conn):
+    """
+    ⚡ TiDB 분산 인덱스 제약에 맞춰 1개씩 순차 실행하며,
+    이미 존재하거나 백그라운드 빌드 중인 경우에도 동기화 작업이 중단되지 않도록 보호합니다.
+    """
+    index_tasks = [
+        ("idx_oms_orders_delivery_date", "CREATE INDEX IF NOT EXISTS idx_oms_orders_delivery_date ON public.oms_orders (delivery_date)"),
+        ("idx_oms_orders_brand_delivery", "CREATE INDEX IF NOT EXISTS idx_oms_orders_brand_delivery ON public.oms_orders (brand_name, delivery_date)"),
+        ("idx_oms_orders_store_delivery", "CREATE INDEX IF NOT EXISTS idx_oms_orders_store_delivery ON public.oms_orders (store_name, delivery_date)")
+    ]
+
+    print("⚡ [인덱스 상태 점검] 속도 최적화 인덱스 점검 시작...", flush=True)
+    for idx_name, sql in index_tasks:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(sql)
+            conn.commit()
+            print(f"  ✅ 인덱스 확인/생성 완료: {idx_name}", flush=True)
+        except Exception as e:
+            conn.rollback()
+            # 이미 빌드 중이거나 존재하는 경우 로그만 남기고 다음 작업으로 안전하게 통과
+            print(f"  ℹ️ 인덱스 처리 건너뜀 ({idx_name}): {e}", flush=True)
+
+
 def sync_to_tidb(combined_df):
     """수집된 Dataframe을 기존 데이터 삭제 후 TiDB Cloud oms_orders 테이블로 업로드"""
     if combined_df is None or combined_df.empty:
@@ -100,8 +124,13 @@ def sync_to_tidb(combined_df):
 
     conn = psycopg2.connect(TIDB_DATABASE_URL)
     try:
+        # 1. 기존 기간 데이터 삭제
         delete_existing_period_data(conn, target_start_date, target_end_date)
 
+        # 2. 인덱스 자동 보장 (TiDB DDL 제약 방어 로직)
+        ensure_indexes_safely(conn)
+
+        # 3. 신규 데이터 대량 INSERT
         df_clean = combined_df.fillna('').astype(str)
         records = []
 
