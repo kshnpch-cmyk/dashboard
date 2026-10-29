@@ -14,7 +14,6 @@ function getDb(env) {
         max: 5,
         idle_timeout: 20,
         types: {
-            // 날짜(1082)를 Date 객체가 아닌 문자열("YYYY-MM-DD")로 반환
             1082: {
                 to: 1082,
                 from: [1082],
@@ -32,7 +31,7 @@ async function handleRestApi(request, env, ctx) {
         return new Response(null, { headers: corsHeaders });
     }
 
-    // ⚡ Cloudflare Edge 캐시 확인 (반복 조회 시 미국 왕복 없이 0.03초 즉시 응답)
+    // ⚡ Cloudflare Edge 캐시 확인 (미국 왕복 없이 즉시 응답)
     const cache = caches.default;
     const cacheKey = new Request(url.toString(), request);
     let cachedResponse = await cache.match(cacheKey);
@@ -42,7 +41,6 @@ async function handleRestApi(request, env, ctx) {
 
     const endpoint = url.pathname.replace(/^\/rest\/v1\/?/, '').split('?')[0];
 
-    // Supabase RPC 호출 무시 (TiDB 일반 뷰 대응)
     if (endpoint.startsWith('rpc/')) {
         return new Response(JSON.stringify({ ok: true, message: "TiDB view is live." }), { headers: corsHeaders });
     }
@@ -52,7 +50,6 @@ async function handleRestApi(request, env, ctx) {
         return new Response(JSON.stringify({ error: `Not Found or Invalid Table: ${endpoint}` }), { status: 404, headers: corsHeaders });
     }
 
-    // PostgREST 쿼리 스트링 -> PostgreSQL SQL 파싱
     let whereClauses = [];
     let queryParams = [];
     let pIdx = 1;
@@ -153,7 +150,7 @@ export default {
     async fetch(request, env, ctx) {
         const url = new URL(request.url);
 
-        // ⚡ [인덱스 생성용 1회성 엔드포인트] 브라우저에서 /init-index 접속 시 작동
+        // ⚡ [인덱스 생성 엔드포인트] 브라우저에서 /init-index 접속 시 작동
         if (url.pathname === '/init-index') {
             const sql = getDb(env);
             try {
