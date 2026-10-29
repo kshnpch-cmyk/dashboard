@@ -262,8 +262,8 @@
     </div>
 
     <script>
-        const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co"; 
-        const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN"; 
+        const SUPABASE_URL = ""; 
+        const SUPABASE_ANON_KEY = ""; 
 
         const KMA_SERVICE_KEY = "IRKAZhuS0MH4uNOeZqsYHKyxVKkjaI1zY8u53Wwq6QfLT9LgddbegGnyDnB7VfRJEFro7AC%2F%2BrmpWbaB31VgFg%3D%3D";
 
@@ -541,12 +541,8 @@
             renderStoreCardListFromSummary(selectedBrands);
         }
 
-        /* 🌤️ 이중 백업 기상 데이터 연동 함수 */
         async function fetchKoreaWeatherData(startDate, endDate) {
             const weatherMap = {};
-            const startStr = startDate.replace(/-/g, '');
-            const endStr = endDate.replace(/-/g, '');
-
             const yesterday = new Date();
             yesterday.setDate(yesterday.getDate() - 1);
             const yesterdayStr = formatDate(yesterday);
@@ -643,7 +639,6 @@
             return weatherMap;
         }
 
-        /* 🚀 모바일 통합 데이터 로드 */
         async function fetchAllDashboardData() {
             if (!validateMobileDates('start')) return;
             activeMobileToken++;
@@ -706,7 +701,6 @@
 
             const labels = Object.keys(dailyMap).sort();
             
-            // 🌤️ 모바일 날씨 데이터 연동
             const startDate = document.getElementById('chart-start-date').value;
             const endDate = document.getElementById('chart-end-date').value;
             const weatherMap = await fetchKoreaWeatherData(startDate, endDate);
