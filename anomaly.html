@@ -120,15 +120,14 @@
             <div class="panel-title">📋 튀는 품목 (Anomaly List) <span id="current-filter-badge" style="font-size:12px; font-weight:normal; color:#2563eb; margin-left:10px;"></span></div>
             <div class="table-container">
                 <table id="anomaly-table">
-                    <!-- 초기 컬럼 너비 배분 -->
                     <colgroup>
-                        <col style="width: 85px;">  <!-- 상태 -->
-                        <col style="width: 100px;"> <!-- 브랜드 -->
-                        <col style="width: auto;">  <!-- 품목명 (자동 확장) -->
-                        <col style="width: 90px;">  <!-- 4주 일평균 -->
-                        <col style="width: 100px;"> <!-- 동요일 평균 -->
-                        <col style="width: 90px;">  <!-- 기준일 수량 -->
-                        <col style="width: 95px;">  <!-- 증감률 -->
+                        <col style="width: 85px;">
+                        <col style="width: 100px;">
+                        <col style="width: auto;">
+                        <col style="width: 90px;">
+                        <col style="width: 100px;">
+                        <col style="width: 90px;">
+                        <col style="width: 95px;">
                     </colgroup>
                     <thead>
                         <tr>
@@ -158,16 +157,16 @@
     </div>
 
     <script>
-        const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co"; 
-        const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN";
+        const SUPABASE_URL = ""; 
+        const SUPABASE_ANON_KEY = "";
         
         let targetDate = '';
         let globalBrandFilter = '';
         let globalItemFilter = '';
         
-        let fullAnomalyList = []; // 전체 계산 완료된 데이터
-        let filteredAnomalyList = []; // 현재 필터 적용된 데이터
-        let currentFilter = 'ALL'; // 'ALL', 'UP', 'ISSUE', 'DOWN'
+        let fullAnomalyList = [];
+        let filteredAnomalyList = [];
+        let currentFilter = 'ALL';
         
         let miniChart = null;
 
@@ -178,11 +177,10 @@
             return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
         }
 
-        /* 💡 컬럼 드래그 리사이즈 기능 초기화 */
         function initColumnResizers() {
             const ths = document.querySelectorAll('#anomaly-table th');
             ths.forEach(th => {
-                if(th.querySelector('.resizer')) return; // 중복 방지
+                if(th.querySelector('.resizer')) return;
                 const resizer = document.createElement('div');
                 resizer.className = 'resizer';
                 th.appendChild(resizer);
@@ -210,10 +208,9 @@
             });
         }
 
-        /* 💡 필터 상태 토글 및 UI 반영 */
         function toggleFilter(filterType) {
             if (currentFilter === filterType) {
-                currentFilter = 'ALL'; // 이미 선택된 걸 누르면 전체보기로 복귀
+                currentFilter = 'ALL';
             } else {
                 currentFilter = filterType;
             }
@@ -244,7 +241,6 @@
             renderTableHTML();
         }
 
-        /* 💡 DB 28일치 광역 병렬 로드 */
         async function fetchDailySummaryRange(startD, endD) {
             let url = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startD}&delivery_date=lte.${endD}&select=delivery_date,item_code,item_name,brand_name,total_qty`;
             if (globalBrandFilter) {
@@ -268,7 +264,6 @@
             return allRows;
         }
 
-        /* 💡 메인 감지 로직 */
         async function runAnomalyDetection() {
             if (!targetDate) return;
             const mode = document.getElementById('compare-mode').value;
@@ -277,21 +272,17 @@
             document.getElementById('anomaly-tbody').innerHTML = `<tr><td colspan="7" class="empty-state">⚡ 직전 4주치 데이터를 스캔하여 튀는 품목을 찾고 있습니다...</td></tr>`;
             document.getElementById('detail-panel').innerHTML = `<div class="empty-state">대기 중...</div>`;
 
-            // 타겟일자 및 과거 28일 계산
             const past28Start = addDays(targetDate, -28);
             const past28End = addDays(targetDate, -1);
             
-            // 비교 동요일 날짜 배열 추출 (히스토리 차트용)
             let compareDates = [];
             if (mode === '1d') compareDates = [addDays(targetDate, -1)];
             else if (mode === '1w') compareDates = [addDays(targetDate, -7)];
             else if (mode === '4w') compareDates = [addDays(targetDate, -7), addDays(targetDate, -14), addDays(targetDate, -21), addDays(targetDate, -28)];
 
-            // 헤더명 변경
             document.getElementById('th-compare-target').innerText = 
                 (mode === '4w') ? '4주 동요일 평균' : ((mode === '1w') ? '직전 주 동요일' : '전일 (어제)');
 
-            // DB 병렬 로드 (타겟일 당일 + 과거 28일치 전체)
             const [targetRaw, past28Raw] = await Promise.all([
                 fetchDailySummaryRange(targetDate, targetDate),
                 fetchDailySummaryRange(past28Start, past28End)
@@ -299,14 +290,12 @@
 
             const itemMap = {};
             
-            // 타겟일 누적
             targetRaw.forEach(r => {
                 const code = r.item_code || '-';
                 if (!itemMap[code]) itemMap[code] = { code, name: r.item_name, brand: r.brand_name, targetQty: 0, past28Sum: 0, compareQtySum: 0, history: {} };
                 itemMap[code].targetQty += cleanNumber(r.total_qty);
             });
 
-            // 과거 28일 누적
             past28Raw.forEach(r => {
                 const code = r.item_code || '-';
                 const dStr = String(r.delivery_date).split('T')[0];
@@ -315,7 +304,6 @@
                 const q = cleanNumber(r.total_qty);
                 itemMap[code].past28Sum += q;
                 
-                // 선택한 비교 대상군 날짜에 속하면 별도 누적 및 히스토리 저장
                 if (compareDates.includes(dStr)) {
                     itemMap[code].compareQtySum += q;
                     itemMap[code].history[dStr] = (itemMap[code].history[dStr] || 0) + q;
@@ -325,10 +313,9 @@
             const expectedCompareDays = compareDates.length;
             fullAnomalyList = [];
             
-            // 1차 이상치 판별 (증감률 계산)
             Object.values(itemMap).forEach(item => {
-                const avg28Days = item.past28Sum / 28; // 4주 전체 일평균
-                const avgCompareQty = item.compareQtySum > 0 ? (item.compareQtySum / expectedCompareDays) : 0; // 비교군 평균
+                const avg28Days = item.past28Sum / 28;
+                const avgCompareQty = item.compareQtySum > 0 ? (item.compareQtySum / expectedCompareDays) : 0;
                 
                 let diffPct = 0;
                 if (avgCompareQty === 0 && item.targetQty > 0) diffPct = 999; 
@@ -338,7 +325,7 @@
                 item.avgCompareQty = avgCompareQty;
                 item.diffPct = diffPct;
                 item.compareDates = compareDates;
-                item.isStoreIssue = false; // 기본값
+                item.isStoreIssue = false;
 
                 if (diffPct >= threshold || diffPct <= -50) {
                     if (item.targetQty + avgCompareQty >= 10) {
@@ -348,7 +335,6 @@
                 }
             });
 
-            // 💡 [핵심] UP 항목들에 대해 '오입력 의심' 여부를 선제적으로 스캔
             const upItems = fullAnomalyList.filter(i => i.type === 'UP');
             if (upItems.length > 0) {
                 document.getElementById('anomaly-tbody').innerHTML = `<tr><td colspan="7" class="empty-state">⚡ 급증 품목의 점포별 쏠림(오입력) 여부를 정밀 판별 중입니다...</td></tr>`;
@@ -357,7 +343,6 @@
                 let offset = 0, limit = 1000, hasMore = true;
                 let storeBreakdown = [];
                 
-                // 1000개 단위 Chunk로 점포 원천 데이터 로드
                 while (hasMore) {
                     try {
                         let storeUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=eq.${targetDate}&select=item_code,store_name,qty`;
@@ -372,7 +357,6 @@
                     } catch(e) { hasMore = false; }
                 }
 
-                // 품목코드 -> 점포별 발주량 매핑
                 const itemStoreMap = {};
                 storeBreakdown.forEach(r => {
                     if(!itemStoreMap[r.item_code]) itemStoreMap[r.item_code] = {};
@@ -380,14 +364,13 @@
                     itemStoreMap[r.item_code][s] = (itemStoreMap[r.item_code][s] || 0) + cleanNumber(r.qty);
                 });
 
-                // 오입력(Store Issue) 판정
                 upItems.forEach(item => {
                     const storeData = itemStoreMap[item.code];
                     if (storeData) {
                         const topStoreQty = Math.max(...Object.values(storeData));
                         const top1Share = (topStoreQty / item.targetQty) * 100;
                         if (top1Share >= 50 && item.targetQty >= 10) {
-                            item.isStoreIssue = true; // 1개 점포가 50% 이상 독식
+                            item.isStoreIssue = true;
                         }
                     }
                 });
@@ -395,7 +378,6 @@
 
             fullAnomalyList.sort((a, b) => b.diffPct - a.diffPct);
             
-            // KPI 카운트 세팅
             const countUp = fullAnomalyList.filter(i => i.type === 'UP' && !i.isStoreIssue).length;
             const countIssue = fullAnomalyList.filter(i => i.isStoreIssue).length;
             const countDown = fullAnomalyList.filter(i => i.type === 'DOWN').length;
@@ -404,7 +386,6 @@
             document.getElementById('kpi-store-issue').innerText = countIssue;
             document.getElementById('kpi-down-count').innerText = countDown;
 
-            // 렌더링 호출
             applyFilterAndRender();
         }
 
@@ -440,7 +421,6 @@
 
             tbody.innerHTML = html;
             
-            // 첫 번째 항목 자동 클릭
             if (filteredAnomalyList.length > 0) {
                 loadItemDetail(filteredAnomalyList[0].code, document.getElementById('row-0'));
             } else {
@@ -448,7 +428,6 @@
             }
         }
 
-        /* 💡 특정 품목 점포 쏠림 원인 드릴다운 */
         async function loadItemDetail(itemCode, rowElement) {
             document.querySelectorAll('#anomaly-tbody tr').forEach(tr => tr.classList.remove('active-row'));
             if(rowElement) rowElement.classList.add('active-row');
@@ -544,7 +523,6 @@
                 const dayStr = ['일','월','화','수','목','금','토'][new Date(targetDate).getDay()];
                 document.getElementById('display-target-date').innerText = `${targetDate} (${dayStr})`;
 
-                // 필터 상태 초기화
                 currentFilter = 'ALL';
                 document.querySelectorAll('.kpi-box').forEach(b => b.classList.remove('active'));
                 document.getElementById('current-filter-badge').innerText = '';
@@ -554,7 +532,7 @@
         });
 
         window.addEventListener('DOMContentLoaded', () => {
-            initColumnResizers(); // 🚀 헤더 컬럼 리사이저 장착
+            initColumnResizers();
             window.parent.postMessage({ action: 'FRAME_READY', tab: 'anomaly' }, '*');
         });
     </script>
