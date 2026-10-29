@@ -154,8 +154,8 @@
     </div>
 
     <script>
-        const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co"; 
-        const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN";
+        const SUPABASE_URL = ""; 
+        const SUPABASE_ANON_KEY = "";
 
         let brandDonutChart = null;
         let weekdayBarChart = null;
@@ -177,7 +177,6 @@
             const { startDate, endDate, brandName, itemName } = params;
             if (!startDate || !endDate) return;
 
-            // 1. 직전 동기간(Previous Period) 계산 (MoM 비교 분석용)
             const dStart = parseDate(startDate), dEnd = parseDate(endDate);
             const durationDays = Math.round((dEnd - dStart) / 86400000) + 1;
             const prevEnd = formatDate(addDays(dStart, -1));
@@ -185,7 +184,6 @@
 
             document.getElementById('report-meta-text').innerText = `조회 분석 기간: ${startDate.replace(/-/g,'/')} ~ ${endDate.replace(/-/g,'/')} (${durationDays}일간) | 직전 비교 기간: ${prevStart.replace(/-/g,'/')} ~ ${prevEnd.replace(/-/g,'/')}`;
 
-            // 2. 쿼리 URL 세팅
             let baseDaily = `${SUPABASE_URL}/rest/v1/daily_order_summary?select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
             let filterPart = '';
             if (brandName) {
@@ -207,7 +205,6 @@
             const currDailyUrl = `${baseDaily}&delivery_date=gte.${startDate}&delivery_date=lte.${endDate}${filterPart}`;
             const prevDailyUrl = `${baseDaily}&delivery_date=gte.${prevStart}&delivery_date=lte.${prevEnd}${filterPart}`;
             
-            // 점포 요약 뷰 쿼리
             const currStoreUrl = `${SUPABASE_URL}/rest/v1/store_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_name`;
             const prevStoreUrl = `${SUPABASE_URL}/rest/v1/store_order_summary?delivery_date=gte.${prevStart}&delivery_date=lte.${prevEnd}&select=store_name`;
 
@@ -229,7 +226,6 @@
         }
 
         function renderReport(curr, prev, currStores, prevStores, durationDays) {
-            // A. 당기 합산
             let curAmt = 0, curQty = 0;
             const curItems = new Set();
             const brandMap = {}, itemMap = {}, weekdayMap = { 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 };
@@ -239,25 +235,21 @@
                 curQty += q; curAmt += a;
                 if (r.item_name) curItems.add(r.item_name);
 
-                // 브랜드별 집계
                 const b = r.brand_name || '기타';
                 brandMap[b] = (brandMap[b] || 0) + a;
 
-                // 품목별 집계
                 const code = cleanCode(r.item_code);
                 const name = r.item_name || '미등록품목';
                 const iKey = `${code}__${name}`;
                 if (!itemMap[iKey]) itemMap[iKey] = { code, name, qty: 0, amount: 0 };
                 itemMap[iKey].qty += q; itemMap[iKey].amount += a;
 
-                // 요일별 집계 (월=1 ~ 토=6)
                 if (r.delivery_date) {
                     const wd = parseDate(r.delivery_date).getDay();
                     if (wd >= 1 && wd <= 6) weekdayMap[wd] += q;
                 }
             });
 
-            // B. 전기 합산 (비교 분석)
             let prevAmt = 0, prevQty = 0;
             prev.forEach(r => {
                 prevQty += cleanNumber(r.total_qty);
@@ -267,13 +259,11 @@
             const curStoreCount = new Set(currStores.map(s => s.store_name).filter(Boolean)).size;
             const prevStoreCount = new Set(prevStores.map(s => s.store_name).filter(Boolean)).size;
 
-            // 증감률 헬퍼 함수
             const calcRate = (c, p) => p > 0 ? ((c - p) / p * 100) : 0;
             const diffAmt = calcRate(curAmt, prevAmt);
             const diffQty = calcRate(curQty, prevQty);
             const diffStores = calcRate(curStoreCount, prevStoreCount);
 
-            // C. KPI 렌더링
             document.getElementById('kpi-total-amount').innerText = `${curAmt.toLocaleString()} 원`;
             document.getElementById('kpi-diff-amount').innerHTML = formatDiffBadge(diffAmt);
             
@@ -285,7 +275,6 @@
 
             document.getElementById('kpi-total-items').innerText = `${curItems.size.toLocaleString()} 종`;
 
-            // D. 브리핑 텍스트 자동 생성
             const dailyAvgAmt = Math.round(curAmt / Math.max(1, durationDays));
             const topBrand = Object.entries(brandMap).sort((a,b) => b[1] - a[1])[0] || ['전체', 0];
             const topBrandShare = curAmt > 0 ? ((topBrand[1] / curAmt) * 100).toFixed(1) : 0;
@@ -296,11 +285,8 @@
                 전체 브랜드 중 <b>${topBrand[0]}</b>이(가) 총 발주액의 <b>${topBrandShare}%</b>를 견인하며 최대 점유율을 기록했습니다.
             `;
 
-            // E. 차트 렌더링 (도넛 & 막대)
             renderBrandChart(brandMap, curAmt);
             renderWeekdayChart(weekdayMap);
-
-            // F. 파레토 Top 10 테이블 렌더링
             renderParetoTable(itemMap, curAmt);
         }
 
