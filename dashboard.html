@@ -58,8 +58,8 @@
     </div>
 
     <script>
-        const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co"; 
-        const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN";
+        const SUPABASE_URL = ""; 
+        const SUPABASE_ANON_KEY = "";
         let trendChart = null;
         let currentBrandStoreMap = {};
         let fetchToken = 0;
@@ -140,7 +140,6 @@
                 });
                 validCodeList = Array.from(codeSet);
                 
-                // 💡 PostgREST 400 에러를 원천 차단하는 or=(item_code.eq...) 구문 적용
                 const orConds = validCodeList.map(c => `item_code.eq.${encodeURIComponent(c)}`).join(',');
                 dailyUrl += `&or=(${orConds})`;
             }
@@ -156,7 +155,6 @@
                 currentBrandStoreMap = {};
                 renderDashboard(dailyData, weatherMap);
 
-                // 💡 [핵심 버그 수정] 피자박스 점포수가 0개점으로 뜨던 PostgREST in(...) 쿼리 교정
                 if (validCodeList.length > 0) {
                     let storeUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_name,brand_name`;
 
@@ -166,7 +164,6 @@
                         else if (bList.length > 1) storeUrl += `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(safeSearchKeyword(b))}*`).join(',')})`;
                     }
 
-                    // 💡 in(...) 대신 400 에러가 전혀 없는 or=(item_code.eq...) 구문으로 안전 조회
                     const itemOrConds = validCodeList.map(c => `item_code.eq.${encodeURIComponent(c)}`).join(',');
                     storeUrl += `&or=(${itemOrConds})`;
 
