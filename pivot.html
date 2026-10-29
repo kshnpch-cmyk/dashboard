@@ -2,355 +2,297 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>피벗 분석 프레임</title>
-    <!-- 엑셀 저장 및 마우스 드래그(SortableJS) 라이브러리 추가 -->
+    <title>점포별 상세 내역 프레임</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Pretendard', 'Malgun Gothic', sans-serif; background: transparent; color: #1e293b; padding: 5px 0; }
-        
-        .section-panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-bottom: 15px; }
-        .panel-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 15px; }
-        .panel-title-text { font-size: 16px; font-weight: 700; color: #0f172a; }
-        .btn-excel { background-color: #16a34a; color: white; border: none; padding: 5px 12px; font-size: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
-        .btn-excel:hover { background-color: #15803d; }
-
-        /* ✨ 드래그 앤 드롭 피벗 컨트롤 UI 스타일 */
-        .pivot-controls { display: flex; flex-direction: column; gap: 12px; }
-        .pivot-box { 
-            border: 2px dashed #cbd5e1; border-radius: 8px; padding: 12px 15px; 
-            background: #f8fafc; min-height: 65px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; 
-            transition: all 0.2s;
-        }
-        .pivot-box.active-box { border-color: #93c5fd; background: #eff6ff; border-style: solid; }
-        .pivot-box-title { font-size: 13px; font-weight: 800; color: #475569; width: 110px; flex-shrink: 0; line-height: 1.4; }
-        .pivot-box.active-box .pivot-box-title { color: #1d4ed8; }
-        
-        .chip-container { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; flex: 1; min-height: 35px; }
-
-        /* 칩(Chip) 기본 스타일 */
-        .pivot-chip {
-            padding: 7px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; cursor: grab;
-            display: inline-flex; align-items: center; gap: 6px; user-select: none;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: transform 0.1s;
-        }
-        .pivot-chip:active { cursor: grabbing; transform: scale(0.95); }
-
-        /* 상태별 칩 색상 변환 (CSS 자동 적용) */
-        #active-pivot-fields .pivot-chip { background: #2563eb; color: white; border: 1px solid #1d4ed8; }
-        #active-pivot-fields .pivot-chip:hover { background: #1e40af; box-shadow: 0 4px 8px rgba(37,99,235,0.2); }
-        
-        #available-pivot-fields .pivot-chip { background: white; color: #475569; border: 1px solid #cbd5e1; }
-        #available-pivot-fields .pivot-chip:hover { background: #f1f5f9; border-color: #94a3b8; box-shadow: 0 4px 8px rgba(0,0,0,0.08); }
-
-        /* 드래그 중인 칩 스타일 */
-        .sortable-ghost { opacity: 0.4; background-color: #e2e8f0 !important; border: 2px dashed #94a3b8 !important; color: transparent !important; }
-
-        /* CSS로 화살표(▶) 자동 생성 (활성화된 칩 사이에만 적용) */
-        #active-pivot-fields .pivot-chip:not(:last-child)::after {
-            content: "▶"; color: #94a3b8; font-size: 11px; margin-left: 10px; margin-right: -5px; font-weight: 900;
-        }
-
+        .dashboard-layout { display: grid; grid-template-columns: 290px 1fr; gap: 20px; align-items: start; }
+        .panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+        .panel-title { font-size: 17px; font-weight: 700; margin-bottom: 15px; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
         .summary-badge-group { display: flex; align-items: center; gap: 10px; font-size: 13px; }
         .summary-badge { background-color: #f1f5f9; padding: 4px 10px; border-radius: 6px; border: 1px solid #cbd5e1; color: #475569; }
         .summary-badge b { color: #2563eb; }
-
-        .table-container { width: 100%; overflow-x: auto; max-height: 550px; border: 1px solid #e2e8f0; border-radius: 8px; }
+        .search-input { width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; margin-bottom: 10px; outline: none; }
+        .store-list { list-style: none; padding: 0; margin: 0; max-height: 520px; overflow-y: auto; }
+        .store-item { padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 5px; cursor: pointer; display: flex; justify-content: space-between; font-size: 13px; }
+        .store-item:hover, .store-item.active { background-color: #eff6ff; border-color: #2563eb; font-weight: bold; }
+        .table-container { width: 100%; overflow-x: auto; max-height: 520px; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 13px; white-space: nowrap; }
-        th { background-color: #f8fafc; color: #475569; position: sticky; top: 0; z-index: 2; border-bottom: 2px solid #cbd5e1; }
+        th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #e2e8f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+        th { background-color: #f8fafc; color: #475569; position: sticky; top: 0; z-index: 2; }
+        .table-filter-input { width: 100%; padding: 4px 6px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 4px; }
         .text-right { text-align: right; }
-        .no-data-row td { text-align:center; padding:40px; color:#94a3b8; font-size:14px; }
+        .code-tag { font-size: 11px; color: #64748b; font-family: monospace; }
+        .btn-excel { background-color: #16a34a; color: white; border: none; padding: 5px 10px; font-size: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; }
+        .pagination-container { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding-top: 10px; border-top: 1px solid #e2e8f0; }
+        .page-btn { background-color: #f8fafc; border: 1px solid #cbd5e1; padding: 4px 8px; font-size: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; }
+        .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     </style>
 </head>
 <body>
 
-    <!-- 1. 드래그 앤 드롭 그룹 기준 선택 패널 -->
-    <div class="section-panel">
-        <div class="panel-header" style="margin-bottom: 15px;">
-            <span class="panel-title-text">🧩 피벗 그룹핑 기준 <span style="font-size: 12px; font-weight: normal; color: #64748b; margin-left: 8px;">마우스로 드래그(끌어다 놓기)하여 계층 순서를 자유롭게 조합하세요.</span></span>
-            <button class="btn-excel" onclick="exportPivotToExcel()">📥 피벗 엑셀 저장</button>
+    <div class="dashboard-layout">
+        <div class="panel">
+            <div class="panel-title"><span>🏢 주문 점포 필터</span></div>
+            <input type="text" id="store-search-input" class="search-input" placeholder="🔍 점포명 검색" oninput="filterStoreList()">
+            <div id="brand-summary" style="margin-bottom: 8px; font-size: 12px; color: #64748b;">
+                점포수: <b id="brand-store-count">0개</b>
+            </div>
+            <ul class="store-list" id="store-list">
+                <li style="padding:15px; text-align:center; color:#94a3b8; font-size:13px;">상단 [조회]를 누르면 로드됩니다.</li>
+            </ul>
         </div>
-        
-        <div class="pivot-controls">
-            <!-- 적용된 기준 (상단 박스) -->
-            <div class="pivot-box active-box">
-                <div class="pivot-box-title">🎯 적용된 기준<br><span style="font-size:10.5px; font-weight:normal; opacity:0.8;">(드래그하여 순서 변경)</span></div>
-                <div class="chip-container" id="active-pivot-fields">
-                    <!-- 기본 세팅: 브랜드 -> 품목명 -->
-                    <div class="pivot-chip" data-key="brand_name">🏢 브랜드</div>
-                    <div class="pivot-chip" data-key="item_name">📦 품목명</div>
+
+        <div class="panel">
+            <div class="panel-title">
+                <span id="selected-store-title">🛒 기간 내 전체 점포 합산 상세</span>
+                <div class="summary-badge-group">
+                    <button class="btn-excel" onclick="exportToExcel()">📥 엑셀 저장</button>
+                    <span class="summary-badge">수량합계: <b id="list-total-qty">0개</b></span>
+                    <span class="summary-badge">금액합계: <b id="list-total-amount">0원</b></span>
                 </div>
             </div>
+            
+            <div class="table-container">
+                <table id="detail-table">
+                    <colgroup>
+                        <col style="width: 80px;"><col style="width: 140px;"><col style="width: 110px;">
+                        <col style="width: 90px;"><col style="width: 90px;"><col style="width: 90px;">
+                        <col style="width: 180px;"><col style="width: 65px;"><col style="width: 85px;"><col style="width: 105px;">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>점포코드</th><th>점포명</th><th>센터명</th><th>주문일자</th><th>배송일자</th>
+                            <th>품목코드</th><th>품목명</th><th class="text-right">수량</th>
+                            <th class="text-right">단가</th><th class="text-right">금액</th>
+                        </tr>
+                        <tr>
+                            <th><input type="text" id="filter-storeCode" class="table-filter-input" oninput="applyColumnFilters()"></th>
+                            <th><input type="text" id="filter-storeName" class="table-filter-input" oninput="applyColumnFilters()"></th>
+                            <th><input type="text" id="filter-centerName" class="table-filter-input" oninput="applyColumnFilters()"></th>
+                            <th><input type="text" id="filter-orderDate" class="table-filter-input" oninput="applyColumnFilters()"></th>
+                            <th><input type="text" id="filter-deliveryDate" class="table-filter-input" oninput="applyColumnFilters()"></th>
+                            <th><input type="text" id="filter-itemCode" class="table-filter-input" oninput="applyColumnFilters()"></th>
+                            <th><input type="text" id="filter-itemName" class="table-filter-input" oninput="applyColumnFilters()"></th>
+                            <th></th><th></th><th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="order-detail-table">
+                        <tr><td colspan="10" style="text-align:center; padding:30px; color:#94a3b8;">상단 [점포별 상세 조회] 버튼을 누르면 데이터를 불러옵니다.</td></tr>
+                    </tbody>
+                </table>
+            </div>
 
-            <!-- 추가 가능한 기준 (하단 박스) -->
-            <div class="pivot-box">
-                <div class="pivot-box-title">➕ 대기 항목<br><span style="font-size:10.5px; font-weight:normal; opacity:0.8;">(위로 끌어다 놓으세요)</span></div>
-                <div class="chip-container" id="available-pivot-fields">
-                    <!-- 대기 중인 항목들 -->
-                    <div class="pivot-chip" data-key="delivery_date">📅 배송일자</div>
-                    <div class="pivot-chip" data-key="center_name">🏬 센터명</div>
-                    <div class="pivot-chip" data-key="store_name">🏪 점포명</div>
-                    <div class="pivot-chip" data-key="item_code">🏷️ 품목코드</div>
+            <div class="pagination-container">
+                <div style="font-size: 13px; color: #64748b; font-weight: 600;">
+                    페이지당: 
+                    <select id="rows-per-page" style="padding: 2px 4px; border: 1px solid #cbd5e1; border-radius: 4px;" onchange="changeRowsPerPage()">
+                        <option value="10">10개씩</option><option value="50">50개씩</option><option value="100">100개씩</option><option value="1000">1000개씩</option>
+                    </select>
+                </div>
+                <div>
+                    <button class="page-btn" id="btn-prev" onclick="goToPage(currentPage - 1)">‹ 이전</button>
+                    <span style="font-size: 12.5px; font-weight: bold; margin: 0 8px;" id="page-info">1 / 1</span>
+                    <button class="page-btn" id="btn-next" onclick="goToPage(currentPage + 1)">다음 ›</button>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- 2. 피벗 집계 결과 테이블 -->
-    <div class="section-panel">
-        <div class="panel-header" style="margin-bottom: 12px; border:none; padding-bottom:0;">
-            <span class="panel-title-text">📊 피벗 집계 결과 <span style="font-size: 12px; font-weight: normal; color: #64748b; margin-left: 8px;">수량 합계 기준 내림차순으로 자동 정렬됩니다.</span></span>
-            <div class="summary-badge-group">
-                <span class="summary-badge">수량합계: <b id="pivot-total-qty">0개</b></span>
-                <span class="summary-badge">금액합계: <b id="pivot-total-amount">0원</b></span>
-                <span class="summary-badge">집계 행수: <b id="pivot-total-rows">0행</b></span>
-            </div>
-        </div>
-        <div class="table-container">
-            <table>
-                <thead id="pivot-thead"></thead>
-                <tbody id="pivot-tbody">
-                    <tr class="no-data-row"><td colspan="10">상단 [대시보드 종합 조회] 버튼을 눌러 데이터를 불러오세요.</td></tr>
-                </tbody>
-            </table>
         </div>
     </div>
 
     <script>
-        const SUPABASE_URL = "https://zbilhsgfgyfrolveaego.supabase.co"; 
-        const SUPABASE_ANON_KEY = "sb_publishable_OWW3nk7m7Vy3Ex0205ypgg_IG3xdBjN";
+        const SUPABASE_URL = ""; 
+        const SUPABASE_ANON_KEY = "";
 
-        let currentRawData = [];
-        let currentLoadedSource = ''; 
-        let currentSearchParams = null;
-        let currentPivotList = [];
+        let rawDetailOrders = [], baseDetailOrders = [], currentDetailOrders = [];
+        let storeSummaryList = [];
+        let currentSelectedStore = 'ALL';
+        let currentPage = 1, rowsPerPage = 10, totalPages = 1;
 
-        // 💡 피벗 컬럼 메타데이터 정의
-        const PIVOT_COLS = {
-            'delivery_date': { label: '배송일자', isDate: true },
-            'brand_name': { label: '브랜드' },
-            'center_name': { label: '센터명' },
-            'store_name': { label: '점포명' },
-            'item_name': { label: '품목명' },
-            'item_code': { label: '품목코드' }
-        };
-
-        function cleanNumber(v) { return parseFloat(String(v).replace(/[^0-9.-]/g, '')) || 0; }
+        function cleanNumber(val) { return parseFloat(String(val).replace(/[^0-9.-]/g, '')) || 0; }
+        function cleanCode(val) { return (!val && val !== 0) ? '-' : String(val).replace(/\.0$/, '').trim(); }
         function formatDisplayDate(d) { return !d || d === '-' ? '-' : String(d).split('T')[0].replace(/-/g, '/'); }
         function safeSearchKeyword(term) { return term ? term.replace(/"/g, '').replace(/[()]/g, '*').trim() : ''; }
 
-        /* ✨ 마우스 드래그 앤 드롭 설정 (SortableJS 연동) */
-        document.addEventListener('DOMContentLoaded', () => {
-            const activeContainer = document.getElementById('active-pivot-fields');
-            const availableContainer = document.getElementById('available-pivot-fields');
-
-            // 두 컨테이너 간의 드래그 이동을 허용하도록 group을 'shared'로 묶음
-            const sortableOptions = {
-                group: 'shared', 
-                animation: 150, // 부드러운 이동 애니메이션 (ms)
-                ghostClass: 'sortable-ghost', // 드래그 중인 잔상 클래스
-                onEnd: function (evt) {
-                    // 드래그가 끝난 직후 0.01초 내로 피벗 재집계 실행
-                    onCriteriaChange();
-                }
-            };
-
-            new Sortable(activeContainer, sortableOptions);
-            new Sortable(availableContainer, sortableOptions);
-            
-            // 초기 헤더 렌더링
-            renderPivotHeader(getSelectedDimensions());
-            // 부모 프레임에 로드 완료 신호 발송
-            window.parent.postMessage({ action: 'FRAME_READY', tab: 'pivot' }, '*');
-        });
-
-        // 현재 '적용된 기준(active-pivot-fields)' 컨테이너 안에 놓여있는 칩들의 순서를 배열로 추출
-        function getSelectedDimensions() {
-            const activeChips = document.getElementById('active-pivot-fields').querySelectorAll('.pivot-chip');
-            return Array.from(activeChips).map(chip => {
-                const key = chip.getAttribute('data-key');
-                return {
-                    key: key,
-                    label: PIVOT_COLS[key].label,
-                    isDate: PIVOT_COLS[key].isDate || false
-                };
-            });
-        }
-
-        // 테이블 헤더 즉시 갱신
-        function renderPivotHeader(dims) {
-            const thead = document.getElementById('pivot-thead');
-            if (dims.length === 0) {
-                thead.innerHTML = `<tr><th>전체 합산 (선택된 기준 없음)</th><th class="text-right">수량 합계</th><th class="text-right">금액 합계</th><th class="text-right">주문 건수</th></tr>`;
-            } else {
-                thead.innerHTML = `<tr>${dims.map(d => `<th>${d.label}</th>`).join('')}<th class="text-right">수량 합계</th><th class="text-right">금액 합계</th><th class="text-right">주문 건수</th></tr>`;
-            }
-        }
-
-        /* 💡 데이터 원천 조회 로직 (스마트 쿼리) */
-        async function fetchPivotData(params) {
-            currentSearchParams = params;
+        async function fetchDetailData(params) {
             const { startDate, endDate, brandName, itemName } = params;
             if (!startDate || !endDate) return;
 
-            const dims = getSelectedDimensions();
-            renderPivotHeader(dims);
+            rawDetailOrders = [];
+            document.getElementById('order-detail-table').innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:#2563eb;">⚡ 상세 데이터를 로딩 중입니다...</td></tr>`;
 
-            const needStoreOrCenter = dims.some(d => d.key === 'store_name' || d.key === 'center_name');
+            let baseSelect = `select=store_code,store_name,distribution_center,order_date,delivery_date,item_code,item_name,qty,price,total_amount,brand_name`;
+            let url = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&${baseSelect}`;
 
-            currentRawData = [];
-            document.getElementById('pivot-tbody').innerHTML = `<tr class="no-data-row"><td colspan="10" style="color:#2563eb;">⚡ 조건에 맞는 피벗 데이터를 고속 로딩 중입니다...</td></tr>`;
-
-            // 점포명, 센터명이 없으면 무거운 oms_orders 대신 가벼운 요약 뷰 호출
-            if (!needStoreOrCenter) {
-                currentLoadedSource = 'summary';
-                let url = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,brand_name,item_code,item_name,total_qty,total_amount`;
-
-                if (brandName) {
-                    const bList = brandName.split(',').map(b => b.trim()).filter(Boolean);
-                    if (bList.length === 1) url += `&brand_name=ilike.*${encodeURIComponent(safeSearchKeyword(bList[0]))}*`;
-                    else if (bList.length > 1) url += `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(safeSearchKeyword(b))}*`).join(',')})`;
+            if (brandName) {
+                const bList = brandName.split(',').map(b => b.trim()).filter(Boolean);
+                if (bList.length === 1) url += `&brand_name=ilike.*${encodeURIComponent(safeSearchKeyword(bList[0]))}*`;
+                else if (bList.length > 1) url += `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(safeSearchKeyword(b))}*`).join(',')})`;
+            }
+            if (itemName) {
+                const iList = itemName.split(',').map(i => i.trim()).filter(Boolean);
+                if (iList.length === 1) {
+                    const safe = encodeURIComponent(safeSearchKeyword(iList[0]));
+                    url += `&or=(item_code.ilike.*${safe}*,item_name.ilike.*${safe}*)`;
+                } else if (iList.length > 1) {
+                    const orConds = iList.map(i => {
+                        const safe = encodeURIComponent(safeSearchKeyword(i));
+                        return `item_code.ilike.*${safe}*,item_name.ilike.*${safe}*`;
+                    }).join(',');
+                    url += `&or=(${orConds})`;
                 }
-                if (itemName) {
-                    const iList = itemName.split(',').map(i => i.trim()).filter(Boolean);
-                    if (iList.length === 1) url += `&or=(item_code.ilike.*${encodeURIComponent(safeSearchKeyword(iList[0]))}*,item_name.ilike.*${encodeURIComponent(safeSearchKeyword(iList[0]))}*)`;
-                    else if (iList.length > 1) url += `&or=(${iList.map(i => `item_code.ilike.*${encodeURIComponent(safeSearchKeyword(i))}*,item_name.ilike.*${encodeURIComponent(safeSearchKeyword(i))}*`).join(',')})`;
-                }
+            }
 
+            let offset = 0, limit = 1000, hasMore = true;
+            while (hasMore) {
                 try {
-                    const res = await fetch(`${url}&limit=10000`, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
-                    if (res.ok) currentRawData = await res.json();
-                } catch (e) {}
-            } else {
-                currentLoadedSource = 'raw';
-                let selectCols = `delivery_date,brand_name,store_name,distribution_center,item_code,item_name,qty,price,total_amount`;
-                let url = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=${selectCols}`;
-
-                if (brandName) {
-                    const bList = brandName.split(',').map(b => b.trim()).filter(Boolean);
-                    if (bList.length === 1) url += `&brand_name=ilike.*${encodeURIComponent(safeSearchKeyword(bList[0]))}*`;
-                    else if (bList.length > 1) url += `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(safeSearchKeyword(b))}*`).join(',')})`;
-                }
-                if (itemName) {
-                    const iList = itemName.split(',').map(i => i.trim()).filter(Boolean);
-                    if (iList.length === 1) url += `&or=(item_code.ilike.*${encodeURIComponent(safeSearchKeyword(iList[0]))}*,item_name.ilike.*${encodeURIComponent(safeSearchKeyword(iList[0]))}*)`;
-                    else if (iList.length > 1) url += `&or=(${iList.map(i => `item_code.ilike.*${encodeURIComponent(safeSearchKeyword(i))}*,item_name.ilike.*${encodeURIComponent(safeSearchKeyword(i))}*`).join(',')})`;
-                }
-
-                let offset = 0, limit = 1000, hasMore = true;
-                while (hasMore) {
-                    try {
-                        const res = await fetch(`${url}&limit=${limit}&offset=${offset}`, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
-                        if (res.ok) {
-                            const chunk = await res.json();
-                            if (!chunk || chunk.length === 0) break;
-                            chunk.forEach(r => { r.center_name = r.distribution_center || '-'; });
-                            currentRawData = currentRawData.concat(chunk);
-                            if (chunk.length < limit) hasMore = false; else offset += limit;
-                        } else hasMore = false;
-                    } catch (e) { hasMore = false; }
-                }
+                    const res = await fetch(`${url}&order=delivery_date.asc,store_code.asc&limit=${limit}&offset=${offset}`, {
+                        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                    });
+                    if (res.ok) {
+                        const chunk = await res.json();
+                        if (!chunk || chunk.length === 0) break;
+                        chunk.forEach(r => { r.center_name = r.distribution_center || '-'; });
+                        rawDetailOrders = rawDetailOrders.concat(chunk);
+                        if (chunk.length < limit) hasMore = false; else offset += limit;
+                    } else hasMore = false;
+                } catch(e) { hasMore = false; }
             }
 
-            // 조회 완료 시 피벗 집계 즉시 실행
-            runPivot();
+            const storeMap = {};
+            rawDetailOrders.forEach(r => {
+                if (r.store_name) {
+                    if (!storeMap[r.store_name]) storeMap[r.store_name] = 0;
+                    storeMap[r.store_name]++;
+                }
+            });
+            storeSummaryList = Object.keys(storeMap).sort().map(s => ({ store_name: s, count: storeMap[s] }));
+            renderStoreList();
+            onStoreSelect(currentSelectedStore);
         }
 
-        // 드래그가 끝났을 때(순서/항목 변경) 호출
-        function onCriteriaChange() {
-            const dims = getSelectedDimensions();
-            renderPivotHeader(dims);
+        function renderStoreList() {
+            const listEl = document.getElementById('store-list');
+            document.getElementById('brand-store-count').innerText = `${storeSummaryList.length}개`;
+            const totalCount = rawDetailOrders.length;
 
-            const needStoreOrCenter = dims.some(d => d.key === 'store_name' || d.key === 'center_name');
-            // 만약 새로 끌어다 놓은 칩이 '점포명'인데, 이전에 가벼운 요약 뷰만 조회해 둔 상태라면 재조회 실행
-            if (needStoreOrCenter && currentLoadedSource === 'summary' && currentSearchParams) {
-                fetchPivotData(currentSearchParams);
+            let html = [`<li class="store-item total-item ${currentSelectedStore==='ALL'?'active':''}" onclick="onStoreSelect('ALL', this)"><span>🏢 전체 점포 합산</span><span style="color:#2563eb;">${totalCount.toLocaleString()}건</span></li>`];
+            storeSummaryList.forEach(s => {
+                html.push(`<li class="store-item ${currentSelectedStore===s.store_name?'active':''}" onclick="onStoreSelect('${s.store_name}', this)"><span>${s.store_name}</span><span style="color:#64748b;">${s.count.toLocaleString()}건</span></li>`);
+            });
+            listEl.innerHTML = html.join('');
+        }
+
+        function filterStoreList() {
+            const q = document.getElementById('store-search-input').value.toLowerCase().trim();
+            document.querySelectorAll('#store-list .store-item').forEach(item => {
+                item.style.display = item.innerText.toLowerCase().includes(q) ? 'flex' : 'none';
+            });
+        }
+
+        function onStoreSelect(sName, el) {
+            currentSelectedStore = sName;
+            document.querySelectorAll('.store-item').forEach(i => i.classList.remove('active'));
+            if (el) el.classList.add('active');
+
+            if (sName === 'ALL') {
+                document.getElementById('selected-store-title').innerText = `🛒 기간 내 전체 점포 합산 상세`;
+                baseDetailOrders = rawDetailOrders;
             } else {
-                runPivot(); // 그 외에는 이미 받아놓은 데이터로 0.01초 내에 인메모리 정렬
+                document.getElementById('selected-store-title').innerText = `🛒 [${sName}] 주문 상세`;
+                baseDetailOrders = rawDetailOrders.filter(r => r.store_name === sName);
             }
+            applyColumnFilters();
         }
 
-        /* 💡 동적 계층형 피벗 그룹핑 및 정렬 */
-        function runPivot() {
-            const dims = getSelectedDimensions();
-            renderPivotHeader(dims);
+        function applyColumnFilters() {
+            const qSC = document.getElementById('filter-storeCode').value.toLowerCase().trim();
+            const qSN = document.getElementById('filter-storeName').value.toLowerCase().trim();
+            const qCN = document.getElementById('filter-centerName').value.toLowerCase().trim();
+            const qOD = document.getElementById('filter-orderDate').value.toLowerCase().trim();
+            const qDD = document.getElementById('filter-deliveryDate').value.toLowerCase().trim();
+            const qIC = document.getElementById('filter-itemCode').value.toLowerCase().trim();
+            const qIN = document.getElementById('filter-itemName').value.toLowerCase().trim();
 
-            if (!currentRawData || currentRawData.length === 0) {
-                document.getElementById('pivot-tbody').innerHTML = `<tr class="no-data-row"><td colspan="10">조건에 해당하는 데이터가 없습니다.</td></tr>`;
-                document.getElementById('pivot-total-qty').innerText = "0개";
-                document.getElementById('pivot-total-amount').innerText = "0원";
-                document.getElementById('pivot-total-rows').innerText = "0행";
+            currentDetailOrders = baseDetailOrders.filter(r => {
+                if (qSC && !cleanCode(r.store_code).toLowerCase().includes(qSC)) return false;
+                if (qSN && !String(r.store_name||'').toLowerCase().includes(qSN)) return false;
+                if (qCN && !String(r.center_name||'').toLowerCase().includes(qCN)) return false;
+                if (qOD && !formatDisplayDate(r.order_date).toLowerCase().includes(qOD)) return false;
+                if (qDD && !formatDisplayDate(r.delivery_date).toLowerCase().includes(qDD)) return false;
+                if (qIC && !cleanCode(r.item_code).toLowerCase().includes(qIC)) return false;
+                if (qIN && !String(r.item_name||'').toLowerCase().includes(qIN)) return false;
+                return true;
+            });
+            currentPage = 1;
+            renderTable();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('order-detail-table');
+            if (!currentDetailOrders || currentDetailOrders.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:#94a3b8;">데이터가 없습니다.</td></tr>`;
+                document.getElementById('list-total-qty').innerText = "0개";
+                document.getElementById('list-total-amount').innerText = "0원";
+                document.getElementById('page-info').innerText = "0 / 0";
                 return;
             }
 
-            const map = new Map();
-            let grandQty = 0, grandAmt = 0;
-
-            currentRawData.forEach(r => {
-                const q = cleanNumber(r.total_qty || r.qty);
-                const amt = cleanNumber(r.total_amount) || (q * cleanNumber(r.price));
-                grandQty += q; 
-                grandAmt += amt;
-
-                let keys = dims.length === 0 ? ['전체 합산'] : dims.map(d => d.isDate ? formatDisplayDate(r[d.key]) : (r[d.key] || '-'));
-                const hash = keys.join('__||__');
-                let target = map.get(hash);
-                if (!target) {
-                    target = { keys, qty: 0, amount: 0, count: 0 };
-                    map.set(hash, target);
-                }
-                target.qty += q; 
-                target.amount += amt; 
-                target.count += cleanNumber(r.order_count || 1);
+            let sumQty = 0, sumAmt = 0;
+            currentDetailOrders.forEach(r => {
+                const q = cleanNumber(r.qty), p = cleanNumber(r.price);
+                sumQty += q; sumAmt += (cleanNumber(r.total_amount) || (q * p));
             });
+            document.getElementById('list-total-qty').innerText = `${sumQty.toLocaleString()}개`;
+            document.getElementById('list-total-amount').innerText = `${sumAmt.toLocaleString()}원`;
 
-            // 수량 기준 내림차순 자동 정렬
-            currentPivotList = Array.from(map.values()).sort((a, b) => b.qty - a.qty);
+            totalPages = Math.ceil(currentDetailOrders.length / rowsPerPage) || 1;
+            const start = (currentPage - 1) * rowsPerPage;
+            const pageData = currentDetailOrders.slice(start, start + rowsPerPage);
 
-            document.getElementById('pivot-total-qty').innerText = `${grandQty.toLocaleString()}개`;
-            document.getElementById('pivot-total-amount').innerText = `${grandAmt.toLocaleString()}원`;
-            document.getElementById('pivot-total-rows').innerText = `${currentPivotList.length.toLocaleString()}행`;
+            tbody.innerHTML = pageData.map(r => {
+                const q = cleanNumber(r.qty), p = cleanNumber(r.price), t = cleanNumber(r.total_amount) || (q * p);
+                return `<tr>
+                    <td><span class="code-tag">${cleanCode(r.store_code)}</span></td>
+                    <td><b>${r.store_name||'-'}</b></td>
+                    <td><span style="color:#2563eb; font-weight:600;">${r.center_name||'-'}</span></td>
+                    <td>${formatDisplayDate(r.order_date)}</td>
+                    <td><span style="color:#2563eb; font-weight:bold;">${formatDisplayDate(r.delivery_date)}</span></td>
+                    <td><span class="code-tag">${cleanCode(r.item_code)}</span></td>
+                    <td>${r.item_name||'-'}</td>
+                    <td class="text-right">${q.toLocaleString()}</td>
+                    <td class="text-right">${p>0?p.toLocaleString()+'원':'-'}</td>
+                    <td class="text-right"><b>${t>0?t.toLocaleString()+'원':'-'}</b></td>
+                </tr>`;
+            }).join('');
 
-            const tbody = document.getElementById('pivot-tbody');
-            tbody.innerHTML = currentPivotList.map(item => `
-                <tr>
-                    ${item.keys.map(k => `<td><b>${k}</b></td>`).join('')}
-                    <td class="text-right" style="color:#2563eb; font-weight:800;">${item.qty.toLocaleString()}</td>
-                    <td class="text-right" style="font-weight:700;">${item.amount > 0 ? item.amount.toLocaleString() + '원' : '-'}</td>
-                    <td class="text-right" style="color:#64748b;">${item.count.toLocaleString()}건</td>
-                </tr>
-            `).join('');
+            document.getElementById('page-info').innerText = `${currentPage} / ${totalPages}`;
+            document.getElementById('btn-prev').disabled = (currentPage === 1);
+            document.getElementById('btn-next').disabled = (currentPage === totalPages);
         }
 
-        function exportPivotToExcel() {
-            if (!currentPivotList || currentPivotList.length === 0) return alert("저장할 피벗 데이터가 없습니다.");
-            const dims = getSelectedDimensions();
+        function goToPage(p) { if (p < 1 || p > totalPages) return; currentPage = p; renderTable(); }
+        function changeRowsPerPage() { rowsPerPage = parseInt(document.getElementById('rows-per-page').value, 10); currentPage = 1; renderTable(); }
 
-            const exportData = currentPivotList.map(item => {
-                const obj = {};
-                if (dims.length === 0) {
-                    obj['구분'] = item.keys[0];
-                } else {
-                    dims.forEach((d, idx) => { obj[d.label] = item.keys[idx]; });
-                }
-                obj['수량 합계'] = item.qty;
-                obj['금액 합계'] = item.amount;
-                obj['주문 건수'] = item.count;
-                return obj;
-            });
-
+        function exportToExcel() {
+            if (!currentDetailOrders || currentDetailOrders.length === 0) return alert("저장할 데이터가 없습니다.");
+            const exportData = currentDetailOrders.map(r => ({
+                '점포코드': cleanCode(r.store_code), '점포명': r.store_name || '-', '센터명': r.center_name || '-',
+                '주문일자': formatDisplayDate(r.order_date), '배송일자': formatDisplayDate(r.delivery_date),
+                '품목코드': cleanCode(r.item_code), '품목명': r.item_name || '-',
+                '수량': cleanNumber(r.qty), '단가': cleanNumber(r.price),
+                '금액': cleanNumber(r.total_amount) || (cleanNumber(r.qty) * cleanNumber(r.price))
+            }));
             const ws = XLSX.utils.json_to_sheet(exportData), wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "피벗집계");
-            XLSX.writeFile(wb, `OMS_피벗집계_${Date.now()}.xlsx`);
+            XLSX.utils.book_append_sheet(wb, ws, "주문상세");
+            XLSX.writeFile(wb, `OMS_주문상세_${Date.now()}.xlsx`);
         }
 
-        // 부모창 검색 명령 수신
         window.addEventListener('message', (e) => {
-            if (e.data && e.data.action === 'SEARCH') {
-                fetchPivotData(e.data.params);
-            }
+            if (e.data && e.data.action === 'SEARCH') fetchDetailData(e.data.params);
+        });
+        window.addEventListener('DOMContentLoaded', () => {
+            window.parent.postMessage({ action: 'FRAME_READY', tab: 'detail' }, '*');
         });
     </script>
 </body>
