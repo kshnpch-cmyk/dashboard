@@ -14,16 +14,20 @@ on:
   repository_dispatch:
     types: [trigger-oms-sync]
 
+# 깃허브 액션이 저장소에 oms_data.json을 커밋/푸시할 수 있도록 쓰기 권한 부여
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
@@ -42,3 +46,20 @@ jobs:
           END_DATE: ${{ github.event.inputs.end_date || github.event.client_payload.end_date }}
         run: |
           python -u screenshot.py
+
+      - name: Commit & Push oms_data.json
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 변경되거나 생성된 oms_data.json 스테이징
+          git add oms_data.json
+          
+          # 변경사항이 존재할 때만 커밋 및 푸시
+          if git status --porcelain | grep oms_data.json; then
+            git commit -m "Auto update oms_data.json [skip ci]"
+            git push
+            echo "✅ oms_data.json 파일이 GitHub 저장소에 성공적으로 반영되었습니다."
+          else
+            echo "ℹ️ 변경된 데이터가 없어 커밋을 건너뜁니다."
+          fi
