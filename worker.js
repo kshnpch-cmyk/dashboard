@@ -1,6 +1,6 @@
 import postgres from 'postgres';
 
-// ⚡ Cloudflare Worker 인스턴스 전역에 DB 커넥션 풀 유지 (미국 왕복 핸드셰이크 제거)
+// ⚡ DB 커넥션 풀 싱글톤 유지
 let sqlInstance = null;
 
 function getDb(env) {
@@ -31,33 +31,108 @@ const corsHeaders = {
     'Content-Type': 'application/json'
 };
 
-async function handleRestApi(request, env, ctx) {
+// ⚡ 1. [서버 사이드 Push-down 집계] TiDB 엔진 내부에서 합산 계산 후 전송
+async function handleSummaryApi(request, env) {
     const url = new URL(request.url);
+    const startDate = url.searchParams.get('startDate');
+    const endDate = url.searchParams.get('endDate');
+    const brandName = url.searchParams.get('brandName');
+    const itemCode = url.searchParams.get('itemCode');
 
-    if (request.method === 'OPTIONS') {
-        return new Response(null, { headers: corsHeaders });
+    if (!startDate || !endDate) {
+        return new Response(JSON.stringify({ error: "startDate and endDate are required" }), { status: 400, headers: corsHeaders });
     }
 
-    // ⚡ 1. Cloudflare Edge 캐시 확인 (미국 TiDB 왕복 없이 즉시 응답)
+    let whereClauses = ["delivery_date >= $1::date", "delivery_date <= $2::date"];
+    let params = [startDate.replace(/\//g, '-'), endDate.replace(/\//g, '-')];
+    let pIdx = 3;
+
+    if (brandName) {
+        whereClauses.push(`brand_name ILIKE $${pIdx++}`);
+        params.push(`%${brandName.trim()}%`);
+    }
+
+    if (itemCode) {
+        whereClauses.push(`item_code = $${pIdx++}`);
+        params.push(itemCode.trim());
+    }
+
+    // TiDB TiFlash 컬럼 엔진을 직접 타는 초고속 집계 SQL (수만 건 행 -> 30건으로 축소)
+    const sqlQuery = `
+        SELECT 
+            to_char(delivery_date, 'YYYY/MM/DD') AS delivery_date,
+            SUM(qty)::bigint AS total_qty,
+            SUM(total_amount)::numeric(15, 2) AS total_amount,
+            COUNT(DISTINCT store_name)::int AS total_stores,
+            COUNT(DISTINCT item_code)::int AS total_items
+        FROM public.oms_orders
+        WHERE ${whereClauses.join(' AND ')}
+        GROUP BY delivery_date
+        ORDER BY delivery_date ASC;
+    `;
+
+    try {
+        const sql = getDb(env);
+        const rows = await sql.unsafe(sqlQuery, params);
+        return new Response(JSON.stringify(rows), {
+            headers: {
+                ...corsHeaders,
+                'Cache-Control': 'public, max-age=60, s-maxage=300'
+            }
+        });
+    } catch (e) {
+        return new Response(JSON.stringify({ error: e.message, sql: sqlQuery }), { status: 500, headers: corsHeaders });
+    }
+}
+
+// ⚡ 2. [캘린더 전용 초고속 집계] 월 전체 날짜별 주문 건수만 즉시 계산
+async function handleCalendarApi(request, env) {
+    const url = new URL(request.url);
+    const month = url.searchParams.get('month'); // 예: 2026-09
+    if (!month) {
+        return new Response(JSON.stringify({ error: "month parameter required (YYYY-MM)" }), { status: 400, headers: corsHeaders });
+    }
+
+    const startDate = `${month}-01`;
+    const sqlQuery = `
+        SELECT 
+            to_char(delivery_date, 'YYYY-MM-DD') AS delivery_date,
+            SUM(qty)::bigint AS total_qty
+        FROM public.oms_orders
+        WHERE delivery_date >= $1::date AND delivery_date < ($1::date + INTERVAL '1 month')
+        GROUP BY delivery_date
+        ORDER BY delivery_date ASC;
+    `;
+
+    try {
+        const sql = getDb(env);
+        const rows = await sql.unsafe(sqlQuery, [startDate]);
+        return new Response(JSON.stringify(rows), {
+            headers: {
+                ...corsHeaders,
+                'Cache-Control': 'public, max-age=120, s-maxage=600'
+            }
+        });
+    } catch (e) {
+        return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: corsHeaders });
+    }
+}
+
+// 기존 PostgREST 에뮬레이션 엔드포인트
+async function handleRestApi(request, env, ctx) {
+    const url = new URL(request.url);
+    if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+
     const cache = caches.default;
     const cacheKey = new Request(url.toString(), request);
     let cachedResponse = await cache.match(cacheKey);
-    if (cachedResponse) {
-        return cachedResponse;
-    }
+    if (cachedResponse) return cachedResponse;
 
     const endpoint = url.pathname.replace(/^\/rest\/v1\/?/, '').split('?')[0];
-
     if (endpoint.startsWith('rpc/')) {
         return new Response(JSON.stringify({ ok: true, message: "TiDB view is live." }), { headers: corsHeaders });
     }
 
-    const validTables = ['daily_order_summary', 'store_order_summary', 'oms_orders'];
-    if (!validTables.includes(endpoint)) {
-        return new Response(JSON.stringify({ error: `Not Found or Invalid Table: ${endpoint}` }), { status: 404, headers: corsHeaders });
-    }
-
-    // PostgREST 쿼리 스트링 -> PostgreSQL SQL 파싱
     let whereClauses = [];
     let queryParams = [];
     let pIdx = 1;
@@ -87,9 +162,7 @@ async function handleRestApi(request, env, ctx) {
                     queryParams.push(`%${clean}%`);
                 }
             }
-            if (subConds.length > 0) {
-                whereClauses.push(`(${subConds.join(' OR ')})`);
-            }
+            if (subConds.length > 0) whereClauses.push(`(${subConds.join(' OR ')})`);
         } else {
             const col = `"${key}"`;
             if (val.startsWith('gte.')) {
@@ -105,21 +178,12 @@ async function handleRestApi(request, env, ctx) {
                 let clean = decodeURIComponent(val.slice(6)).replace(/^\*|\*$/g, '');
                 whereClauses.push(`${col} ILIKE $${pIdx++}`);
                 queryParams.push(`%${clean}%`);
-            } else if (val.startsWith('in.(') && val.endsWith(')')) {
-                let inVals = val.slice(4, -1).split(',').map(x => decodeURIComponent(x.trim())).filter(Boolean);
-                if (inVals.length > 0) {
-                    let marks = inVals.map(() => `$${pIdx++}`).join(', ');
-                    whereClauses.push(`${col} IN (${marks})`);
-                    queryParams.push(...inVals);
-                }
             }
         }
     }
 
     let sqlQuery = `SELECT ${cols} FROM public."${endpoint}"`;
-    if (whereClauses.length > 0) {
-        sqlQuery += ` WHERE ${whereClauses.join(' AND ')}`;
-    }
+    if (whereClauses.length > 0) sqlQuery += ` WHERE ${whereClauses.join(' AND ')}`;
 
     const order = url.searchParams.get('order');
     if (order) {
@@ -137,17 +201,13 @@ async function handleRestApi(request, env, ctx) {
     if (offset) sqlQuery += ` OFFSET ${parseInt(offset, 10)}`;
 
     const sql = getDb(env);
-
     try {
         const rows = await sql.unsafe(sqlQuery, queryParams);
-
-        // ⚡ 2. 엣지 캐시 헤더 (최근 데이터 5분, 과거 데이터는 재조회 시 즉각 반환)
         const responseHeaders = {
             ...corsHeaders,
             'Cache-Control': 'public, max-age=60, s-maxage=300'
         };
         const response = new Response(JSON.stringify(rows), { headers: responseHeaders });
-
         ctx.waitUntil(cache.put(cacheKey, response.clone()));
         return response;
     } catch (err) {
@@ -159,35 +219,43 @@ export default {
     async fetch(request, env, ctx) {
         const url = new URL(request.url);
 
-        // ⚡ [인덱스 순차 생성 엔드포인트] TiDB DDL 1건씩 안전 실행
+        // ⚡ [TiFlash & 커버링 인덱스 원클릭 구축]
         if (url.pathname === '/init-index') {
             const sql = getDb(env);
             const logs = [];
 
-            const indexTasks = [
-                { name: "delivery_date", sql: `CREATE INDEX IF NOT EXISTS idx_oms_orders_delivery_date ON public.oms_orders (delivery_date)` },
-                { name: "brand_delivery", sql: `CREATE INDEX IF NOT EXISTS idx_oms_orders_brand_delivery ON public.oms_orders (brand_name, delivery_date)` },
-                { name: "store_delivery", sql: `CREATE INDEX IF NOT EXISTS idx_oms_orders_store_delivery ON public.oms_orders (store_name, delivery_date)` }
+            const ddlTasks = [
+                { name: "TiFlash 복제본 활성화", sql: `ALTER TABLE public.oms_orders SET TIFLASH REPLICA 1;` },
+                { name: "커버링 집계 인덱스", sql: `CREATE INDEX IF NOT EXISTS idx_oms_orders_covering ON public.oms_orders (delivery_date, brand_name, store_name, qty, total_amount);` },
+                { name: "기본 배송일 인덱스", sql: `CREATE INDEX IF NOT EXISTS idx_oms_orders_delivery_date ON public.oms_orders (delivery_date);` }
             ];
 
-            for (const task of indexTasks) {
+            for (const task of ddlTasks) {
                 try {
                     await sql.unsafe(task.sql);
-                    logs.push(`${task.name} 인덱스: 완료 또는 정상 유지`);
+                    logs.push(`✅ ${task.name}: 성공`);
                 } catch (e) {
-                    logs.push(`${task.name} 인덱스: ${e.message}`);
+                    logs.push(`ℹ️ ${task.name}: ${e.message}`);
                 }
             }
 
             return new Response(JSON.stringify({ ok: true, details: logs }, null, 2), { headers: corsHeaders });
         }
 
-        // 1. /rest/v1/ 데이터 조회 요청 라우팅
+        // ⚡ 서버 사이드 푸시다운 API 라우팅
+        if (url.pathname === '/api/summary') {
+            return handleSummaryApi(request, env);
+        }
+        if (url.pathname === '/api/calendar') {
+            return handleCalendarApi(request, env);
+        }
+
+        // 기존 REST API
         if (url.pathname.startsWith('/rest/v1/')) {
             return handleRestApi(request, env, ctx);
         }
 
-        // 2. 정적 자산(HTML, JS, CSS 등) 제공
+        // 정적 자산 배포
         if (env.ASSETS) {
             return env.ASSETS.fetch(request);
         }
