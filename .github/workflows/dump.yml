@@ -19,41 +19,85 @@ jobs:
       - name: 의존성 설치
         run: pip install pandas psycopg2-binary
 
-      - name: TiDB 전체 데이터 고속 덤프
+      - name: TiDB 데이터 월별 분할 덤프 (1GB 제한 우회)
         env:
           TIDB_DATABASE_URL: ${{ secrets.TIDB_DATABASE_URL }}
         run: |
           python -c "
           import os, psycopg2, pandas as pd
+          from datetime import datetime, date
 
           print('🔌 TiDB 연결 중...')
           conn = psycopg2.connect(os.environ['TIDB_DATABASE_URL'])
           cur = conn.cursor()
 
-          # ORDER BY를 제거하여 TiDB 정렬 메모리 초과 에러 방지
-          sql = '''
-              SELECT 
-                  to_char(order_date, 'YYYY-MM-DD') AS order_date,
-                  to_char(delivery_date, 'YYYY-MM-DD') AS delivery_date,
-                  store_code, store_name, brand_name, distribution_center,
-                  item_code, item_name, qty, price, total_amount
-              FROM public.oms_orders;
-          '''
-          print('📥 데이터 스트리밍 조회 중...')
-          cur.execute(sql)
-          cols = [desc[0] for desc in cur.description]
-          rows = cur.fetchall()
+          # 1. 배송일자 최소값과 최대값 확인
+          cur.execute('SELECT MIN(delivery_date), MAX(delivery_date) FROM public.oms_orders WHERE delivery_date IS NOT NULL;')
+          min_val, max_val = cur.fetchone()
+
+          if isinstance(min_val, str):
+              min_d = datetime.strptime(min_val[:10], '%Y-%m-%d').date()
+          elif isinstance(min_val, (datetime, date)):
+              min_d = min_val if isinstance(min_val, date) else min_val.date()
+          else:
+              min_d = date(2026, 7, 1)
+
+          if isinstance(max_val, str):
+              max_d = datetime.strptime(max_val[:10], '%Y-%m-%d').date()
+          elif isinstance(max_val, (datetime, date)):
+              max_d = max_val if isinstance(max_val, date) else max_val.date()
+          else:
+              max_d = date(2026, 10, 31)
+
+          print(f'📅 전체 데이터 기간: {min_d} ~ {max_d}')
+
+          # 2. 월 단위 구간 생성
+          chunks = []
+          curr = min_d.replace(day=1)
+          while curr <= max_d:
+              year = curr.year + (curr.month // 12)
+              month = (curr.month % 12) + 1
+              nxt = curr.replace(year=year, month=month, day=1)
+              chunks.append((curr.strftime('%Y-%m-%d'), nxt.strftime('%Y-%m-%d')))
+              curr = nxt
+
+          # 3. 1개월 단위로 분할 조회 (TiDB 메모리를 수십 MB만 사용하여 1GB 쿼터 완벽 우회)
+          all_dfs = []
+          for s_date, e_date in chunks:
+              print(f'📥 [{s_date} ~ {e_date}] 구간 추출 중...', flush=True)
+              sql = '''
+                  SELECT 
+                      to_char(order_date, 'YYYY-MM-DD') AS order_date,
+                      to_char(delivery_date, 'YYYY-MM-DD') AS delivery_date,
+                      store_code, store_name, brand_name, distribution_center,
+                      item_code, item_name, qty, price, total_amount
+                  FROM public.oms_orders
+                  WHERE delivery_date >= %s::date AND delivery_date < %s::date;
+              '''
+              cur.execute(sql, (s_date, e_date))
+              cols = [desc[0] for desc in cur.description]
+              rows = cur.fetchall()
+              if rows:
+                  df_chunk = pd.DataFrame(rows, columns=cols)
+                  print(f'   -> {len(df_chunk):,}건 로드 완료')
+                  all_dfs.append(df_chunk)
+              else:
+                  print('   -> 0건')
+
           cur.close()
           conn.close()
 
-          print(f'⚡ 추출 완료 ({len(rows):,}건). GitHub 메모리에서 정렬 처리 중...')
-          df = pd.DataFrame(rows, columns=cols)
-          # GitHub Actions 러너(7GB RAM)에서 안전하게 정렬 수행
-          df.sort_values(by=['delivery_date', 'brand_name'], ascending=[True, True], inplace=True)
-
-          print('💾 oms_data.json 파일 쓰는 중...')
-          df.to_json('oms_data.json', orient='records', force_ascii=False)
-          print(f'🎉 oms_data.json 동기화 완료! 총 {len(df):,}건 저장됨.')
+          # 4. GitHub Actions 러너의 7GB 메모리에서 하나로 병합 및 정렬
+          if all_dfs:
+              print('⚡ 전체 데이터 병합 및 정렬 처리 중...')
+              df_all = pd.concat(all_dfs, ignore_index=True)
+              df_all.sort_values(by=['delivery_date', 'brand_name'], ascending=[True, True], inplace=True)
+              
+              print('💾 oms_data.json 파일 저장 중...')
+              df_all.to_json('oms_data.json', orient='records', force_ascii=False)
+              print(f'🎉 총 {len(df_all):,}건 저장 완료!')
+          else:
+              print('⚠️ 추출할 데이터가 없습니다.')
           "
 
       - name: 저장소 푸시
@@ -61,6 +105,6 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add oms_data.json
-          git commit -m 'chore: dump all historical data into oms_data.json [skip ci]' || exit 0
+          git commit -m 'chore: chunked dump all historical data into oms_data.json [skip ci]' || exit 0
           git push
           echo "✅ oms_data.json 저장소 반영 완료"
