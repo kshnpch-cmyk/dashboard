@@ -32,7 +32,6 @@
     </style>
 </head>
 <body>
-
     <div class="section-panel">
         <div class="kpi-grid">
             <div class="kpi-card"><div class="kpi-title">기간 내 총 주문수량</div><div class="kpi-value" id="kpi-total-qty">0 건</div></div>
@@ -58,8 +57,6 @@
     </div>
 
     <script>
-        // ⚡ 브라우저 메모리에 보관할 정적 캐시 데이터
-        let cachedOmsOrders = null;
         let trendChart = null;
         let currentBrandStoreMap = {};
         let fetchToken = 0;
@@ -117,90 +114,94 @@
             return {};
         }
 
-        // ⚡ [0.005초 초고속 조회] 정적 JSON 1회 로드 후 브라우저 메모리 필터링
+        // ⚡ [서버 푸시다운 적용] 미국 서버에서 집계된 데이터만 즉시 호출 (0.05초)
         async function fetchChartData(params) {
             const currentToken = ++fetchToken;
             const { startDate, endDate, brandName, itemCode, itemName } = params;
             if (!startDate || !endDate) return;
 
-            const sDate = startDate.replace(/\//g, '-');
-            const eDate = endDate.replace(/\//g, '-');
+            const queryParams = new URLSearchParams({
+                startDate: startDate.replace(/\//g, '-'),
+                endDate: endDate.replace(/\//g, '-')
+            });
+            if (brandName) queryParams.append('brandName', brandName);
+            if (itemCode || itemName) queryParams.append('itemCode', (itemCode || itemName).trim());
 
             try {
-                // 1. 처음 접속 시 1회만 oms_data.json 다운로드 (이후 조회는 0초 즉시 처리)
-                if (!cachedOmsOrders) {
-                    document.getElementById('kpi-total-stores').innerHTML = `<span class="loading-text">⚡ 데이터 로딩...</span>`;
-                    const res = await fetch('./oms_data.json');
-                    if (!res.ok) throw new Error("oms_data.json 파일을 찾을 수 없습니다.");
-                    cachedOmsOrders = await res.json();
-                    console.log(`✅ oms_data.json 메모리 적재 완료: 총 ${cachedOmsOrders.length.toLocaleString()}건`);
-                }
+                document.getElementById('kpi-total-stores').innerHTML = `<span class="loading-text">⚡ 집계중...</span>`;
+                currentBrandStoreMap = {};
+
+                // 1. 차트 렌더링에 필요한 날씨 및 서버사이드 그룹핑 데이터 동시 호출
+                const [resSummary, weatherMap] = await Promise.all([
+                    fetch(`/api/summary?${queryParams.toString()}`),
+                    fetchWeatherData(startDate.replace(/\//g, '-'), endDate.replace(/\//g, '-'))
+                ]);
 
                 if (fetchToken !== currentToken) return;
 
-                // 2. 검색 조건 파싱
-                let bList = [];
-                if (brandName) {
-                    bList = brandName.split(',').map(b => safeSearchKeyword(b).toLowerCase()).filter(Boolean);
+                if (resSummary.ok) {
+                    const summaryRows = await resSummary.json();
+                    
+                    // 즉각 차트 및 상단 KPI 수치 표출
+                    renderDashboard(summaryRows, weatherMap);
+
+                    let totalUniqueStores = 0;
+                    summaryRows.forEach(r => { totalUniqueStores = Math.max(totalUniqueStores, r.total_stores || 0); });
+                    document.getElementById('kpi-total-stores').innerText = `${totalUniqueStores.toLocaleString()} 개점`;
+
+                    // 2. 상세보기 모달을 위한 점포 데이터는 백그라운드에서 별도로 고속 로딩
+                    fetchStoreDetails(params, currentToken);
                 }
-
-                const targetInput = (itemCode || itemName || '').trim();
-                let validCodeList = [];
-                if (targetInput) {
-                    const rawCodes = targetInput.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-                    const codeSet = new Set();
-                    rawCodes.forEach(rc => {
-                        expandCodeVariants(rc).forEach(v => codeSet.add(v.toLowerCase()));
-                        codeSet.add(rc);
-                    });
-                    validCodeList = Array.from(codeSet);
-                }
-
-                // 3. 브라우저 메모리 안에서 조건 매칭 (0.005초 소요)
-                const filteredData = cachedOmsOrders.filter(row => {
-                    const d = (row.delivery_date || '').split('T')[0].replace(/\//g, '-');
-                    if (!d || d < sDate || d > eDate) return false;
-
-                    // 브랜드 필터
-                    if (bList.length > 0) {
-                        const bName = (row.brand_name || '').toLowerCase();
-                        if (!bList.some(target => bName.includes(target))) return false;
-                    }
-
-                    // 품목코드/품목명 필터
-                    if (validCodeList.length > 0) {
-                        const c = String(row.item_code || '').toLowerCase();
-                        const n = String(row.item_name || '').toLowerCase();
-                        const match = validCodeList.some(target => c === target || c.startsWith(target) || n.includes(target));
-                        if (!match) return false;
-                    }
-
-                    return true;
-                });
-
-                // 4. 날씨 데이터 수신 및 화면 즉시 렌더링
-                const weatherMap = await fetchWeatherData(sDate, eDate);
-                if (fetchToken !== currentToken) return;
-
-                renderDashboard(filteredData, weatherMap);
-                recalculateStores(filteredData, true);
-
             } catch (e) {
                 console.error("대시보드 조회 실패:", e);
                 document.getElementById('kpi-total-stores').innerText = "0 개점";
             }
         }
 
+        // 백그라운드에서 스마트배치를 이용해 고속으로 점포 정보만 가져오기
+        async function fetchStoreDetails(params, tokenCheck) {
+            const { startDate, endDate, brandName, itemCode, itemName } = params;
+            let storeUrl = `/rest/v1/oms_orders?delivery_date=gte.${startDate.replace(/\//g, '-')}&delivery_date=lte.${endDate.replace(/\//g, '-')}&select=store_name,brand_name`;
+
+            if (brandName) {
+                const bList = brandName.split(',').map(b => b.trim()).filter(Boolean);
+                if (bList.length === 1) storeUrl += `&brand_name=ilike.*${encodeURIComponent(safeSearchKeyword(bList[0]))}*`;
+                else if (bList.length > 1) storeUrl += `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(safeSearchKeyword(b))}*`).join(',')})`;
+            }
+
+            const targetInput = (itemCode || itemName || '').trim();
+            if (targetInput) {
+                let validCodeList = [];
+                const rawCodes = targetInput.split(',').map(s => s.trim()).filter(Boolean);
+                const codeSet = new Set();
+                rawCodes.forEach(rc => { expandCodeVariants(rc).forEach(v => codeSet.add(v)); });
+                validCodeList = Array.from(codeSet);
+                
+                const itemOrConds = validCodeList.map(c => `item_code.eq.${encodeURIComponent(c)}`).join(',');
+                storeUrl += `&or=(${itemOrConds})`;
+            }
+
+            try {
+                const res = await fetch(`${storeUrl}&limit=50000`);
+                if (res.ok && fetchToken === tokenCheck) {
+                    const storeData = await res.json();
+                    recalculateStores(storeData, true);
+                }
+            } catch(e) {
+                console.error("점포 모달 데이터 로드 실패", e);
+            }
+        }
+
         function renderDashboard(data, weatherMap = {}) {
-            let totalQty = 0, totalAmount = 0; 
-            const items = new Set(), dailyMap = {};
+            let totalQty = 0, totalAmount = 0, maxItems = 0; 
+            const dailyMap = {};
 
             data.forEach(r => {
-                const q = cleanNumber(r.qty || r.total_qty);
-                const amt = cleanNumber(r.total_amount) || (q * cleanNumber(r.price));
+                const q = cleanNumber(r.total_qty);
+                const amt = cleanNumber(r.total_amount);
                 totalQty += q; 
                 totalAmount += amt;
-                if (r.item_code) items.add(r.item_code);
+                maxItems = Math.max(maxItems, cleanNumber(r.total_items));
 
                 const dKey = formatDisplayDate(r.delivery_date);
                 if (!dailyMap[dKey]) dailyMap[dKey] = { qty: 0, amount: 0 };
@@ -209,7 +210,7 @@
             });
 
             document.getElementById('kpi-total-qty').innerText = `${totalQty.toLocaleString()} 건`;
-            document.getElementById('kpi-total-items').innerText = `${items.size.toLocaleString()} 종`;
+            document.getElementById('kpi-total-items').innerText = `${maxItems.toLocaleString()} 종 (일 최대)`;
             document.getElementById('kpi-total-amount').innerText = `${totalAmount.toLocaleString()} 원`;
 
             const rawDates = Object.keys(dailyMap).sort();
@@ -279,27 +280,14 @@
                     },
                     scales: {
                         x: {
-                            ticks: {
-                                font: { size: 10, weight: 'bold' },
-                                maxRotation: 0,
-                                minRotation: 0,
-                                autoSkip: true,
-                                autoSkipPadding: 8
-                            }
+                            ticks: { font: { size: 10, weight: 'bold' }, maxRotation: 0, minRotation: 0, autoSkip: true, autoSkipPadding: 8 }
                         },
                         y1: {
-                            type: 'linear',
-                            position: 'left',
-                            beginAtZero: true,
-                            grace: '20%',
+                            type: 'linear', position: 'left', beginAtZero: true, grace: '20%',
                             title: { display: true, text: '주문수량 (건)', font: { size: 10, weight: 'bold' } }
                         },
                         y2: {
-                            type: 'linear',
-                            position: 'right',
-                            beginAtZero: true,
-                            grid: { drawOnChartArea: false },
-                            grace: '20%',
+                            type: 'linear', position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, grace: '20%',
                             title: { display: true, text: '주문금액 (원)', font: { size: 10, weight: 'bold' } }
                         }
                     }
@@ -332,7 +320,7 @@
             const listEl = document.getElementById('brand-store-modal-list');
             const sorted = Object.keys(currentBrandStoreMap).sort((a,b) => currentBrandStoreMap[b].size - currentBrandStoreMap[a].size);
             if (sorted.length === 0) {
-                listEl.innerHTML = '<div style="padding: 20px; text-align: center; color: #94a3b8;">주문 점포 데이터가 없습니다.</div>';
+                listEl.innerHTML = '<div style="padding: 20px; text-align: center; color: #94a3b8;">주문 점포 데이터 로딩중이거나 없습니다.</div>';
                 return;
             }
             listEl.innerHTML = sorted.map(b => `<div class="brand-store-modal-row"><span>🏢 ${b}</span><b>${currentBrandStoreMap[b].size.toLocaleString()} 개점</b></div>`).join('');
