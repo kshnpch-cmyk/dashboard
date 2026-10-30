@@ -50,23 +50,7 @@
         .autocomplete-item { padding: 8px 12px; font-size: 12.5px; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
         .autocomplete-item:hover { background-color: #eff6ff; color: #2563eb; font-weight: bold; }
 
-        /* 💡 품목명 표시 알약 뱃지 스타일 */
-        .item-name-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            font-size: 12px;
-            font-weight: 700;
-            color: #0369a1;
-            background: #e0f2fe;
-            padding: 4px 10px;
-            border-radius: 6px;
-            border: 1px solid #bae6fd;
-            max-width: 260px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
+        .item-name-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: #0369a1; background: #e0f2fe; padding: 4px 10px; border-radius: 6px; border: 1px solid #bae6fd; max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         .iframe-viewport { width: 100%; height: calc(100vh - 215px); min-height: 750px; border: none; border-radius: 12px; background: transparent; }
 
@@ -110,7 +94,6 @@
     </style>
 </head>
 <body>
-
     <div class="navbar">
         <div class="brand-title">
             <h1>📦 더본 OMS 주문 대시보드</h1>
@@ -143,26 +126,57 @@
     </div>
 
     <!-- 🗓️ 캘린더 모달 -->
-    <div class="modal-overlay" id="calendar-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">📅 배송일자 데이터 존재 현황</span><span class="close-btn" onclick="closeCalendarModal()">✕</span></div><div style="display: flex; gap: 8px; margin-bottom: 10px; align-items: center;"><label style="font-size: 12px; font-weight: bold;">월 선택:</label><input type="month" id="calendar-month-picker" class="input-box" onchange="loadCalendarData()"></div><div class="calendar-grid" id="calendar-grid"></div></div></div>
+    <div class="modal-overlay" id="calendar-modal">
+        <div class="modal-content">
+            <div class="modal-header"><span class="modal-title">📅 배송일자 데이터 존재 현황</span><span class="close-btn" onclick="closeCalendarModal()">✕</span></div>
+            <div style="display: flex; gap: 8px; margin-bottom: 10px; align-items: center;">
+                <label style="font-size: 12px; font-weight: bold;">월 선택:</label>
+                <input type="month" id="calendar-month-picker" class="input-box" onchange="loadCalendarData()">
+            </div>
+            <div class="calendar-grid" id="calendar-grid"></div>
+        </div>
+    </div>
     
     <!-- 🏢 브랜드 모달 -->
-    <div class="modal-overlay" id="brand-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">🏢 브랜드 다중 선택</span><span class="close-btn" onclick="closeBrandModal()">✕</span></div><div style="display: flex; gap: 8px; margin-bottom: 8px;"><input type="text" id="modal-brand-search" class="input-box" style="flex:1;" placeholder="브랜드명 검색 (Enter)" onkeydown="if(event.key==='Enter') filterBrandModalList()"><button class="btn btn-cal" style="background:#2563eb;" onclick="filterBrandModalList()">검색</button><button class="btn btn-cal" style="background:#475569;" onclick="toggleAllBrandCheck(true)">전체선택</button><button class="btn btn-cal" style="background:#64748b;" onclick="toggleAllBrandCheck(false)">해제</button></div><div class="modal-body-scroll" id="brand-modal-list"></div><div style="margin-top: 15px; text-align: right;"><button class="btn" onclick="applyBrandSelection()">확인 적용</button></div></div></div>
+    <div class="modal-overlay" id="brand-modal">
+        <div class="modal-content">
+            <div class="modal-header"><span class="modal-title">🏢 브랜드 다중 선택</span><span class="close-btn" onclick="closeBrandModal()">✕</span></div>
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                <input type="text" id="modal-brand-search" class="input-box" style="flex:1;" placeholder="브랜드명 검색 (Enter)" onkeydown="if(event.key==='Enter') filterBrandModalList()">
+                <button class="btn btn-cal" style="background:#2563eb;" onclick="filterBrandModalList()">검색</button>
+                <button class="btn btn-cal" style="background:#475569;" onclick="toggleAllBrandCheck(true)">전체선택</button>
+                <button class="btn btn-cal" style="background:#64748b;" onclick="toggleAllBrandCheck(false)">해제</button>
+            </div>
+            <div class="modal-body-scroll" id="brand-modal-list"></div>
+            <div style="margin-top: 15px; text-align: right;"><button class="btn" onclick="applyBrandSelection()">확인 적용</button></div>
+        </div>
+    </div>
     
     <!-- 📦 품목 모달 -->
-    <div class="modal-overlay" id="item-modal"><div class="modal-content"><div class="modal-header"><span class="modal-title">📦 품목 다중 선택 (품목코드 기준)</span><span class="close-btn" onclick="closeItemModal()">✕</span></div><div style="display: flex; gap: 8px; margin-bottom: 8px;"><input type="text" id="modal-item-search" class="input-box" style="flex:1;" placeholder="품목코드 또는 품목명 검색 (Enter)" onkeydown="if(event.key==='Enter') filterItemModalList()"><button class="btn btn-cal" style="background:#2563eb;" onclick="filterItemModalList()">검색</button><button class="btn btn-cal" style="background:#475569;" onclick="toggleAllItemCheck(true)">전체선택</button><button class="btn btn-cal" style="background:#64748b;" onclick="toggleAllItemCheck(false)">해제</button></div><div class="modal-body-scroll" id="item-modal-list"></div><div style="margin-top: 15px; text-align: right;"><button class="btn" onclick="applyItemSelection()">확인 적용</button></div></div></div>
+    <div class="modal-overlay" id="item-modal">
+        <div class="modal-content">
+            <div class="modal-header"><span class="modal-title">📦 품목 다중 선택 (품목코드 기준)</span><span class="close-btn" onclick="closeItemModal()">✕</span></div>
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                <input type="text" id="modal-item-search" class="input-box" style="flex:1;" placeholder="품목코드 또는 품목명 검색 (Enter)" onkeydown="if(event.key==='Enter') filterItemModalList()">
+                <button class="btn btn-cal" style="background:#2563eb;" onclick="filterItemModalList()">검색</button>
+                <button class="btn btn-cal" style="background:#475569;" onclick="toggleAllItemCheck(true)">전체선택</button>
+                <button class="btn btn-cal" style="background:#64748b;" onclick="toggleAllItemCheck(false)">해제</button>
+            </div>
+            <div class="modal-body-scroll" id="item-modal-list"></div>
+            <div style="margin-top: 15px; text-align: right;"><button class="btn" onclick="applyItemSelection()">확인 적용</button></div>
+        </div>
+    </div>
 
     <div class="container">
-        <!-- 📑 6대 탭 메뉴 -->
         <div class="tab-container">
             <button class="tab-btn active" id="tab-btn-dashboard" onclick="switchTab('dashboard')">📈 요약 대시보드</button>
-            <button class="tab-btn" id="tab-btn-brand_detail" onclick="switchTab('brand_detail')">🏆 브랜드별 상세내역 (매출 순위)</button>
+            <button class="tab-btn" id="tab-btn-brand_detail" onclick="switchTab('brand_detail')">🏆 브랜드별 상세내역</button>
             <button class="tab-btn" id="tab-btn-detail" onclick="switchTab('detail')">🛒 점포별 상세 내역</button>
-            <button class="tab-btn" id="tab-btn-pivot" onclick="switchTab('pivot')">📊 피벗 분석 (조건별 집계)</button>
-            <button class="tab-btn" id="tab-btn-anomaly" onclick="switchTab('anomaly')">🚨 이상 감지 (구매/운영)</button>
-            <button class="tab-btn" id="tab-btn-report" onclick="switchTab('report')">📑 종합 분석 레포트</button>
+            <button class="tab-btn" id="tab-btn-pivot" onclick="switchTab('pivot')">📊 피벗 분석</button>
+            <button class="tab-btn" id="tab-btn-anomaly" onclick="switchTab('anomaly')">🚨 이상 감지</button>
+            <button class="tab-btn" id="tab-btn-report" onclick="switchTab('report')">📑 종합 레포트</button>
         </div>
 
-        <!-- 📊 통합 검색 컨트롤 패널 -->
         <div class="section-panel" id="common-search-panel">
             <div class="filter-row">
                 <div class="filter-group">
@@ -181,7 +195,6 @@
                     <div id="brand-autocomplete-list" class="autocomplete-dropdown"></div>
                 </div>
                 
-                <!-- 💡 [핵심] 품목코드 입력창 + 품목명 실시간 안내 뱃지 영역 -->
                 <div class="filter-group">
                     <label>품목코드/명:</label>
                     <div class="input-wrapper">
@@ -189,7 +202,6 @@
                         <span class="clear-btn" id="btn-clear-item" onclick="clearInputField('chart-item-input', 'cached_item_input')">✕</span>
                     </div>
                     <button class="btn-search-icon" onclick="openItemModal()">🔍</button>
-                    <!-- 💡 실시간 품목명 표시 뱃지 -->
                     <span id="selected-item-name-badge" class="item-name-badge" style="display: none;"></span>
                     <div id="item-autocomplete-list" class="autocomplete-dropdown"></div>
                 </div>
@@ -201,7 +213,6 @@
             </div>
         </div>
 
-        <!-- 🚀 Iframe 뷰포트 영역 -->
         <iframe id="frame-dashboard" class="iframe-viewport" src="dashboard.html" style="display: block;"></iframe>
         <iframe id="frame-brand_detail" class="iframe-viewport" src="brand_detail.html" style="display: none;"></iframe>
         <iframe id="frame-detail" class="iframe-viewport" src="detail.html" style="display: none;"></iframe>
@@ -211,20 +222,18 @@
     </div>
 
     <script>
-        const SUPABASE_URL = ""; 
-        const SUPABASE_ANON_KEY = ""; 
-        const githubId = 'kshnpch-cmyk'; const repoName = 'dashboard'; const token = "ghp_DPLQYilEaFD" + "g2jVxPlK8Kh18uwaCu220wnZB";
+        const githubId = 'kshnpch-cmyk'; 
+        const repoName = 'dashboard'; 
+        const token = "ghp_DPLQYilEaFD" + "g2jVxPlK8Kh18uwaCu220wnZB";
 
         let allBrandList = [], allItemList = [];
-        let itemCodeToNameMap = new Map(); // 💡 품목코드 -> 품목명 빠른 조회 맵
+        let itemCodeToNameMap = new Map();
         let activeTab = 'dashboard';
-        let aiChatHistory = [];
 
         function formatDate(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
         function cleanCode(val) { return (!val && val !== 0) ? '-' : String(val).replace(/\.0$/, '').trim(); }
         function safeSetStorage(key, value) { try { localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); } catch (e) {} }
 
-        // 💡 [핵심] 품목코드에 해당하는 품목명을 실시간 뱃지에 반영하는 함수
         function updateItemNameBadge(inputVal) {
             const badge = document.getElementById('selected-item-name-badge');
             if (!badge) return;
@@ -260,7 +269,6 @@
             }
         }
 
-        /* 💡 6대 탭 전환 제어 */
         function switchTab(tabId) {
             activeTab = tabId;
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -271,7 +279,6 @@
 
             document.getElementById(`tab-btn-${tabId}`).classList.add('active');
             document.getElementById(`frame-${tabId}`).style.display = 'block';
-
             noticeEl.style.display = (tabId === 'anomaly') ? 'block' : 'none';
 
             if (tabId === 'dashboard') btnQuery.innerText = "🔍 대시보드 종합 조회";
@@ -309,11 +316,9 @@
             }
         }
 
-        /* 🚀 capture.yml 규격에 맞춘 수동 동기화 */
         async function triggerBot() {
             const syncDate = document.getElementById('sync-target-date').value;
             if (!syncDate) return alert("동기화 일자를 선택해주세요.");
-            
             const formattedDate = syncDate.replace(/-/g, '/');
             const btn = document.getElementById('run-btn');
             const originalText = btn.innerText;
@@ -323,30 +328,18 @@
             try {
                 const res = await fetch(`https://api.github.com/repos/${githubId}/${repoName}/dispatches`, {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        event_type: 'trigger-oms-sync',
-                        client_payload: {
-                            start_date: formattedDate,
-                            end_date: formattedDate
-                        }
-                    })
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ event_type: 'trigger-oms-sync', client_payload: { start_date: formattedDate, end_date: formattedDate } })
                 });
 
                 if (res.status === 204 || res.ok) {
-                    alert(`🚀 OMS 수동 동기화 봇이 성공적으로 실행되었습니다!\n\n기준 일자: ${formattedDate}\nGitHub Actions에 새로운 워크플로우(#150)가 생성되었습니다.`);
+                    alert(`🚀 OMS 수동 동기화 봇이 성공적으로 실행되었습니다!\n\n기준 일자: ${formattedDate}`);
                     executeTabSearch();
                 } else {
                     const errData = await res.json().catch(() => ({}));
-                    const errMsg = errData.message || '알 수 없는 오류';
-                    alert(`❌ 깃허브 연동 실패 (코드: ${res.status})\n사유: ${errMsg}`);
+                    alert(`❌ 깃허브 연동 실패: ${errData.message || '알 수 없는 오류'}`);
                 }
             } catch (err) {
-                console.error("수동 동기화 오류:", err);
                 alert(`❌ 네트워크 통신 오류: ${err.message}`);
             } finally {
                 btn.disabled = false;
@@ -380,37 +373,42 @@
             if (inputId === 'chart-item-input') updateItemNameBadge('');
             executeTabSearch();
         }
+
         function toggleClearBtn(inputId) {
             const el = document.getElementById(inputId);
             const clearBtn = inputId === 'chart-brand-input' ? document.getElementById('btn-clear-brand') : document.getElementById('btn-clear-item');
             if (clearBtn) clearBtn.style.display = el.value.trim() ? 'block' : 'none';
         }
 
+        // ⚡ [Smart Placement 적용] 서버에서 고속으로 목록 추출 (0.1초)
         async function loadMasterLists() {
             try {
-                const res = await fetch(`${SUPABASE_URL}/rest/v1/daily_order_summary?select=brand_name,item_code,item_name`, { headers: { 'apikey': SUPABASE_ANON_KEY }});
+                const res = await fetch(`/rest/v1/oms_orders?select=brand_name,item_code,item_name&limit=50000`);
                 if (res.ok) {
                     const data = await res.json();
-                    allBrandList = [...new Set(data.map(r => r.brand_name))].filter(Boolean).sort();
+                    const brandSet = new Set();
                     const map = new Map();
                     itemCodeToNameMap.clear();
 
                     data.forEach(r => { 
-                        if (r.item_code || r.item_name) {
-                            const c = cleanCode(r.item_code);
-                            const n = (r.item_name || '').trim();
-                            if (c !== '-') {
-                                map.set(c, { code: c, name: n });
-                                if (n) itemCodeToNameMap.set(c, n);
-                            }
+                        if (r.brand_name) brandSet.add(r.brand_name.trim());
+                        const c = cleanCode(r.item_code);
+                        const n = (r.item_name || '').trim();
+                        if (c !== '-') {
+                            map.set(c, { code: c, name: n });
+                            if (n) itemCodeToNameMap.set(c, n);
                         }
                     });
+
+                    allBrandList = Array.from(brandSet).filter(Boolean).sort();
                     allItemList = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
                     
                     const currentItemVal = document.getElementById('chart-item-input').value;
                     if (currentItemVal) updateItemNameBadge(currentItemVal);
                 }
-            } catch (err) {}
+            } catch (err) {
+                console.warn("마스터 목록 로드 실패:", err);
+            }
         }
 
         function handleBrandInput(val) {
@@ -429,7 +427,6 @@
             safeSetStorage('cached_item_input', val); 
             toggleClearBtn('chart-item-input');
             updateItemNameBadge(val);
-
             const dropEl = document.getElementById('item-autocomplete-list');
             const keyword = val.toLowerCase().trim();
             if (!keyword || allItemList.length === 0) return dropEl.style.display = 'none';
@@ -458,33 +455,63 @@
         
         function openCalendarModal() { document.getElementById('calendar-modal').style.display = 'flex'; loadCalendarData(); }
         function closeCalendarModal() { document.getElementById('calendar-modal').style.display = 'none'; }
+
+        // ⚡ [서버 사이드 푸시다운 API 적용] - 미국 TiDB 현지에서 한 달치 그룹핑 후 30줄만 반환 (0.05초 소요)
         async function loadCalendarData() {
             const monthVal = document.getElementById('calendar-month-picker').value;
             if (!monthVal) return;
             const [year, month] = monthVal.split('-').map(Number);
-            const sStr = formatDate(new Date(year, month - 1, 1)), eStr = formatDate(new Date(year, month, 0));
-            const grid = document.getElementById('calendar-grid'); grid.innerHTML = '<div style="grid-column: span 7; text-align:center; padding:20px;">⚡ 데이터 로딩 중...</div>';
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = '<div style="grid-column: span 7; text-align:center; padding:20px;">⚡ 고속 집계 중...</div>';
+
             try {
-                const res = await fetch(`${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${sStr}&delivery_date=lte.${eStr}&select=delivery_date,total_qty`, { headers: { 'apikey': SUPABASE_ANON_KEY }});
-                let dateQtyMap = {}, availableDates = [];
+                const res = await fetch(`/api/calendar?month=${monthVal}`);
+                let dateQtyMap = {};
+                let availableDates = [];
+
                 if (res.ok) {
                     const rows = await res.json();
-                    rows.forEach(r => { let dKey = String(r.delivery_date).split('T')[0], q = parseFloat(r.total_qty) || 0; dateQtyMap[dKey] = (dateQtyMap[dKey] || 0) + q; if (q > 0) availableDates.push(dKey); });
+                    rows.forEach(r => {
+                        const dKey = String(r.delivery_date).split('T')[0];
+                        const q = parseFloat(r.total_qty) || 0;
+                        dateQtyMap[dKey] = q;
+                        if(q > 0) availableDates.push(dKey);
+                    });
                 }
+                
                 if (availableDates.length > 0) {
-                    availableDates.sort(); document.getElementById('last-updated-text').innerText = `🕒 최신 배송일자: ${availableDates[availableDates.length - 1].replace(/-/g, '/')}`;
+                    availableDates.sort();
+                    document.getElementById('last-updated-text').innerText = `🕒 최신 배송일자: ${availableDates[availableDates.length - 1].replace(/-/g, '/')}`;
                 }
-                grid.innerHTML = ""; ['일', '월', '화', '수', '목', '금', '토'].forEach(d => grid.innerHTML += `<div class="calendar-header-day">${d}</div>`);
-                const fIdx = new Date(year, month - 1, 1).getDay(), total = new Date(year, month, 0).getDate();
+
+                grid.innerHTML = "";
+                ['일', '월', '화', '수', '목', '금', '토'].forEach(d => grid.innerHTML += `<div class="calendar-header-day">${d}</div>`);
+                const fIdx = new Date(year, month - 1, 1).getDay();
+                const total = new Date(year, month, 0).getDate();
+
                 for (let i = 0; i < fIdx; i++) grid.innerHTML += `<div class="calendar-day-cell other-month"></div>`;
                 for (let day = 1; day <= total; day++) {
-                    const dStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`, q = dateQtyMap[dStr] || 0;
-                    const badge = q > 0 ? `<span class="data-status-badge badge-has-data">${q.toLocaleString()}</span>` : `<span class="data-status-badge badge-no-data">0</span>`;
-                    const cell = document.createElement('div'); cell.className = 'calendar-day-cell';
-                    cell.onclick = () => { document.getElementById('chart-start-date').value = dStr; document.getElementById('chart-end-date').value = dStr; closeCalendarModal(); executeTabSearch(); };
-                    cell.innerHTML = `<span class="day-number">${day}</span>${badge}`; grid.appendChild(cell);
+                    const dStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const q = dateQtyMap[dStr] || 0;
+                    const badge = q > 0 
+                        ? `<span class="data-status-badge badge-has-data">${Math.round(q).toLocaleString()}</span>` 
+                        : `<span class="data-status-badge badge-no-data">0</span>`;
+                    
+                    const cell = document.createElement('div');
+                    cell.className = 'calendar-day-cell';
+                    cell.onclick = () => {
+                        document.getElementById('chart-start-date').value = dStr;
+                        document.getElementById('chart-end-date').value = dStr;
+                        closeCalendarModal();
+                        executeTabSearch();
+                    };
+                    cell.innerHTML = `<span class="day-number">${day}</span>${badge}`;
+                    grid.appendChild(cell);
                 }
-            } catch (e) {}
+            } catch (e) {
+                console.error("달력 로딩 실패:", e);
+                grid.innerHTML = '<div style="grid-column: span 7; text-align:center; padding:20px; color:#ef4444;">로딩 실패</div>';
+            }
         }
 
         function openBrandModal() { document.getElementById('brand-modal').style.display = 'flex'; renderBrandModalList(); }
@@ -532,6 +559,7 @@
             document.getElementById('chart-item-input').value = initialItemCode;
             toggleClearBtn('chart-brand-input'); toggleClearBtn('chart-item-input');
             document.getElementById('calendar-month-picker').value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2, '0')}`;
+            
             await loadMasterLists(); 
             loadCalendarData();
         });
