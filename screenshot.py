@@ -10,14 +10,13 @@ import pandas as pd
 import psycopg2
 from psycopg2.extras import execute_values
 
-# Selenium 헤드리스 환경 설정
+# Selenium 헤드리스 환경 설정 (webdriver_manager 제거)
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
 
 # -------------------------------------------------------------
 # 1. 환경변수 및 기본 설정
@@ -42,7 +41,6 @@ def parse_arguments():
     parser.add_argument("--end-date", type=str, default=None, help="종료 배송일자 (YYYY-MM-DD)")
     args = parser.parse_args()
 
-    # 인자가 없을 경우 기본값: 어제 ~ 오늘
     today_str = datetime.now().strftime("%Y-%m-%d")
     yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
@@ -71,8 +69,13 @@ def get_chrome_driver():
     }
     options.add_experimental_option("prefs", prefs)
 
-    service = Service(ChromeDriverManager().install())
-    return webdriver.Chrome(service=service, options=options)
+    # Selenium 내장 드라이버 매니저 활용 (외부 패키지 불필요)
+    try:
+        from webdriver_manager.chrome import ChromeDriverManager
+        service = Service(ChromeDriverManager().install())
+        return webdriver.Chrome(service=service, options=options)
+    except Exception:
+        return webdriver.Chrome(options=options)
 
 
 def crawl_oms_data(start_date, end_date):
@@ -103,7 +106,6 @@ def crawl_oms_data(start_date, end_date):
 
         # 주문/배송 관리 메뉴 이동 및 날짜 조회
         print(f"📅 주문 데이터 조회 ({start_date} ~ {end_date})...", flush=True)
-        # ※ 실제 OMS 메뉴 링크 및 검색 필드 셀렉터에 맞춰 동작
         time.sleep(2)
         driver.save_screenshot("step3_search_result.png")
 
@@ -131,7 +133,6 @@ def clean_dataframe(df):
     if df.empty:
         return df
 
-    # 컬럼 매핑 사전
     column_mapping = {
         "주문일자": "order_date",
         "배송일자": "delivery_date",
@@ -158,14 +159,12 @@ def clean_dataframe(df):
         if col not in df.columns:
             df[col] = "-" if "name" in col or "code" in col else 0
 
-    # 날짜 및 수치형 정제
     df["order_date"] = pd.to_datetime(df["order_date"], errors="coerce").dt.strftime("%Y-%m-%d")
     df["delivery_date"] = pd.to_datetime(df["delivery_date"], errors="coerce").dt.strftime("%Y-%m-%d")
     df["qty"] = pd.to_numeric(df["qty"], errors="coerce").fillna(0)
     df["price"] = pd.to_numeric(df["price"], errors="coerce").fillna(0)
     df["total_amount"] = pd.to_numeric(df["total_amount"], errors="coerce").fillna(0)
 
-    # 배송일자가 누락된 행 제거
     df = df.dropna(subset=["delivery_date"])
     return df[required_cols]
 
@@ -247,7 +246,7 @@ def sync_to_tidb_and_rollup(df, start_date, end_date):
     # ---------------------------------------------------------
     print("⚡ 프론트엔드 캐시 파일 갱신 중...", flush=True)
 
-    # 1) calendar_data.json (요약 테이블 기반으로 0.05초 만에 추출)
+    # 1) calendar_data.json (요약 테이블 기반으로 즉시 추출)
     cur.execute("""
         SELECT to_char(delivery_date, 'YYYY-MM-DD'), SUM(total_qty)::bigint
         FROM public.oms_daily_summary
@@ -261,21 +260,25 @@ def sync_to_tidb_and_rollup(df, start_date, end_date):
         json.dump(calendar_map, f, ensure_ascii=False)
     print(f"   -> calendar_data.json 저장 완료 ({len(calendar_map)}일치)")
 
-    # 2) oms_data.json (최근 7일치 상세 원본만 안전하게 유지)
-    cur.execute("""
-        SELECT 
-            to_char(order_date, 'YYYY-MM-DD') AS order_date,
-            to_char(delivery_date, 'YYYY-MM-DD') AS delivery_date,
-            store_code, store_name, brand_name, distribution_center,
-            item_code, item_name, qty, price, total_amount
-        FROM public.oms_orders
-        WHERE delivery_date >= CURRENT_DATE - INTERVAL '7 days'
-        ORDER BY delivery_date ASC, brand_name ASC;
-    """)
-    cols = [desc[0] for desc in cur.description]
-    recent_df = pd.DataFrame(cur.fetchall(), columns=cols)
-    recent_df.to_json("oms_data.json", orient="records", force_ascii=False)
-    print(f"   -> oms_data.json 저장 완료 (최근 7일, {len(recent_df):,}건)")
+    # 2) oms_data.json (Cloudflare 25MB 한도 유지를 위해 최근 3일치만 적재)
+    all_dates = sorted([d for d in calendar_map.keys() if d and calendar_map[d] > 0])
+    recent_dates = all_dates[-3:] if len(all_dates) >= 3 else all_dates
+
+    if recent_dates:
+        cur.execute("""
+            SELECT 
+                to_char(order_date, 'YYYY-MM-DD') AS order_date,
+                to_char(delivery_date, 'YYYY-MM-DD') AS delivery_date,
+                store_code, store_name, brand_name, distribution_center,
+                item_code, item_name, qty, price, total_amount
+            FROM public.oms_orders
+            WHERE delivery_date = ANY(%s::date[])
+            ORDER BY delivery_date ASC, brand_name ASC;
+        """, (recent_dates,))
+        cols = [desc[0] for desc in cur.description]
+        recent_df = pd.DataFrame(cur.fetchall(), columns=cols)
+        recent_df.to_json("oms_data.json", orient="records", force_ascii=False)
+        print(f"   -> oms_data.json 저장 완료 (최근 {len(recent_dates)}일, {len(recent_df):,}건)")
 
     cur.close()
     conn.close()
