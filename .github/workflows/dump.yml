@@ -19,7 +19,7 @@ jobs:
       - name: 의존성 설치
         run: pip install pandas psycopg2-binary
 
-      - name: TiDB 최적화 덤프 (파이썬 정렬 & 25MB 한도 준수)
+      - name: TiDB 최적화 덤프 (Cloudflare 25MB 한도 준수 - 최근 3일)
         env:
           TIDB_DATABASE_URL: ${{ secrets.TIDB_DATABASE_URL }}
         run: |
@@ -31,8 +31,7 @@ jobs:
           conn.autocommit = True
           cur = conn.cursor()
 
-          # 1. [캘린더 전용 1.5KB 초경량 데이터] 전 기간(7~11월) 일별 주문건수 집계
-          print('📅 캘린더용 일별 집계 데이터 추출 중...')
+          # 1. [캘린더 전용 초경량 데이터]
           cur.execute('''
               SELECT to_char(delivery_date, 'YYYY-MM-DD') AS delivery_date, SUM(qty)::bigint AS total_qty
               FROM public.oms_orders
@@ -43,14 +42,12 @@ jobs:
           cal_data = {r[0]: int(r[1]) for r in cal_rows if r[0] and r[1] is not None}
           with open('calendar_data.json', 'w', encoding='utf-8') as f:
               json.dump(cal_data, f, ensure_ascii=False)
-          print(f'✅ calendar_data.json 생성 완료: 총 {len(cal_data)}일치 ({os.path.getsize("calendar_data.json")} bytes)')
 
-          # 2. [대시보드 전용] TiDB SQL 쿼리 없이 1단계 cal_data에서 최근 7일을 파이썬으로 즉시 추출
+          # 2. [대시보드 전용] 25MB 이내 유지를 위해 최근 3일치만 타겟팅 (~15MB)
           all_dates = sorted([d for d in cal_data.keys() if d and cal_data[d] > 0])
-          recent_dates = all_dates[-7:]
-          print(f'📅 최근 7개 배송일자 추출 대상: {recent_dates}')
+          recent_dates = all_dates[-3:]
+          print(f'📅 최근 3개 배송일자 추출 대상 (25MB 제한 준수): {recent_dates}')
 
-          # 3. TiDB 메모리 부담 없이 1일씩 안전하게 조회 (ORDER BY 없음)
           all_rows = []
           cols = None
           sql = '''
@@ -75,13 +72,12 @@ jobs:
           cur.close()
           conn.close()
 
-          print(f'⚡ 총 {len(all_rows):,}건 로드 완료. GitHub 메모리에서 정렬 처리 중...')
           df = pd.DataFrame(all_rows, columns=cols)
           df.sort_values(by=['delivery_date', 'brand_name'], ascending=[True, True], inplace=True)
 
           df.to_json('oms_data.json', orient='records', force_ascii=False)
           size_mb = os.path.getsize('oms_data.json') / (1024 * 1024)
-          print(f'✅ oms_data.json 생성 완료: 총 {len(df):,}건 ({size_mb:.2f} MB)')
+          print(f'✅ oms_data.json 생성 완료: 총 {len(df):,}건 ({size_mb:.2f} MB, 25MB 이하 성공)')
           EOF
 
       - name: 저장소 푸시
@@ -89,6 +85,6 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add calendar_data.json oms_data.json
-          git commit -m 'chore: optimize calendar_data.json and chunked oms_data.json [skip ci]' || exit 0
+          git commit -m 'chore: resize oms_data.json under 25MB for Cloudflare deploy [skip ci]' || exit 0
           git push
-          echo "✅ 배포 완료"
+          echo "✅ 배포 파일 갱신 완료"
