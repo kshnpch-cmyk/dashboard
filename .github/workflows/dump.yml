@@ -23,11 +23,12 @@ jobs:
         env:
           TIDB_DATABASE_URL: ${{ secrets.TIDB_DATABASE_URL }}
         run: |
+          python - << 'EOF'
           import os, json, psycopg2, pandas as pd
 
           print('🔌 TiDB 연결 중...')
           conn = psycopg2.connect(os.environ['TIDB_DATABASE_URL'])
-          conn.autocommit = True  # 트랜잭션 메모리 누적 해제
+          conn.autocommit = True
           cur = conn.cursor()
 
           # 1. [캘린더 전용 5KB 초경량 데이터] 전 기간 일별 주문건수 집계
@@ -43,9 +44,9 @@ jobs:
           cal_data = {r[0]: int(r[1]) for r in cal_rows if r[0] and r[1] is not None}
           with open('calendar_data.json', 'w', encoding='utf-8') as f:
               json.dump(cal_data, f, ensure_ascii=False)
-          print(f'✅ calendar_data.json 생성 완료: 총 {len(cal_data)}일치 데이터 (약 {os.path.getsize("calendar_data.json")} bytes)')
+          print(f'✅ calendar_data.json 생성 완료: 총 {len(cal_data)}일치 데이터 ({os.path.getsize("calendar_data.json")} bytes)')
 
-          # 2. [대시보드 전용] 최근 35일치 세부 원본 데이터 (Cloudflare 25MB 한도 준수)
+          # 2. [대시보드 전용] 최근 35일치 세부 원본 데이터
           print('📥 대시보드용 최근 35일 세부 데이터 추출 중...')
           cur.execute("SELECT (MAX(delivery_date) - INTERVAL '35 days')::date FROM public.oms_orders;")
           start_date = cur.fetchone()[0]
@@ -64,10 +65,11 @@ jobs:
           cols = [desc[0] for desc in cur.description]
           df = pd.DataFrame(cur.fetchall(), columns=cols)
           df.to_json('oms_data.json', orient='records', force_ascii=False)
-          print(f'✅ oms_data.json 생성 완료: 총 {len(df):,}건 (약 {os.path.getsize("oms_data.json") / (1024*1024):.1f} MB)')
+          print(f'✅ oms_data.json 생성 완료: 총 {len(df):,}건 ({os.path.getsize("oms_data.json") / (1024*1024):.1f} MB)')
 
           cur.close()
           conn.close()
+          EOF
 
       - name: 저장소 푸시
         run: |
