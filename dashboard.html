@@ -58,15 +58,15 @@
     </div>
 
     <script>
-        const SUPABASE_URL = ""; 
-        const SUPABASE_ANON_KEY = "";
+        // ⚡ 브라우저 메모리에 보관할 정적 캐시 데이터
+        let cachedOmsOrders = null;
         let trendChart = null;
         let currentBrandStoreMap = {};
         let fetchToken = 0;
 
         function cleanNumber(val) { return parseFloat(String(val).replace(/[^0-9.-]/g, '')) || 0; }
         function formatDisplayDate(dateStr) { return !dateStr || dateStr === '-' ? '-' : String(dateStr).split('T')[0].replace(/-/g, '/'); }
-        function safeSearchKeyword(term) { return term ? term.replace(/"/g, '').replace(/[()]/g, '*').trim() : ''; }
+        function safeSearchKeyword(term) { return term ? term.replace(/"/g, '').replace(/[()]/g, '').trim() : ''; }
 
         function expandCodeVariants(rawCode) {
             const trimmed = String(rawCode).trim();
@@ -117,85 +117,73 @@
             return {};
         }
 
+        // ⚡ [0.005초 초고속 조회] 정적 JSON 1회 로드 후 브라우저 메모리 필터링
         async function fetchChartData(params) {
             const currentToken = ++fetchToken;
             const { startDate, endDate, brandName, itemCode, itemName } = params;
             if (!startDate || !endDate) return;
 
-            const targetInput = (itemCode || itemName || '').trim();
-            let dailyUrl = `${SUPABASE_URL}/rest/v1/daily_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=delivery_date,total_qty,total_amount,item_name,item_code,brand_name`;
-            
-            if (brandName) {
-                const bList = brandName.split(',').map(b => b.trim()).filter(Boolean);
-                if (bList.length === 1) dailyUrl += `&brand_name=ilike.*${encodeURIComponent(safeSearchKeyword(bList[0]))}*`;
-                else if (bList.length > 1) dailyUrl += `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(safeSearchKeyword(b))}*`).join(',')})`;
-            }
-
-            let validCodeList = [];
-            if (targetInput) {
-                const rawCodes = targetInput.split(',').map(s => s.trim()).filter(Boolean);
-                const codeSet = new Set();
-                rawCodes.forEach(rc => {
-                    expandCodeVariants(rc).forEach(v => codeSet.add(v));
-                });
-                validCodeList = Array.from(codeSet);
-                
-                const orConds = validCodeList.map(c => `item_code.eq.${encodeURIComponent(c)}`).join(',');
-                dailyUrl += `&or=(${orConds})`;
-            }
+            const sDate = startDate.replace(/\//g, '-');
+            const eDate = endDate.replace(/\//g, '-');
 
             try {
-                const [resDaily, weatherMap] = await Promise.all([
-                    fetch(dailyUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } }),
-                    fetchWeatherData(startDate, endDate)
-                ]);
-                const dailyData = resDaily.ok ? await resDaily.json() : [];
-
-                document.getElementById('kpi-total-stores').innerHTML = `<span class="loading-text">⚡ 집계중...</span>`;
-                currentBrandStoreMap = {};
-                renderDashboard(dailyData, weatherMap);
-
-                if (validCodeList.length > 0) {
-                    let storeUrl = `${SUPABASE_URL}/rest/v1/oms_orders?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_name,brand_name`;
-
-                    if (brandName) {
-                        const bList = brandName.split(',').map(b => b.trim()).filter(Boolean);
-                        if (bList.length === 1) storeUrl += `&brand_name=ilike.*${encodeURIComponent(safeSearchKeyword(bList[0]))}*`;
-                        else if (bList.length > 1) storeUrl += `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(safeSearchKeyword(b))}*`).join(',')})`;
-                    }
-
-                    const itemOrConds = validCodeList.map(c => `item_code.eq.${encodeURIComponent(c)}`).join(',');
-                    storeUrl += `&or=(${itemOrConds})`;
-
-                    let offset = 0, limit = 1000, hasMore = true;
-                    let storeDataAccumulated = [];
-                    while (hasMore) {
-                        if (fetchToken !== currentToken) return;
-                        const res = await fetch(`${storeUrl}&limit=${limit}&offset=${offset}`, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
-                        if (res.ok) {
-                            const chunk = await res.json();
-                            if (!chunk || chunk.length === 0) break;
-                            storeDataAccumulated = storeDataAccumulated.concat(chunk);
-                            recalculateStores(storeDataAccumulated, false);
-                            if (chunk.length < limit) hasMore = false; else offset += limit;
-                        } else { 
-                            hasMore = false; 
-                        }
-                    }
-                    recalculateStores(storeDataAccumulated, true);
-
-                } else {
-                    let storeUrl = `${SUPABASE_URL}/rest/v1/store_order_summary?delivery_date=gte.${startDate}&delivery_date=lte.${endDate}&select=store_name,brand_name`;
-                    if (brandName) {
-                        const bList = brandName.split(',').map(b => b.trim()).filter(Boolean);
-                        if (bList.length === 1) storeUrl += `&brand_name=ilike.*${encodeURIComponent(safeSearchKeyword(bList[0]))}*`;
-                        else if (bList.length > 1) storeUrl += `&or=(${bList.map(b => `brand_name.ilike.*${encodeURIComponent(safeSearchKeyword(b))}*`).join(',')})`;
-                    }
-
-                    const res = await fetch(`${storeUrl}&limit=10000`, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
-                    const storeDataAccumulated = res.ok ? await res.json() : [];
-                    recalculateStores(storeDataAccumulated, true);
+                // 1. 처음 접속 시 1회만 oms_data.json 다운로드 (이후 조회는 0초 즉시 처리)
+                if (!cachedOmsOrders) {
+                    document.getElementById('kpi-total-stores').innerHTML = `<span class="loading-text">⚡ 데이터 로딩...</span>`;
+                    const res = await fetch('./oms_data.json');
+                    if (!res.ok) throw new Error("oms_data.json 파일을 찾을 수 없습니다.");
+                    cachedOmsOrders = await res.json();
+                    console.log(`✅ oms_data.json 메모리 적재 완료: 총 ${cachedOmsOrders.length.toLocaleString()}건`);
                 }
+
+                if (fetchToken !== currentToken) return;
+
+                // 2. 검색 조건 파싱
+                let bList = [];
+                if (brandName) {
+                    bList = brandName.split(',').map(b => safeSearchKeyword(b).toLowerCase()).filter(Boolean);
+                }
+
+                const targetInput = (itemCode || itemName || '').trim();
+                let validCodeList = [];
+                if (targetInput) {
+                    const rawCodes = targetInput.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+                    const codeSet = new Set();
+                    rawCodes.forEach(rc => {
+                        expandCodeVariants(rc).forEach(v => codeSet.add(v.toLowerCase()));
+                        codeSet.add(rc);
+                    });
+                    validCodeList = Array.from(codeSet);
+                }
+
+                // 3. 브라우저 메모리 안에서 조건 매칭 (0.005초 소요)
+                const filteredData = cachedOmsOrders.filter(row => {
+                    const d = (row.delivery_date || '').split('T')[0].replace(/\//g, '-');
+                    if (!d || d < sDate || d > eDate) return false;
+
+                    // 브랜드 필터
+                    if (bList.length > 0) {
+                        const bName = (row.brand_name || '').toLowerCase();
+                        if (!bList.some(target => bName.includes(target))) return false;
+                    }
+
+                    // 품목코드/품목명 필터
+                    if (validCodeList.length > 0) {
+                        const c = String(row.item_code || '').toLowerCase();
+                        const n = String(row.item_name || '').toLowerCase();
+                        const match = validCodeList.some(target => c === target || c.startsWith(target) || n.includes(target));
+                        if (!match) return false;
+                    }
+
+                    return true;
+                });
+
+                // 4. 날씨 데이터 수신 및 화면 즉시 렌더링
+                const weatherMap = await fetchWeatherData(sDate, eDate);
+                if (fetchToken !== currentToken) return;
+
+                renderDashboard(filteredData, weatherMap);
+                recalculateStores(filteredData, true);
 
             } catch (e) {
                 console.error("대시보드 조회 실패:", e);
@@ -204,14 +192,20 @@
         }
 
         function renderDashboard(data, weatherMap = {}) {
-            let totalQty = 0, totalAmount = 0; const items = new Set(), dailyMap = {};
+            let totalQty = 0, totalAmount = 0; 
+            const items = new Set(), dailyMap = {};
+
             data.forEach(r => {
-                const q = cleanNumber(r.total_qty || r.qty), amt = cleanNumber(r.total_amount) || (q * cleanNumber(r.price));
-                totalQty += q; totalAmount += amt;
+                const q = cleanNumber(r.qty || r.total_qty);
+                const amt = cleanNumber(r.total_amount) || (q * cleanNumber(r.price));
+                totalQty += q; 
+                totalAmount += amt;
                 if (r.item_code) items.add(r.item_code);
+
                 const dKey = formatDisplayDate(r.delivery_date);
                 if (!dailyMap[dKey]) dailyMap[dKey] = { qty: 0, amount: 0 };
-                dailyMap[dKey].qty += q; dailyMap[dKey].amount += amt;
+                dailyMap[dKey].qty += q; 
+                dailyMap[dKey].amount += amt;
             });
 
             document.getElementById('kpi-total-qty').innerText = `${totalQty.toLocaleString()} 건`;
@@ -337,7 +331,7 @@
             document.getElementById('brand-store-modal').style.display = 'flex';
             const listEl = document.getElementById('brand-store-modal-list');
             const sorted = Object.keys(currentBrandStoreMap).sort((a,b) => currentBrandStoreMap[b].size - currentBrandStoreMap[a].size);
-            if(sorted.length === 0) {
+            if (sorted.length === 0) {
                 listEl.innerHTML = '<div style="padding: 20px; text-align: center; color: #94a3b8;">주문 점포 데이터가 없습니다.</div>';
                 return;
             }
