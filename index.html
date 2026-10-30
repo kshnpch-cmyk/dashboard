@@ -18,9 +18,6 @@
         .brand-title h1 { margin: 0; font-size: 20px; font-weight: 700; }
         .version-tag { background-color: #10b981; color: white; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 12px; letter-spacing: 0.5px; }
         .control-panel { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-        .sync-date-group { display: flex; align-items: center; background-color: #1e293b; padding: 6px 12px; border-radius: 8px; gap: 8px; border: 1px solid #334155; }
-        .sync-date-group label { font-size: 13px; color: #94a3b8; font-weight: 600; }
-        .date-input { background-color: #0f172a; color: #ffffff; border: 1px solid #475569; padding: 6px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; color-scheme: dark; }
         .last-updated-tag { font-size: 12px; color: #38bdf8; background-color: #1e293b; padding: 6px 12px; border-radius: 6px; border: 1px solid #0284c7; font-weight: bold; display: flex; align-items: center; gap: 8px; }
         .btn { background-color: #2563eb; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px; }
         .btn:hover { background-color: #1d4ed8; }
@@ -61,9 +58,14 @@
         .close-btn { cursor: pointer; font-size: 18px; font-weight: bold; color: #64748b; }
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 10px; }
         .calendar-header-day { text-align: center; font-weight: bold; font-size: 11px; color: #64748b; padding: 4px 0; background: #f8fafc; }
-        .calendar-day-cell { background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; height: 48px; padding: 4px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; }
-        .calendar-day-cell:hover { border-color: #2563eb; background-color: #eff6ff; }
+        .calendar-header-day.sunday { color: #ef4444; }
+        .calendar-day-cell { background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; height: 48px; padding: 4px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; position: relative; }
+        .calendar-day-cell:hover:not(.sunday-cell):not(.other-month) { border-color: #2563eb; background-color: #eff6ff; }
         .calendar-day-cell.other-month { background-color: #f8fafc; opacity: 0.3; cursor: default; }
+        .calendar-day-cell.sunday-cell { cursor: not-allowed; background-color: #fef2f2; }
+        .calendar-day-cell.sunday-cell .day-number { color: #ef4444; }
+        .calendar-day-cell.selected { border: 2px solid #2563eb; background-color: #eff6ff; }
+        
         .day-number { font-size: 11px; font-weight: bold; }
         .data-status-badge { font-size: 9.5px; font-weight: bold; padding: 1px 3px; border-radius: 3px; text-align: center; }
         .badge-has-data { background-color: #d1fae5; color: #047857; }
@@ -72,6 +74,11 @@
         .search-list-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid #f1f5f9; font-size: 13px; cursor: pointer; }
         .search-list-item:hover { background-color: #eff6ff; }
         .search-list-item label { cursor: pointer; width: 100%; display: flex; align-items: center; gap: 8px; }
+
+        .modal-footer { margin-top: 15px; display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid #e2e8f0; }
+        .sync-btn { background: #3b82f6; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px; opacity: 0.5; cursor: not-allowed; }
+        .sync-btn.active { background: #2563eb; opacity: 1; cursor: pointer; }
+        .sync-btn.active:hover { background: #1d4ed8; }
 
         /* AI 플로팅 버튼 */
         .ai-floating-btn { position: fixed; bottom: 28px; right: 28px; width: 62px; height: 62px; border-radius: 50%; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%); color: white; border: none; box-shadow: 0 8px 25px rgba(139, 92, 246, 0.45); cursor: pointer; z-index: 9999; display: flex; align-items: center; justify-content: center; font-size: 26px; transition: all 0.3s; animation: floatingPulse 2.8s infinite; }
@@ -103,13 +110,8 @@
         <div class="control-panel">
             <div class="last-updated-tag">
                 <span id="last-updated-text">🕒 최신 배송일자: 로딩 중...</span>
-                <button class="btn btn-cal" onclick="openCalendarModal()">📅 캘린더</button>
+                <button class="btn btn-cal" onclick="openCalendarModal()">📅 캘린더 (수동 동기화)</button>
             </div>
-            <div class="sync-date-group">
-                <label>동기화 일자:</label>
-                <input type="date" id="sync-target-date" class="date-input">
-            </div>
-            <button id="run-btn" class="btn" onclick="triggerBot()">🚀 OMS 수동 동기화</button>
             <button class="btn btn-forecast-link" onclick="window.open('forecast.html', '_blank')">🔮 수요 예측 (Forecast)</button>
         </div>
     </div>
@@ -126,15 +128,21 @@
         <div class="ai-chat-input-area"><input type="text" id="ai-user-input" onkeydown="if(event.key==='Enter') sendAiMessage()"><button class="btn-ai-send" id="ai-send-btn" onclick="sendAiMessage()">전송</button></div>
     </div>
 
-    <!-- 🗓️ 캘린더 모달 -->
+    <!-- 🗓️ 캘린더 모달 (수동 동기화 통합) -->
     <div class="modal-overlay" id="calendar-modal">
         <div class="modal-content">
-            <div class="modal-header"><span class="modal-title">📅 배송일자 데이터 존재 현황</span><span class="close-btn" onclick="closeCalendarModal()">✕</span></div>
+            <div class="modal-header"><span class="modal-title">📅 배송일자 선택 및 수동 동기화</span><span class="close-btn" onclick="closeCalendarModal()">✕</span></div>
             <div style="display: flex; gap: 8px; margin-bottom: 10px; align-items: center;">
                 <label style="font-size: 12px; font-weight: bold;">월 선택:</label>
                 <input type="month" id="calendar-month-picker" class="input-box" onchange="loadCalendarData()">
+                <span style="font-size: 11px; color: #64748b; margin-left: auto;">💡 날짜 선택 후 대시보드 조회 또는 동기화 실행</span>
             </div>
             <div class="calendar-grid" id="calendar-grid"></div>
+            
+            <div class="modal-footer">
+                <button class="btn btn-query" id="cal-search-btn" onclick="applySelectedDateToSearch()" style="visibility: hidden;">🔍 이 날짜로 대시보드 조회</button>
+                <button class="sync-btn" id="cal-sync-btn" onclick="triggerBotFromCalendar()" disabled>🚀 선택 일자 수동 동기화</button>
+            </div>
         </div>
     </div>
     
@@ -234,6 +242,7 @@
         let allBrandList = [], allItemList = [];
         let itemCodeToNameMap = new Map();
         let activeTab = 'dashboard';
+        let selectedCalendarDate = null;
 
         function formatDate(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
         function cleanCode(val) { return (!val && val !== 0) ? '-' : String(val).replace(/\.0$/, '').trim(); }
@@ -318,37 +327,6 @@
             const activeFrame = document.getElementById(`frame-${activeTab}`);
             if (activeFrame && activeFrame.contentWindow) {
                 activeFrame.contentWindow.postMessage({ action: 'SEARCH', params }, '*');
-            }
-        }
-
-        async function triggerBot() {
-            const syncDate = document.getElementById('sync-target-date').value;
-            if (!syncDate) return alert("동기화 일자를 선택해주세요.");
-            const formattedDate = syncDate.replace(/-/g, '/');
-            const btn = document.getElementById('run-btn');
-            const originalText = btn.innerText;
-            btn.disabled = true;
-            btn.innerText = "⏳ 깃허브 봇 기동 중...";
-
-            try {
-                const res = await fetch(`https://api.github.com/repos/${githubId}/${repoName}/dispatches`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ event_type: 'trigger-oms-sync', client_payload: { start_date: formattedDate, end_date: formattedDate } })
-                });
-
-                if (res.status === 204 || res.ok) {
-                    alert(`🚀 OMS 수동 동기화 봇이 성공적으로 실행되었습니다!\n\n기준 일자: ${formattedDate}`);
-                    executeTabSearch();
-                } else {
-                    const errData = await res.json().catch(() => ({}));
-                    alert(`❌ 깃허브 연동 실패: ${errData.message || '알 수 없는 오류'}`);
-                }
-            } catch (err) {
-                alert(`❌ 네트워크 통신 오류: ${err.message}`);
-            } finally {
-                btn.disabled = false;
-                btn.innerText = originalText;
             }
         }
 
@@ -469,10 +447,15 @@
             msgBox.scrollTop = msgBox.scrollHeight;
         }
         
-        function openCalendarModal() { document.getElementById('calendar-modal').style.display = 'flex'; loadCalendarData(); }
+        function openCalendarModal() { 
+            document.getElementById('calendar-modal').style.display = 'flex'; 
+            selectedCalendarDate = null;
+            updateCalendarButtons();
+            loadCalendarData(); 
+        }
         function closeCalendarModal() { document.getElementById('calendar-modal').style.display = 'none'; }
 
-        // ⚡ [0.001초 로딩] calendar_data.json(5KB)을 메모리에 올려 즉시 일별 수량 표출
+        // ⚡ [0.001초 로딩] calendar_data.json을 메모리에 올려 즉시 일별 수량 표출
         async function loadCalendarData() {
             const monthVal = document.getElementById('calendar-month-picker').value;
             if (!monthVal) return;
@@ -485,23 +468,6 @@
                         const res = await fetch('./calendar_data.json');
                         if (res.ok) cachedCalendarData = await res.json();
                     } catch (e) {}
-
-                    // calendar_data.json이 아직 생성 전일 경우 oms_data.json에서 자동 보완
-                    if (!cachedCalendarData) {
-                        try {
-                            const res2 = await fetch('./oms_data.json');
-                            if (res2.ok) {
-                                const rows = await res2.json();
-                                const map = {};
-                                rows.forEach(r => {
-                                    const d = (r.delivery_date || '').split('T')[0].replace(/\//g, '-');
-                                    const q = parseFloat(r.qty || r.total_qty) || 0;
-                                    if (d) map[d] = (map[d] || 0) + q;
-                                });
-                                cachedCalendarData = map;
-                            }
-                        } catch (e) {}
-                    }
                 }
 
                 const dateQtyMap = cachedCalendarData || {};
@@ -512,11 +478,16 @@
                 }
 
                 grid.innerHTML = "";
-                ['일', '월', '화', '수', '목', '금', '토'].forEach(d => grid.innerHTML += `<div class="calendar-header-day">${d}</div>`);
+                ['일', '월', '화', '수', '목', '금', '토'].forEach((d, idx) => {
+                    const c = idx === 0 ? "calendar-header-day sunday" : "calendar-header-day";
+                    grid.innerHTML += `<div class="${c}">${d}</div>`;
+                });
+                
                 const fIdx = new Date(year, month - 1, 1).getDay();
                 const total = new Date(year, month, 0).getDate();
 
                 for (let i = 0; i < fIdx; i++) grid.innerHTML += `<div class="calendar-day-cell other-month"></div>`;
+                
                 for (let day = 1; day <= total; day++) {
                     const dStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                     const q = dateQtyMap[dStr] || 0;
@@ -525,19 +496,87 @@
                         : `<span class="data-status-badge badge-no-data">0</span>`;
                     
                     const cell = document.createElement('div');
+                    const isSunday = new Date(year, month - 1, day).getDay() === 0;
+                    
                     cell.className = 'calendar-day-cell';
-                    cell.onclick = () => {
-                        document.getElementById('chart-start-date').value = dStr;
-                        document.getElementById('chart-end-date').value = dStr;
-                        closeCalendarModal();
-                        executeTabSearch();
-                    };
+                    if (isSunday) {
+                        cell.classList.add('sunday-cell');
+                    } else {
+                        if (selectedCalendarDate === dStr) cell.classList.add('selected');
+                        
+                        cell.onclick = () => {
+                            document.querySelectorAll('.calendar-day-cell').forEach(c => c.classList.remove('selected'));
+                            cell.classList.add('selected');
+                            selectedCalendarDate = dStr;
+                            updateCalendarButtons();
+                        };
+                    }
+                    
                     cell.innerHTML = `<span class="day-number">${day}</span>${badge}`;
                     grid.appendChild(cell);
                 }
             } catch (e) {
                 console.error("캘린더 로딩 실패:", e);
                 grid.innerHTML = '<div style="grid-column: span 7; text-align:center; padding:20px; color:#ef4444;">데이터 로드 실패</div>';
+            }
+        }
+
+        function updateCalendarButtons() {
+            const syncBtn = document.getElementById('cal-sync-btn');
+            const searchBtn = document.getElementById('cal-search-btn');
+            
+            if (selectedCalendarDate) {
+                syncBtn.classList.add('active');
+                syncBtn.disabled = false;
+                syncBtn.innerText = `🚀 ${selectedCalendarDate} 수동 동기화`;
+                
+                searchBtn.style.visibility = 'visible';
+                searchBtn.innerText = `🔍 ${selectedCalendarDate} 대시보드 조회`;
+            } else {
+                syncBtn.classList.remove('active');
+                syncBtn.disabled = true;
+                syncBtn.innerText = `🚀 선택 일자 수동 동기화`;
+                
+                searchBtn.style.visibility = 'hidden';
+            }
+        }
+
+        function applySelectedDateToSearch() {
+            if (!selectedCalendarDate) return;
+            document.getElementById('chart-start-date').value = selectedCalendarDate;
+            document.getElementById('chart-end-date').value = selectedCalendarDate;
+            closeCalendarModal();
+            executeTabSearch();
+        }
+
+        async function triggerBotFromCalendar() {
+            if (!selectedCalendarDate) return;
+            
+            const btn = document.getElementById('cal-sync-btn');
+            const originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = "⏳ 봇 기동 중...";
+
+            try {
+                const formattedDate = selectedCalendarDate.replace(/-/g, '/');
+                const res = await fetch(`https://api.github.com/repos/${githubId}/${repoName}/dispatches`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ event_type: 'trigger-oms-sync', client_payload: { start_date: formattedDate, end_date: formattedDate } })
+                });
+
+                if (res.status === 204 || res.ok) {
+                    alert(`🚀 OMS 수동 동기화 봇이 성공적으로 실행되었습니다!\n\n대상 일자: ${selectedCalendarDate}`);
+                    closeCalendarModal();
+                } else {
+                    const errData = await res.json().catch(() => ({}));
+                    alert(`❌ 깃허브 연동 실패: ${errData.message || '알 수 없는 오류'}`);
+                }
+            } catch (err) {
+                alert(`❌ 네트워크 통신 오류: ${err.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = originalText;
             }
         }
 
@@ -580,7 +619,6 @@
             const today = new Date(), past7 = new Date(); past7.setDate(today.getDate() - 7);
             document.getElementById('chart-start-date').value = localStorage.getItem('cached_chart_start_date') || formatDate(past7);
             document.getElementById('chart-end-date').value = localStorage.getItem('cached_chart_end_date') || formatDate(today);
-            document.getElementById('sync-target-date').value = formatDate(today);
             document.getElementById('chart-brand-input').value = localStorage.getItem('cached_brand_input') || '';
             const initialItemCode = localStorage.getItem('cached_item_input') || '';
             document.getElementById('chart-item-input').value = initialItemCode;
