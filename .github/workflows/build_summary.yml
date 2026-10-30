@@ -1,0 +1,72 @@
+name: Build Daily Summary Table
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 의존성 설치
+        run: pip install psycopg2-binary
+
+      - name: TiDB 요약 테이블 생성 및 데이터 압축
+        env:
+          TIDB_DATABASE_URL: ${{ secrets.TIDB_DATABASE_URL }}
+        run: |
+          python - << 'EOF'
+          import os, psycopg2
+
+          print('🔌 TiDB 연결 중...')
+          conn = psycopg2.connect(os.environ['TIDB_DATABASE_URL'])
+          conn.autocommit = True
+          cur = conn.cursor()
+
+          print('1. 📊 요약 테이블(oms_daily_summary) 생성 및 초기화...')
+          cur.execute('''
+              CREATE TABLE IF NOT EXISTS public.oms_daily_summary (
+                  delivery_date DATE NOT NULL,
+                  brand_name VARCHAR(100) NOT NULL,
+                  item_code VARCHAR(100) NOT NULL,
+                  item_name VARCHAR(255),
+                  total_qty BIGINT DEFAULT 0,
+                  total_amount NUMERIC(15, 2) DEFAULT 0,
+                  store_count INT DEFAULT 0,
+                  PRIMARY KEY (delivery_date, brand_name, item_code)
+              );
+              TRUNCATE TABLE public.oms_daily_summary;
+          ''')
+
+          print('2. 🗜️ 월별 분할 집계 및 압축 저장 (메모리 제한 우회)...')
+          months = ['2026-07', '2026-08', '2026-09', '2026-10', '2026-11']
+          
+          for m in months:
+              print(f'   -> [{m}]월 데이터 원본을 읽어 압축하는 중...', flush=True)
+              sql = f'''
+                  INSERT INTO public.oms_daily_summary 
+                  (delivery_date, brand_name, item_code, item_name, total_qty, total_amount, store_count)
+                  SELECT 
+                      delivery_date, 
+                      brand_name, 
+                      item_code, 
+                      MAX(item_name) AS item_name,
+                      SUM(qty) AS total_qty,
+                      SUM(total_amount) AS total_amount,
+                      COUNT(DISTINCT store_name) AS store_count
+                  FROM public.oms_orders
+                  WHERE to_char(delivery_date, 'YYYY-MM') = '{m}'
+                  GROUP BY delivery_date, brand_name, item_code;
+              '''
+              cur.execute(sql)
+
+          cur.execute('SELECT COUNT(*) FROM public.oms_daily_summary;')
+          cnt = cur.fetchone()[0]
+          print(f'🎉 데이터 압축 완료! 약 200만 건의 원본이 단 {cnt:,}건의 초고속 요약 데이터로 변환되었습니다.')
+
+          cur.close()
+          conn.close()
+          EOF
