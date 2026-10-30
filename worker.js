@@ -141,4 +141,4 @@ export default {
     // 3. 정적 파일(HTML, JS, CSS, JSON 등) 서빙
     return env.ASSETS ? env.ASSETS.fetch(request) : new Response('Not Found', { status: 404 });
   }
-};
+}; 
