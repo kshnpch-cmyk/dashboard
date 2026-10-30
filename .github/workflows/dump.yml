@@ -19,26 +19,41 @@ jobs:
       - name: 의존성 설치
         run: pip install pandas psycopg2-binary
 
-      - name: TiDB 전체 데이터 덤프
+      - name: TiDB 전체 데이터 고속 덤프
         env:
           TIDB_DATABASE_URL: ${{ secrets.TIDB_DATABASE_URL }}
         run: |
           python -c "
           import os, psycopg2, pandas as pd
+
+          print('🔌 TiDB 연결 중...')
           conn = psycopg2.connect(os.environ['TIDB_DATABASE_URL'])
+          cur = conn.cursor()
+
+          # ORDER BY를 제거하여 TiDB 정렬 메모리 초과 에러 방지
           sql = '''
               SELECT 
                   to_char(order_date, 'YYYY-MM-DD') AS order_date,
                   to_char(delivery_date, 'YYYY-MM-DD') AS delivery_date,
                   store_code, store_name, brand_name, distribution_center,
                   item_code, item_name, qty, price, total_amount
-              FROM public.oms_orders
-              ORDER BY delivery_date ASC, brand_name ASC;
+              FROM public.oms_orders;
           '''
-          df = pd.read_sql(sql, conn)
+          print('📥 데이터 스트리밍 조회 중...')
+          cur.execute(sql)
+          cols = [desc[0] for desc in cur.description]
+          rows = cur.fetchall()
+          cur.close()
           conn.close()
+
+          print(f'⚡ 추출 완료 ({len(rows):,}건). GitHub 메모리에서 정렬 처리 중...')
+          df = pd.DataFrame(rows, columns=cols)
+          # GitHub Actions 러너(7GB RAM)에서 안전하게 정렬 수행
+          df.sort_values(by=['delivery_date', 'brand_name'], ascending=[True, True], inplace=True)
+
+          print('💾 oms_data.json 파일 쓰는 중...')
           df.to_json('oms_data.json', orient='records', force_ascii=False)
-          print(f'✅ 총 {len(df):,}건 추출 및 oms_data.json 덮어쓰기 완료')
+          print(f'🎉 oms_data.json 동기화 완료! 총 {len(df):,}건 저장됨.')
           "
 
       - name: 저장소 푸시
@@ -48,3 +63,4 @@ jobs:
           git add oms_data.json
           git commit -m 'chore: dump all historical data into oms_data.json [skip ci]' || exit 0
           git push
+          echo "✅ oms_data.json 저장소 반영 완료"
