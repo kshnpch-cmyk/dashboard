@@ -1,0 +1,50 @@
+name: Dump All Data to oms_data.json
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 의존성 설치
+        run: pip install pandas psycopg2-binary
+
+      - name: TiDB 전체 데이터 덤프
+        env:
+          TIDB_DATABASE_URL: ${{ secrets.TIDB_DATABASE_URL }}
+        run: |
+          python -c "
+          import os, psycopg2, pandas as pd
+          conn = psycopg2.connect(os.environ['TIDB_DATABASE_URL'])
+          sql = '''
+              SELECT 
+                  to_char(order_date, 'YYYY-MM-DD') AS order_date,
+                  to_char(delivery_date, 'YYYY-MM-DD') AS delivery_date,
+                  store_code, store_name, brand_name, distribution_center,
+                  item_code, item_name, qty, price, total_amount
+              FROM public.oms_orders
+              ORDER BY delivery_date ASC, brand_name ASC;
+          '''
+          df = pd.read_sql(sql, conn)
+          conn.close()
+          df.to_json('oms_data.json', orient='records', force_ascii=False)
+          print(f'✅ 총 {len(df):,}건 추출 및 oms_data.json 덮어쓰기 완료')
+          "
+
+      - name: 저장소 푸시
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add oms_data.json
+          git commit -m 'chore: dump all historical data into oms_data.json [skip ci]' || exit 0
+          git push
