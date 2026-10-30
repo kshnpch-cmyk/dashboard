@@ -1,28 +1,35 @@
 import postgres from 'postgres';
 
+// ⚡ Cloudflare Worker 인스턴스 전역에 DB 커넥션 풀 유지 (미국 왕복 핸드셰이크 제거)
+let sqlInstance = null;
+
+function getDb(env) {
+    if (!sqlInstance) {
+        const dbUrl = env.TIDB_DATABASE_URL || "postgresql://1yr8qr4zyjgi7030.postgres:LSj_KcNBk0k589WJ5pawg_NIsZ_AKTxS@1yr8qr4zyjgi7030.gateway01.us-east-1.prod.aws.pg.tidbcloud.com:5432/postgres?sslmode=require";
+        sqlInstance = postgres(dbUrl, {
+            ssl: 'require',
+            max: 10,
+            idle_timeout: 30,
+            connect_timeout: 10,
+            types: {
+                1082: {
+                    to: 1082,
+                    from: [1082],
+                    serialize: (x) => x,
+                    parse: (x) => x
+                }
+            }
+        });
+    }
+    return sqlInstance;
+}
+
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, Prefer, Range',
     'Content-Type': 'application/json'
 };
-
-function getDb(env) {
-    const dbUrl = env.TIDB_DATABASE_URL || "postgresql://1yr8qr4zyjgi7030.postgres:LSj_KcNBk0k589WJ5pawg_NIsZ_AKTxS@1yr8qr4zyjgi7030.gateway01.us-east-1.prod.aws.pg.tidbcloud.com:5432/postgres?sslmode=require";
-    return postgres(dbUrl, {
-        ssl: 'require',
-        max: 5,
-        idle_timeout: 20,
-        types: {
-            1082: {
-                to: 1082,
-                from: [1082],
-                serialize: (x) => x,
-                parse: (x) => x
-            }
-        }
-    });
-}
 
 async function handleRestApi(request, env, ctx) {
     const url = new URL(request.url);
@@ -31,7 +38,7 @@ async function handleRestApi(request, env, ctx) {
         return new Response(null, { headers: corsHeaders });
     }
 
-    // ⚡ Cloudflare Edge 캐시 확인 (반복 조회 시 미국 왕복 없이 즉시 응답)
+    // ⚡ 1. Cloudflare Edge 캐시 확인 (미국 TiDB 왕복 없이 즉시 응답)
     const cache = caches.default;
     const cacheKey = new Request(url.toString(), request);
     let cachedResponse = await cache.match(cacheKey);
@@ -50,6 +57,7 @@ async function handleRestApi(request, env, ctx) {
         return new Response(JSON.stringify({ error: `Not Found or Invalid Table: ${endpoint}` }), { status: 404, headers: corsHeaders });
     }
 
+    // PostgREST 쿼리 스트링 -> PostgreSQL SQL 파싱
     let whereClauses = [];
     let queryParams = [];
     let pIdx = 1;
@@ -133,9 +141,10 @@ async function handleRestApi(request, env, ctx) {
     try {
         const rows = await sql.unsafe(sqlQuery, queryParams);
 
+        // ⚡ 2. 엣지 캐시 헤더 (최근 데이터 5분, 과거 데이터는 재조회 시 즉각 반환)
         const responseHeaders = {
             ...corsHeaders,
-            'Cache-Control': 'public, max-age=60, s-maxage=180'
+            'Cache-Control': 'public, max-age=60, s-maxage=300'
         };
         const response = new Response(JSON.stringify(rows), { headers: responseHeaders });
 
@@ -154,37 +163,31 @@ export default {
         if (url.pathname === '/init-index') {
             const sql = getDb(env);
             const logs = [];
-            
-            try {
-                await sql.unsafe(`CREATE INDEX IF NOT EXISTS idx_oms_orders_delivery_date ON public.oms_orders (delivery_date)`);
-                logs.push("delivery_date 인덱스 생성 성공");
-            } catch (e) {
-                logs.push(`delivery_date 인덱스: ${e.message}`);
+
+            const indexTasks = [
+                { name: "delivery_date", sql: `CREATE INDEX IF NOT EXISTS idx_oms_orders_delivery_date ON public.oms_orders (delivery_date)` },
+                { name: "brand_delivery", sql: `CREATE INDEX IF NOT EXISTS idx_oms_orders_brand_delivery ON public.oms_orders (brand_name, delivery_date)` },
+                { name: "store_delivery", sql: `CREATE INDEX IF NOT EXISTS idx_oms_orders_store_delivery ON public.oms_orders (store_name, delivery_date)` }
+            ];
+
+            for (const task of indexTasks) {
+                try {
+                    await sql.unsafe(task.sql);
+                    logs.push(`${task.name} 인덱스: 완료 또는 정상 유지`);
+                } catch (e) {
+                    logs.push(`${task.name} 인덱스: ${e.message}`);
+                }
             }
 
-            try {
-                await sql.unsafe(`CREATE INDEX IF NOT EXISTS idx_oms_orders_brand_delivery ON public.oms_orders (brand_name, delivery_date)`);
-                logs.push("brand_delivery 인덱스 생성 성공");
-            } catch (e) {
-                logs.push(`brand_delivery 인덱스: ${e.message}`);
-            }
-
-            try {
-                await sql.unsafe(`CREATE INDEX IF NOT EXISTS idx_oms_orders_store_delivery ON public.oms_orders (store_name, delivery_date)`);
-                logs.push("store_delivery 인덱스 생성 성공");
-            } catch (e) {
-                logs.push(`store_delivery 인덱스: ${e.message}`);
-            }
-
-            return new Response(JSON.stringify({ ok: true, details: logs }), { headers: corsHeaders });
+            return new Response(JSON.stringify({ ok: true, details: logs }, null, 2), { headers: corsHeaders });
         }
 
-        // 1. /rest/v1/ 요청 라우팅
+        // 1. /rest/v1/ 데이터 조회 요청 라우팅
         if (url.pathname.startsWith('/rest/v1/')) {
             return handleRestApi(request, env, ctx);
         }
 
-        // 2. 정적 자산(HTML, JS 등) 반환
+        // 2. 정적 자산(HTML, JS, CSS 등) 제공
         if (env.ASSETS) {
             return env.ASSETS.fetch(request);
         }
