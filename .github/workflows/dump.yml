@@ -31,14 +31,13 @@ jobs:
           conn.autocommit = True
           cur = conn.cursor()
 
-          # 1. [캘린더 전용 5KB 초경량 데이터] 전 기간 일별 주문건수 집계
-          print('📅 캘린더용 일별 집계 데이터 추출 중 (7~11월)...')
+          # 1. [캘린더 전용 1.5KB 초경량 데이터] 전 기간 일별 주문건수 집계
+          print('📅 캘린더용 일별 집계 데이터 추출 중...')
           cur.execute('''
               SELECT to_char(delivery_date, 'YYYY-MM-DD') AS delivery_date, SUM(qty)::bigint AS total_qty
               FROM public.oms_orders
               WHERE delivery_date IS NOT NULL
-              GROUP BY delivery_date
-              ORDER BY delivery_date ASC;
+              GROUP BY delivery_date;
           ''')
           cal_rows = cur.fetchall()
           cal_data = {r[0]: int(r[1]) for r in cal_rows if r[0] and r[1] is not None}
@@ -46,7 +45,7 @@ jobs:
               json.dump(cal_data, f, ensure_ascii=False)
           print(f'✅ calendar_data.json 생성 완료: 총 {len(cal_data)}일치 데이터 ({os.path.getsize("calendar_data.json")} bytes)')
 
-          # 2. [대시보드 전용] 최근 35일치 세부 원본 데이터
+          # 2. [대시보드 전용] 최근 35일치 세부 원본 데이터 (ORDER BY를 SQL에서 제거)
           print('📥 대시보드용 최근 35일 세부 데이터 추출 중...')
           cur.execute("SELECT (MAX(delivery_date) - INTERVAL '35 days')::date FROM public.oms_orders;")
           start_date = cur.fetchone()[0]
@@ -58,17 +57,21 @@ jobs:
                   store_code, store_name, brand_name, distribution_center,
                   item_code, item_name, qty, price, total_amount
               FROM public.oms_orders
-              WHERE delivery_date >= %s
-              ORDER BY delivery_date ASC, brand_name ASC;
+              WHERE delivery_date >= %s;
           '''
           cur.execute(sql, (start_date,))
           cols = [desc[0] for desc in cur.description]
-          df = pd.DataFrame(cur.fetchall(), columns=cols)
-          df.to_json('oms_data.json', orient='records', force_ascii=False)
-          print(f'✅ oms_data.json 생성 완료: 총 {len(df):,}건 ({os.path.getsize("oms_data.json") / (1024*1024):.1f} MB)')
-
+          rows = cur.fetchall()
           cur.close()
           conn.close()
+
+          print(f'⚡ {len(rows):,}건 로드 완료. GitHub 메모리에서 정렬 처리 중...')
+          df = pd.DataFrame(rows, columns=cols)
+          # GitHub Actions 러너(7GB RAM)에서 안전하게 정렬 수행
+          df.sort_values(by=['delivery_date', 'brand_name'], ascending=[True, True], inplace=True)
+
+          df.to_json('oms_data.json', orient='records', force_ascii=False)
+          print(f'✅ oms_data.json 생성 완료: 총 {len(df):,}건 ({os.path.getsize("oms_data.json") / (1024*1024):.1f} MB)')
           EOF
 
       - name: 저장소 푸시
