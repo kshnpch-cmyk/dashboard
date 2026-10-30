@@ -1,16 +1,11 @@
-import { Client } from 'pg';
+import postgres from 'postgres';
 
-// TiDB PostgreSQL 접속 설정 (환경변수 또는 기본값)
-const DB_CONFIG = {
-  connectionString: 'postgresql://1yr8qr4zyjgi7030.postgres:LSj_KcNBk0k589WJ5pawg_NIsZ_AKTxS@1yr8qr4zyjgi7030.gateway01.us-east-1.prod.aws.pg.tidbcloud.com:5432/postgres?sslmode=require',
-  ssl: { rejectUnauthorized: false }
-};
+const DB_URL = 'postgresql://1yr8qr4zyjgi7030.postgres:LSj_KcNBk0k589WJ5pawg_NIsZ_AKTxS@1yr8qr4zyjgi7030.gateway01.us-east-1.prod.aws.pg.tidbcloud.com:5432/postgres?sslmode=require';
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    // CORS 기본 헤더
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -21,7 +16,7 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // 1. 📅 [0.005초 캘린더 API] oms_daily_summary 테이블 기반 조회
+    // 1. 📅 [0.005초 캘린더 API] oms_daily_summary 기반 집계
     if (url.pathname === '/api/calendar') {
       const month = url.searchParams.get('month'); // YYYY-MM
       if (!month) {
@@ -31,39 +26,36 @@ export default {
         });
       }
 
-      const client = new Client(DB_CONFIG);
+      const sql = postgres(DB_URL, { ssl: 'require', max: 1 });
       try {
-        await client.connect();
-        const sql = `
+        const rows = await sql`
           SELECT 
             to_char(delivery_date, 'YYYY-MM-DD') AS delivery_date,
             SUM(total_qty)::bigint AS total_qty
           FROM public.oms_daily_summary
-          WHERE to_char(delivery_date, 'YYYY-MM') = $1
+          WHERE to_char(delivery_date, 'YYYY-MM') = ${month}
           GROUP BY delivery_date
           ORDER BY delivery_date ASC;
         `;
-        const res = await client.query(sql, [month]);
-        await client.end();
 
-        return new Response(JSON.stringify(res.rows), {
+        return new Response(JSON.stringify(rows), {
           headers: {
             ...corsHeaders,
             'Content-Type': 'application/json',
-            // 과거 데이터는 Cloudflare 글로벌 엣지에 1일간 캐싱
             'Cache-Control': 'public, max-age=86400, s-maxage=86400'
           }
         });
       } catch (err) {
-        try { await client.end(); } catch (e) {}
         return new Response(JSON.stringify({ error: err.message }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
+      } finally {
+        ctx.waitUntil(sql.end());
       }
     }
 
-    // 2. ⚡ [0.03초 대시보드 요약 API] oms_daily_summary 테이블 기반 필터 집계
+    // 2. ⚡ [0.03초 대시보드 요약 API] oms_daily_summary 기반 필터 집계
     if (url.pathname === '/api/summary') {
       const startDate = url.searchParams.get('startDate');
       const endDate = url.searchParams.get('endDate');
@@ -77,10 +69,8 @@ export default {
         });
       }
 
-      const client = new Client(DB_CONFIG);
+      const sql = postgres(DB_URL, { ssl: 'require', max: 1 });
       try {
-        await client.connect();
-
         let conditions = [`delivery_date >= $1::date AND delivery_date <= $2::date`];
         let params = [startDate, endDate];
         let pIdx = 3;
@@ -116,7 +106,7 @@ export default {
           }
         }
 
-        const sql = `
+        const queryStr = `
           SELECT 
             to_char(delivery_date, 'YYYY-MM-DD') AS delivery_date,
             SUM(total_qty)::bigint AS total_qty,
@@ -129,10 +119,9 @@ export default {
           ORDER BY delivery_date ASC;
         `;
 
-        const res = await client.query(sql, params);
-        await client.end();
+        const rows = await sql.unsafe(queryStr, params);
 
-        return new Response(JSON.stringify(res.rows), {
+        return new Response(JSON.stringify(rows), {
           headers: {
             ...corsHeaders,
             'Content-Type': 'application/json',
@@ -140,15 +129,16 @@ export default {
           }
         });
       } catch (err) {
-        try { await client.end(); } catch (e) {}
         return new Response(JSON.stringify({ error: err.message }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
+      } finally {
+        ctx.waitUntil(sql.end());
       }
     }
 
-    // 3. 정적 자산 및 기본 프록시 패스스루
+    // 3. 정적 파일(HTML, JS, CSS, JSON 등) 서빙
     return env.ASSETS ? env.ASSETS.fetch(request) : new Response('Not Found', { status: 404 });
   }
 };
