@@ -19,7 +19,7 @@ jobs:
       - name: 의존성 설치
         run: pip install pandas psycopg2-binary
 
-      - name: TiDB 최적화 덤프 (1일 분할 쿼리 & 25MB 한도 준수)
+      - name: TiDB 최적화 덤프 (파이썬 정렬 & 25MB 한도 준수)
         env:
           TIDB_DATABASE_URL: ${{ secrets.TIDB_DATABASE_URL }}
         run: |
@@ -45,20 +45,12 @@ jobs:
               json.dump(cal_data, f, ensure_ascii=False)
           print(f'✅ calendar_data.json 생성 완료: 총 {len(cal_data)}일치 ({os.path.getsize("calendar_data.json")} bytes)')
 
-          # 2. [대시보드 전용] 최근 10일치 일자 목록 확보
-          print('📥 최근 10개 배송일자 목록 조회 중...')
-          cur.execute('''
-              SELECT DISTINCT to_char(delivery_date, 'YYYY-MM-DD') 
-              FROM public.oms_orders 
-              WHERE delivery_date IS NOT NULL 
-              ORDER BY 1 DESC 
-              LIMIT 10;
-          ''')
-          recent_dates = [r[0] for r in cur.fetchall()]
-          recent_dates.reverse()
-          print(f'📅 대상 일자 ({len(recent_dates)}일): {recent_dates}')
+          # 2. [대시보드 전용] TiDB SQL 쿼리 없이 1단계 cal_data에서 최근 7일을 파이썬으로 즉시 추출
+          all_dates = sorted([d for d in cal_data.keys() if d and cal_data[d] > 0])
+          recent_dates = all_dates[-7:]
+          print(f'📅 최근 7개 배송일자 추출 대상: {recent_dates}')
 
-          # 3. TiDB 메모리 초과를 방지하기 위해 1일씩 안전하게 분할 추출
+          # 3. TiDB 메모리 부담 없이 1일씩 안전하게 조회 (ORDER BY 없음)
           all_rows = []
           cols = None
           sql = '''
@@ -89,7 +81,7 @@ jobs:
 
           df.to_json('oms_data.json', orient='records', force_ascii=False)
           size_mb = os.path.getsize('oms_data.json') / (1024 * 1024)
-          print(f'✅ oms_data.json 생성 완료: 총 {len(df):,}건 ({size_mb:.2f} MB, Cloudflare 25MB 한도 내 안착)')
+          print(f'✅ oms_data.json 생성 완료: 총 {len(df):,}건 ({size_mb:.2f} MB)')
           EOF
 
       - name: 저장소 푸시
